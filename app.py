@@ -578,7 +578,7 @@ label.check input { accent-color:var(--acento); }
   </section>
 
   <p class="pie">
-    Todo se ejecuta en tu ordenador. El token vive en memoria mientras dura la consulta y no se escribe en ningún fichero.
+    Todo se ejecuta en tu ordenador y no se guarda ninguna cookie de Steam. Si marcas «recordar», el token queda cifrado con DPAPI y solo lo puede leer tu usuario de Windows.
     <a href="#" id="detener">Detener la interfaz</a>
   </p>
 </main>
