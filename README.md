@@ -16,7 +16,7 @@ Steam fusiona todas las bibliotecas del grupo y no ofrece ningún filtro para ve
 
 1. Instala [Python 3.8 o superior](https://www.python.org/downloads/). En Windows, marca «Add python.exe to PATH».
 2. Doble clic en `iniciar.cmd`. Se abre una página en `127.0.0.1`.
-3. Pega el token (abajo se explica cómo) y pulsa **Actualizar**.
+3. Pega el token la primera vez. A partir de ahí se guarda cifrado y se reutiliza hasta que caduque: abres la app y se actualiza sola.
 
 Todo queda en tu ordenador. No hay servidor, no hay cuenta, no hay telemetría.
 
@@ -113,19 +113,21 @@ La API key es opcional y se saca gratis en `https://steamcommunity.com/dev/apike
 
 Los tres endpoints de familia están sin documentar. Funcionan hoy y pueden cambiar mañana.
 
-## Privacidad
+## Privacidad y seguridad
 
-- No se sube nada a ningún sitio.
-- El token no se escribe en disco.
-- `snapshot.json`, `historial.csv` y `novedades.*` guardan los SteamID convertidos en un hash de 10 caracteres, no los IDs reales. Los ficheros de datos están en `.gitignore`, igual que `library.csv`, `panel.html` y `prestados.*`.
+- **Ninguna cookie.** El programa no lee, no pide y no guarda cookies de Steam. No hay navegador embebido ni automatización del tuyo.
+- **El token se guarda cifrado.** Con la casilla «Recordar el token en este equipo», el JWT se cifra con DPAPI en `%LOCALAPPDATA%\SteamFamilies\token.bin`. Solo tu usuario de Windows puede descifrarlo, y el token muere solo a las 24 horas. La página trae un enlace **olvidar** para borrarlo.
+- **Nada sale de tu equipo.** No hay servidor propio ni telemetría: las únicas conexiones son a `api.steampowered.com` y `steamcommunity.com`.
+- **Identificadores en hash.** `snapshot.json`, `historial.csv` y `novedades.*` guardan los SteamID convertidos en un hash de 10 caracteres, no los IDs reales. Los ficheros de datos están en `.gitignore`, igual que `library.csv`, `panel.html` y `prestados.*`.
+- **El servidor local solo escucha en 127.0.0.1** y rechaza peticiones de otras webs por cabecera `Origin`.
 - Si compartes el panel, compartes la lista de juegos y tus horas jugadas. No lleva identificadores de nadie.
 
 ## Límites
 
-- Hay que repetir el token cada 24 horas.
+- El token caduca a las 24 horas. Con «recordar» no hay que pegarlo cada vez, pero un día sí y otro también.
 - Los free-to-play cuentan como biblioteca: un juego gratis reclamado también sale como novedad.
 - «Comprado», «key» y «regalo» no se distinguen: el endpoint solo dice que alguien lo tiene.
-- `rt_time_acquired` no se usa para fechar compras porque su significado no está documentado.
+- `rt_time_acquired` se usa como fecha de adquisición porque cuadra con compras reales, pero Valve no documenta su significado exacto.
 - Los juegos excluidos del préstamo por su dueño aparecen como bloqueados, no desaparecen.
 
 ## Créditos
