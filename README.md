@@ -1,102 +1,94 @@
 # steam-family-library
 
-Script de un solo archivo que exporta la biblioteca de Steam completa: los juegos que has comprado y los que te comparte tu familia con Steam Families. Genera un JSON y un CSV con el dueño de cada título.
+Exporta tu biblioteca familiar de Steam, separa lo que te prestan de lo que es tuyo y detecta qué ha entrado nuevo desde la última vez. Sin instalar nada más que Python, con una interfaz local en el navegador.
 
-## Por qué existe
+Steam fusiona todas las bibliotecas del grupo y no ofrece ningún filtro para ver solo lo prestado. Este programa sí.
 
-El endpoint público `IPlayerService/GetOwnedGames` solo devuelve los juegos que has comprado. No hay ningún parámetro que cambie eso: los juegos compartidos le son invisibles.
+## Lo que hace
 
-Los juegos que puedes jugar de verdad están detrás de otro endpoint, no documentado:
+- **Biblioteca completa**: todos los juegos que el grupo puede jugar, con la etiqueta `own` (tuyo) o `family` (de otro).
+- **Filtro de prestados**: qué no es tuyo, si se puede jugar ahora y por qué no.
+- **Novedades**: compara con la ejecución anterior y avisa de juegos nuevos, juegos que desaparecen y juegos que pasa a tener otro miembro.
+- **Nombres**: resuelve el alias de cada miembro, sin API key.
+- **Panel**: buscador sin acentos, filtros por origen y estado, orden por horas o última sesión, enlaces a la tienda.
 
-```
-IFamilyGroupsService/GetSharedLibraryApps/v1
-```
+## Empezar
 
-Con `include_own=true` devuelve la biblioteca familiar fusionada en una sola llamada y dice qué miembro es dueño de cada título.
+1. Instala [Python 3.8 o superior](https://www.python.org/downloads/). En Windows, marca «Add python.exe to PATH».
+2. Doble clic en `iniciar.cmd`. Se abre una página en `127.0.0.1`.
+3. Pega el token (abajo se explica cómo) y pulsa **Actualizar**.
 
-El cliente de Steam no tiene un filtro para ver solo lo prestado, así que la alternativa práctica es exportar y filtrar la columna `source` (`own` / `family`).
+Todo queda en tu ordenador. No hay servidor, no hay cuenta, no hay telemetría.
 
-## Requisitos
+### El token
 
-Python 3.8 o superior. Sin dependencias externas.
+1. Con la sesión de Steam abierta en el navegador, entra en `https://store.steampowered.com/pointssummary/ajaxgetasyncconfig`.
+2. Copia el valor de `webapi_token` (dentro de `data`).
+3. Pégalo en la interfaz.
 
-## Conseguir el token
+Es un JWT que caduca a las 24 horas. No se guarda en ningún fichero: vive en memoria mientras dura la consulta.
 
-`GetSharedLibraryApps` no acepta una API key normal de desarrollador. Necesita el `webapi_token` de una sesión web ya iniciada.
+## Qué genera
 
-1. Inicia sesión en Steam en el navegador.
-2. Abre `https://store.steampowered.com/pointssummary/ajaxgetasyncconfig`.
-3. Copia el valor de `webapi_token` (dentro de `data`).
+| Fichero | Contenido |
+|---|---|
+| `panel.html` | Panel completo, un solo fichero, sin conexión |
+| `library.csv` | Biblioteca entera con la columna `source` |
+| `prestados.csv` / `prestados.txt` | Solo lo que te prestan |
+| `novedades.txt` / `novedades.json` | Lo que cambió en la última ejecución |
+| `historial.csv` | Una fila por novedad, con fecha |
+| `snapshot.json` | Retrato de la biblioteca para poder comparar |
 
-Es un JWT válido unas 24 horas y lleva tu SteamID64 dentro, así que no hay que buscar nada más.
+Los CSV van en UTF-8 con BOM para que Excel respete los acentos.
 
-## Uso
-
-PowerShell:
-
-```
-$env:STEAM_WEBAPI_TOKEN='eyJ0eXAi...'
-python steam_family_library.py --include-free
-```
-
-Bash:
-
-```
-export STEAM_WEBAPI_TOKEN='eyJ0eXAi...'
-python3 steam_family_library.py --include-free
-```
-
-| Opción | Por defecto | Qué hace |
-|---|---|---|
-| `--json PATH` | `library.json` | Ruta del JSON |
-| `--csv PATH` | `library.csv` | Ruta del CSV |
-| `--include-free` | desactivado | Incluye juegos free-to-play |
-| `--include-non-games` | desactivado | Incluye herramientas, bandas sonoras y demos |
-| `--token TOKEN` | `$STEAM_WEBAPI_TOKEN` | Token en línea |
-
-## Salida
-
-`library.csv` se escribe en UTF-8 con BOM para que Excel respete los acentos, con una fila por juego ordenado por nombre:
-
-```csv
-appid,name,source,playable,exclude_reason,playtime_minutes,acquired,last_played,store_url
-242820,140,family,True,,0,2021-06-04,,https://store.steampowered.com/app/242820
-```
-
-Campos que conviene entender:
-
-- `source`: `own` si lo has comprado tú, `family` si viene de otro miembro. Un juego que tenéis dos se marca `own`.
-- `playable` y `exclude_reason`: los compartidos pueden estar bloqueados (excluido por el dueño, no elegible para compartir, restricción regional o de DRM).
-- `playtime_minutes` y `last_played` son tus horas, no las del dueño.
-
-`library.json` lleva lo mismo más `owner_steamids`, la lista de miembros que poseen cada juego.
-
-## Filtrar solo lo prestado es una línea:
-
-```python
-import csv
-rows = list(csv.DictReader(open("library.csv", encoding="utf-8")))
-prestados = [r for r in rows if r["source"] == "family"]
-```
-
-## Panel HTML
-
-`panel.py` convierte el CSV en un `panel.html` de un solo fichero, sin dependencias ni conexión: buscador que ignora acentos, filtro por origen (prestados, tuyos), por estado (jugable, bloqueado, ya jugado, sin estrenar) y orden por nombre, horas o última sesión. Los datos van incrustados.
+## Uso desde la terminal
 
 ```
-python panel.py library.csv panel.html
+$env:STEAM_WEBAPI_TOKEN = "eyJ0eXAi..."
+python steam_family_library.py --datos .
+python panel.py --datos .
 ```
+
+Opciones de `steam_family_library.py`:
+
+| Opción | Para qué |
+|---|---|
+| `--datos RUTA` | Carpeta de salida (por defecto, la actual) |
+| `--token TOKEN` | Token en línea, sin variable de entorno |
+| `--api-key CLAVE` | API key opcional de Steam, resuelve nombres sin límites |
+| `--include-free` | Incluye free-to-play |
+| `--include-non-games` | Incluye herramientas, bandas sonoras y demos |
+| `--sin-nombres` | No consulta alias (más rápido) |
+| `--sin-historial` | No toca snapshot, novedades ni historial |
+
+La API key es opcional y se saca gratis en `https://steamcommunity.com/dev/apikey`. Sin ella, los nombres salen del endpoint de la comunidad de Steam, que a veces responde 429 y deja «Miembro 1», «Miembro 2» hasta la siguiente ejecución.
+
+## Cómo funciona
+
+1. El token es un JWT firmado por Steam; su campo `sub` es tu SteamID64 y `exp` la caducidad.
+2. `IFamilyGroupsService/GetFamilyGroupForUser` devuelve el id del grupo y sus miembros.
+3. `IFamilyGroupsService/GetSharedLibraryApps` con `include_own=true` devuelve todas las apps del grupo con `owner_steamids`, `exclude_reason` y `rt_playtime`.
+4. Si tu SteamID está entre los dueños, el juego es `own`; si no, `family`.
+5. `panel.py` incrusta los datos en un HTML y filtra en JavaScript.
+6. Las novedades son una comparación entre el `snapshot.json` anterior y el actual.
+
+Los tres endpoints de familia están sin documentar. Funcionan hoy y pueden cambiar mañana.
 
 ## Privacidad
 
-`library.json` contiene tu SteamID64 y los de todos los miembros de tu grupo familiar. Trátalo como dato personal: el `.gitignore` de este repo ya lo excluye, junto con los CSV generados y cualquier fichero de token.
+- No se sube nada a ningún sitio.
+- El token no se escribe en disco.
+- `snapshot.json`, `historial.csv` y `novedades.*` guardan los SteamID convertidos en un hash de 10 caracteres, no los IDs reales. Los ficheros de datos están en `.gitignore`, igual que `library.csv`, `panel.html` y `prestados.*`.
+- Si compartes el panel, compartes la lista de juegos y tus horas jugadas. No lleva identificadores de nadie.
 
-## Limitaciones
+## Límites
 
-- El endpoint no está documentado. Valve puede cambiarlo sin avisar.
-- No devuelve géneros, etiquetas, notas ni fechas de lanzamiento. Para eso hace falta una segunda pasada sobre `store.steampowered.com/api/appdetails`, limitada a unas 200 peticiones cada 5 minutos.
-- Solo funciona con Steam Families. Si tu cuenta sigue en el sistema antiguo de préstamo familiar, no hay nada que leer.
+- Hay que repetir el token cada 24 horas.
+- Los free-to-play cuentan como biblioteca: un juego gratis reclamado también sale como novedad.
+- «Comprado», «key» y «regalo» no se distinguen: el endpoint solo dice que alguien lo tiene.
+- `rt_time_acquired` no se usa para fechar compras porque su significado no está documentado.
+- Los juegos excluidos del préstamo por su dueño aparecen como bloqueados, no desaparecen.
 
 ## Créditos
 
-Basado en [salah153/steam-family-library](https://github.com/salah153/steam-family-library), bajo licencia MIT. Ver `LICENSE`.
+Basado en [salah153/steam-family-library](https://github.com/salah153/steam-family-library). MIT, ver `LICENSE`.

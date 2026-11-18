@@ -2,6 +2,11 @@ library.json
 library.csv
 prestados.csv
 prestados.txt
+panel.html
+novedades.json
+novedades.txt
+historial.csv
+snapshot.json
 token.txt
 *.token
 .env
