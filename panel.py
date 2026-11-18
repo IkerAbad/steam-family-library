@@ -101,6 +101,7 @@ def main():
             "wf": nov.get("fecha", ""),
             "g": bool(e.get("gratis")) if e else False,
             "v": (por_appid.get(appid) or {}).get("v", ""),
+            "q": r["acquired"],
         })
 
     prestados = [j for j in juegos if j["s"] == "family"]
@@ -183,6 +184,8 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
 .nuevo { color:var(--acento); border-color:#2b5878; background:#14222c; }
 .fuera { color:var(--rojo); border-color:#5c2f2f; background:#241717; }
 .dim { color:var(--suave); }
+.atajo { background:#22303c; color:var(--acento); border:1px solid #2b5878; border-radius:6px; padding:7px 12px; font:inherit; cursor:pointer; }
+.atajo:hover { background:#2a3d4d; }
 #vacio { padding:30px 24px; color:var(--suave); }
 </style>
 </head>
@@ -210,12 +213,20 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
     <option value="sinestrenar">Sin estrenar</option>
   </select>
   <select id="orden">
+    <option value="anadido">Anadido (mas reciente)</option>
     <option value="nombre">Nombre A-Z</option>
     <option value="horas">Mas horas jugadas</option>
     <option value="reciente">Ultima sesion</option>
     <option value="dueno">Dueno A-Z</option>
   </select>
+  <select id="antiguedad">
+    <option value="todo">Cualquier fecha</option>
+    <option value="30">Anadidos en 30 dias</option>
+    <option value="90">Anadidos en 90 dias</option>
+    <option value="anio">Anadidos este anio</option>
+  </select>
   <label class="check"><input type="checkbox" id="soloNuevos"> Solo novedades</label>
+  <button type="button" id="presetCompras" class="atajo">Compras de la familia (90 dias)</button>
 </div>
 <div id="resumen"></div>
 <table>
@@ -227,7 +238,7 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
       <th>Estado</th>
       <th class="der">Tus horas</th>
       <th class="der">Ultima sesion</th>
-      <th class="der">Desde</th>
+      <th class="der">Anadido</th>
     </tr>
   </thead>
   <tbody id="cuerpo"></tbody>
@@ -252,10 +263,14 @@ const totales = {
   horas: DATOS.filter(d => d.s === "family").reduce((a, d) => a + d.m, 0),
   jugados: DATOS.filter(d => d.s === "family" && d.m > 0).length
 };
+const hoyISO = new Date().toISOString().slice(0, 10);
+const isoDias = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+const recientesAnio = DATOS.filter(d => d.q && d.q >= hoyISO.slice(0, 4) + "-01-01").length;
 $("stats").innerHTML =
   "<b>" + totales.juegos + "</b> juegos &middot; <b>" + totales.prestados + "</b> prestados &middot; " +
   "<b>" + totales.jugables + "</b> jugables ahora &middot; <b>" + totales.jugados + "</b> ya jugados de ellos &middot; " +
-  "<b>" + (totales.horas / 60).toFixed(1).replace(".", ",") + "</b> h acumuladas en prestados";
+  "<b>" + (totales.horas / 60).toFixed(1).replace(".", ",") + "</b> h acumuladas en prestados &middot; " +
+  "<b>" + recientesAnio + "</b> anadidos este anio";
 
 if (HAY_NOV) {
   const nuevos = DATOS.filter(d => d.w === "nuevo").length;
@@ -273,12 +288,19 @@ function pinta() {
   const origen = $("origen").value;
   const estado = $("estado").value;
   const orden = $("orden").value;
+  const antiguedad = $("antiguedad").value;
   const soloNuevos = $("soloNuevos").checked;
+
+  let corte = "";
+  if (antiguedad === "30") corte = isoDias(30);
+  else if (antiguedad === "90") corte = isoDias(90);
+  else if (antiguedad === "anio") corte = hoyISO.slice(0, 4) + "-01-01";
 
   let lista = DATOS.filter(d => {
     if (q && !d.b.includes(q)) return false;
     if (origen !== "todo" && d.s !== origen) return false;
     if (soloNuevos && d.w !== "nuevo") return false;
+    if (corte && !(d.q && d.q >= corte)) return false;
     switch (estado) {
       case "jugable": if (!d.p) return false; break;
       case "bloqueado": if (d.p) return false; break;
@@ -288,7 +310,8 @@ function pinta() {
     return true;
   });
 
-  if (orden === "horas") lista.sort((a, b) => b.m - a.m || a.n.localeCompare(b.n, "es"));
+  if (orden === "anadido") lista.sort((a, b) => (b.q || "").localeCompare(a.q || "") || a.n.localeCompare(b.n, "es"));
+  else if (orden === "horas") lista.sort((a, b) => b.m - a.m || a.n.localeCompare(b.n, "es"));
   else if (orden === "reciente") lista.sort((a, b) => (b.u || "").localeCompare(a.u || "") || a.n.localeCompare(b.n, "es"));
   else if (orden === "dueno") lista.sort((a, b) => (a.d || "zz").localeCompare(b.d || "zz", "es") || a.n.localeCompare(b.n, "es"));
   else lista.sort((a, b) => a.n.localeCompare(b.n, "es"));
@@ -371,7 +394,8 @@ function pinta() {
 
     const td7 = document.createElement("td");
     td7.className = "der dim";
-    td7.textContent = fecha(d.v);
+    td7.textContent = fecha(d.q);
+    td7.title = "Fecha en la que Steam dice que se adquirio";
 
     tr.append(td1, td2, td3, td4, td5, td6, td7);
     frag.appendChild(tr);
@@ -379,9 +403,18 @@ function pinta() {
   cuerpo.replaceChildren(frag);
 }
 
-["q", "origen", "estado", "orden", "soloNuevos"].forEach(id => $(id).addEventListener("input", pinta));
+["q", "origen", "estado", "orden", "antiguedad", "soloNuevos"].forEach(id => $(id).addEventListener("input", pinta));
 $("verNuevos").addEventListener("click", () => {
   $("soloNuevos").checked = !$("soloNuevos").checked;
+  pinta();
+});
+$("presetCompras").addEventListener("click", () => {
+  $("q").value = "";
+  $("origen").value = "family";
+  $("estado").value = "todo";
+  $("antiguedad").value = "90";
+  $("orden").value = "anadido";
+  $("soloNuevos").checked = false;
   pinta();
 });
 pinta();
