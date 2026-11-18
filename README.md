@@ -37,6 +37,8 @@ El código es Python estándar sin dependencias, así que no hay nada que instal
 2. Copia el valor de `webapi_token` (dentro de `data`).
 3. Pégalo en la interfaz.
 
+Atajo: en la propia interfaz, dentro de «Copiar el token en un solo clic», arrastra el botón **Copiar token** a la barra de marcadores. Luego, en la página del token, pulsa ese marcador: deja el token en el portapapeles (o lo muestra solo para copiarlo) y vuelves a la interfaz a pulsar **Pegar**.
+
 Es un JWT que caduca a las 24 horas. No se guarda en ningún fichero: vive en memoria mientras dura la consulta.
 
 ## Qué genera
