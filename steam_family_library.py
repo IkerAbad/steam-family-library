@@ -137,7 +137,11 @@ def nombres(steamids, previos=None, api_key=""):
             pass
 
     pendientes = [s for s in faltan if s not in out]
-    if pendientes:
+    for espera in (0, 2, 6):
+        if not pendientes:
+            break
+        if espera:
+            time.sleep(espera)
         try:
             url = "https://steamcommunity.com/actions/ajaxresolveusers?steamids=" + ",".join(pendientes)
             req = urllib.request.Request(url, headers={"User-Agent": UA})
@@ -148,6 +152,7 @@ def nombres(steamids, previos=None, api_key=""):
                         out[sid] = u["persona_name"].strip()
         except Exception:
             pass
+        pendientes = [s for s in pendientes if s not in out]
 
     return out
 
@@ -207,12 +212,15 @@ def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api
     alias.setdefault(yo, "tú")
 
     juegos, csv_filas, snapshot = [], [], {}
+    previos_juegos = (previo or {}).get("juegos") or {}
+    hoy = datetime.now().strftime("%Y-%m-%d")
     for a in apps:
         appid = a.get("appid")
         duenos = [str(o) for o in a.get("owner_steamids", [])]
         motivo = a.get("exclude_reason", 0)
         nombre = a.get("name", "")
         propio = yo in duenos
+        antes = previos_juegos.get(str(appid)) or {}
         juego = {
             "appid": appid,
             "name": nombre,
@@ -231,6 +239,8 @@ def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api
             "n": nombre,
             "o": sorted(juego["owners"]),
             "p": juego["playable"],
+            # se conserva la fecha en la que lo vimos por primera vez
+            "v": antes.get("v") or hoy,
         }
 
     juegos.sort(key=lambda g: g["name"].lower())
@@ -250,6 +260,22 @@ def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api
             "juegos": snapshot,
         },
     }
+
+
+def es_gratis(appid):
+    """True/False si la ficha de la tienda lo dice; None si no se puede saber."""
+    try:
+        url = (f"https://store.steampowered.com/api/appdetails?appids={appid}"
+               "&filters=basic&l=spanish")
+        req = urllib.request.Request(url, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            datos = json.load(r)
+        info = (datos.get(str(appid)) or {}).get("data") or {}
+        if "is_free" in info:
+            return bool(info["is_free"])
+    except Exception:
+        pass
+    return None
 
 
 def comparar(antes, despues, yo, alias):
@@ -322,8 +348,9 @@ def chivato(eventos, ahora):
     if not eventos:
         lineas.append("Sin cambios desde la ultima vez.")
     for e in eventos:
+        extra = "  [gratis]" if e.get("gratis") else ""
         if e["evento"] == "nuevo":
-            lineas.append(f"+ {e['nombre']}  (de {de(e)})")
+            lineas.append(f"+ {e['nombre']}  (de {de(e)}){extra}")
         elif e["evento"] == "nuevo_dueno":
             lineas.append(f"= {e['nombre']}  (ahora tambien de {de(e)})")
         else:
@@ -340,6 +367,7 @@ def main():
     p.add_argument("--sin-nombres", action="store_true", help="no consulta los alias de los miembros")
     p.add_argument("--api-key", default="", help="opcional, API key de Steam (ver README): resuelve nombres sin limites")
     p.add_argument("--sin-historial", action="store_true", help="no toca historial.csv ni novedades")
+    p.add_argument("--sin-precios", action="store_true", help="no consulta la tienda para marcar los juegos gratis")
     args = p.parse_args()
 
     for flujo in (sys.stdout, sys.stderr):
@@ -385,6 +413,12 @@ def main():
     if not args.sin_historial:
         if previo:
             eventos = comparar(previo, datos_nuevos["snapshot"], datos_nuevos["yo"], datos_nuevos["alias"])
+            if eventos and not args.sin_precios:
+                for e in [x for x in eventos if x["evento"] == "nuevo"][:25]:
+                    gratis = es_gratis(e["appid"])
+                    if gratis is not None:
+                        e["gratis"] = gratis
+                    time.sleep(1.1)
         try:
             ruta_snap.write_text(json.dumps(datos_nuevos["snapshot"], ensure_ascii=False, indent=1), encoding="utf-8")
             (datos / "novedades.json").write_text(json.dumps({

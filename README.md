@@ -52,6 +52,21 @@ Es un JWT que caduca a las 24 horas. No se guarda en ningún fichero: vive en me
 
 Los CSV van en UTF-8 con BOM para que Excel respete los acentos.
 
+El panel añade la columna **Desde** (el día en que ese juego apareció por primera vez en la biblioteca familiar), la marca **nuevo** en lo que entró en la última ejecución y **gratis** cuando la ficha de Steam lo marca como free-to-play, para no confundir un reclamo gratuito con una compra.
+
+## Pruebas
+
+```
+python -m unittest discover -s pruebas -v
+```
+
+13 pruebas de la lógica, sin red: comparación de novedades, etiquetas, nombres, textos, validación de rutas y generación del panel.
+
+En cada `push`, GitHub Actions ejecuta además:
+
+- **Linux**: Ubuntu 22.04 con Python 3.8 y Ubuntu latest con Python 3.12.
+- **Windows**: Python 3.9 y 3.12, incluido el lanzador `.cmd` real, comprobando que responde y que no deja procesos vivos.
+
 ## Uso desde la terminal
 
 ```
@@ -71,6 +86,7 @@ Opciones de `steam_family_library.py`:
 | `--include-non-games` | Incluye herramientas, bandas sonoras y demos |
 | `--sin-nombres` | No consulta alias (más rápido) |
 | `--sin-historial` | No toca snapshot, novedades ni historial |
+| `--sin-precios` | No consulta la tienda para marcar los juegos gratis |
 
 La API key es opcional y se saca gratis en `https://steamcommunity.com/dev/apikey`. Sin ella, los nombres salen del endpoint de la comunidad de Steam, que a veces responde 429 y deja «Miembro 1», «Miembro 2» hasta la siguiente ejecución. En la interfaz hay un desplegable para pegarla sin guardarla en disco.
 

@@ -99,6 +99,8 @@ def main():
             "d": dueno(r),
             "w": e["evento"] if e else "",
             "wf": nov.get("fecha", ""),
+            "g": bool(e.get("gratis")) if e else False,
+            "v": (por_appid.get(appid) or {}).get("v", ""),
         })
 
     prestados = [j for j in juegos if j["s"] == "family"]
@@ -160,11 +162,12 @@ label.check input { accent-color:var(--acento); }
 #resumen { padding:2px 24px 10px; color:var(--suave); font-size:13px; }
 table { width:100%; border-collapse:collapse; table-layout:fixed; }
 thead th { position:sticky; top:0; background:var(--panel); text-align:left; padding:9px 12px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--suave); border-bottom:1px solid var(--borde); user-select:none; }
-thead th:nth-child(2) { width:170px; }
-thead th:nth-child(3) { width:110px; }
+thead th:nth-child(2) { width:150px; }
+thead th:nth-child(3) { width:100px; }
 thead th:nth-child(4) { width:180px; }
 thead th:nth-child(5) { width:100px; }
 thead th:nth-child(6) { width:120px; }
+thead th:nth-child(7) { width:100px; }
 thead th.der { text-align:right; }
 tbody td { padding:8px 12px; border-bottom:1px solid #1e242c; vertical-align:middle; }
 tbody td:first-child { overflow:hidden; }
@@ -224,6 +227,7 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
       <th>Estado</th>
       <th class="der">Tus horas</th>
       <th class="der">Ultima sesion</th>
+      <th class="der">Desde</th>
     </tr>
   </thead>
   <tbody id="cuerpo"></tbody>
@@ -312,6 +316,13 @@ function pinta() {
       b.textContent = "nuevo";
       b.title = "Entro despues del " + d.wf;
       cont.appendChild(b);
+      if (d.g) {
+        const g = document.createElement("span");
+        g.className = "marca dim";
+        g.textContent = "gratis";
+        g.title = "La ficha de Steam lo marca como free-to-play";
+        cont.appendChild(g);
+      }
     } else if (d.w === "fuera") {
       const b = document.createElement("span");
       b.className = "marca fuera";
@@ -358,7 +369,11 @@ function pinta() {
     td6.className = "der dim";
     td6.textContent = fecha(d.u);
 
-    tr.append(td1, td2, td3, td4, td5, td6);
+    const td7 = document.createElement("td");
+    td7.className = "der dim";
+    td7.textContent = fecha(d.v);
+
+    tr.append(td1, td2, td3, td4, td5, td6, td7);
     frag.appendChild(tr);
   }
   cuerpo.replaceChildren(frag);
