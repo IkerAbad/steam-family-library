@@ -1,44 +1,49 @@
 #!/usr/bin/env python3
 """
-Export your full Steam library -- your own games plus every game shared with
-you through Steam Families -- to JSON and CSV.
+Exporta tu biblioteca familiar de Steam y detecta novedades entre ejecuciones.
 
-Steam's well-known IPlayerService/GetOwnedGames endpoint only ever returns
-games you personally own; family-shared titles are invisible to it. This
-script uses IFamilyGroupsService/GetSharedLibraryApps instead, which returns
-the merged family library and records which member owns each title.
+Steam fusiona tus juegos con los de tu familia y no ofrece ningún filtro para
+separarlos. El endpoint publico IPlayerService/GetOwnedGames solo devuelve los
+juegos que has comprado. Los compartidos viven en
+IFamilyGroupsService/GetSharedLibraryApps, sin documentar, y necesita el
+webapi_token de una sesion web.
 
-Requires Python 3.8+. No third-party dependencies.
+Ademas de exportar, guarda un retrato de la biblioteca (snapshot.json) y lo
+compara con el anterior: juegos nuevos, juegos que desaparecen y juegos que
+pasa a tener otro miembro.
 
-See README.md for how to obtain a token.
+Requiere Python 3.8+. Sin dependencias.
 
-    export STEAM_WEBAPI_TOKEN='eyJ0eXAi...'
-    python3 steam_family_library.py
-
-MIT licensed.
+    python steam_family_library.py --datos .
 """
 
 import argparse
 import base64
 import csv
+import hashlib
 import json
 import os
+import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from pathlib import Path
 
 API = "https://api.steampowered.com"
-
-# Values Steam returns in the `exclude_reason` field. 0 means the game is
-# shareable and playable by you right now.
+UA = "steam-family-library/2.0"
 EXCLUDE_REASONS = {
     0: "",
-    1: "excluded by owner",
-    2: "not eligible for sharing",
-    3: "region or DRM restricted",
+    1: "excluido por el dueno",
+    2: "no se puede compartir",
+    3: "restringido por region o DRM",
 }
+COLUMNAS = [
+    "appid", "name", "source", "playable", "exclude_reason",
+    "playtime_minutes", "acquired", "last_played", "store_url",
+]
 
 
 def die(msg):
@@ -46,176 +51,326 @@ def die(msg):
     sys.exit(1)
 
 
-def api_get(iface_method, params):
-    """Call a Steam web API GET endpoint and return its `response` object."""
-    url = f"{API}/{iface_method}/?" + urllib.parse.urlencode(params, doseq=True)
-    req = urllib.request.Request(
-        url, headers={"User-Agent": "steam-family-library/1.0"}
-    )
+def api_get(metodo, params):
+    url = f"{API}/{metodo}/?" + urllib.parse.urlencode(params, doseq=True)
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
-            payload = json.load(resp)
+            return json.load(resp).get("response", {})
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "replace")[:500]
-        hint = ""
-        if e.code in (401, 403):
-            hint = "\n\nA 401/403 nearly always means the token expired. Grab a fresh one."
-        die(f"{iface_method} returned HTTP {e.code}\n{body}{hint}")
+        cuerpo = e.read().decode("utf-8", "replace")[:400]
+        pista = "\nEl token caduca a las 24 h: saca uno nuevo." if e.code in (401, 403) else ""
+        die(f"{metodo} devolvio HTTP {e.code}\n{cuerpo}{pista}")
     except urllib.error.URLError as e:
-        die(f"could not reach the Steam API: {e.reason}")
-    return payload.get("response", {})
+        die(f"no se pudo conectar con la API de Steam: {e.reason}")
 
 
-def steamid_from_token(token):
-    """The webapi_token is a JWT whose `sub` claim is the account's SteamID64."""
-    parts = token.split(".")
-    if len(parts) != 3:
-        die("token does not look like a JWT -- copy only the webapi_token "
-            "value, without surrounding quotes or whitespace")
+def steamid_del_token(token):
+    partes = token.split(".")
+    if len(partes) != 3:
+        die("el token no parece un JWT. Copia solo el valor de webapi_token, sin comillas")
     try:
-        claims_b64 = parts[1] + "=" * (-len(parts[1]) % 4)  # restore padding
-        claims = json.loads(base64.urlsafe_b64decode(claims_b64))
+        relleno = partes[1] + "=" * (-len(partes[1]) % 4)
+        claims = json.loads(base64.urlsafe_b64decode(relleno))
     except Exception:
-        die("could not decode the token payload")
-
+        die("no se pudo leer el contenido del token")
     exp = claims.get("exp")
     if exp and datetime.now(tz=timezone.utc).timestamp() > exp:
-        die("that token has expired -- reload the token URL for a new one")
+        die("ese token ya ha caducado. Recarga la pagina del token para tener uno nuevo")
+    sid = claims.get("sub")
+    if not sid:
+        die("el token no lleva SteamID")
+    return str(sid)
 
-    steamid = claims.get("sub")
-    if not steamid:
-        die("token has no `sub` claim, so no SteamID could be read from it")
-    return steamid
+
+def etiqueta(steamid):
+    """Identificador estable sin exponer el SteamID: mismo numero siempre, sin nombre."""
+    return hashlib.sha256(steamid.encode()).hexdigest()[:10]
 
 
-def day(epoch):
-    """Steam's rt_* fields are unix seconds. 0 means never."""
+def nombres(steamids, previos=None, api_key=""):
+    """Alias publico de cada miembro. Sin API key: endpoint de la comunidad.
+
+    `previos` va por etiqueta (hash), no por SteamID, para no guardar los IDs.
+    429 significa que Steam ha frenado las peticiones: se devuelve lo que haya y
+    se reintenta en la siguiente ejecucion.
+    """
+    previos = dict(previos or {})
+    out = {}
+    faltan = []
+    for sid in steamids:
+        h = etiqueta(sid)
+        previo_nombre = previos.get(h, "")
+        if previo_nombre and not previo_nombre.startswith("Miembro "):
+            out[sid] = previo_nombre
+        else:
+            faltan.append(sid)
+    if not faltan:
+        return out
+
+    if api_key:
+        try:
+            params = urllib.parse.urlencode({"key": api_key, "steamids": ",".join(faltan)})
+            url = f"{API}/ISteamUser/GetPlayerSummaries/v2/?{params}"
+            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=20) as r:
+                for p in json.load(r).get("response", {}).get("players", []):
+                    sid = str(p.get("steamid", ""))
+                    if sid in faltan and p.get("personaname"):
+                        out[sid] = p["personaname"].strip()
+        except Exception:
+            pass
+
+    pendientes = [s for s in faltan if s not in out]
+    if pendientes:
+        try:
+            url = "https://steamcommunity.com/actions/ajaxresolveusers?steamids=" + ",".join(pendientes)
+            req = urllib.request.Request(url, headers={"User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                for u in json.load(r):
+                    sid = str(u.get("steamid", ""))
+                    if sid in pendientes and u.get("persona_name"):
+                        out[sid] = u["persona_name"].strip()
+        except Exception:
+            pass
+
+    return out
+
+
+def rellenar_huecos(alias, miembros, yo):
+    """Quien no se haya podido resolver sale como Miembro 1, 2... siempre el mismo."""
+    n = 0
+    for sid in miembros:
+        if sid == yo or sid in alias:
+            continue
+        n += 1
+        alias[sid] = f"Miembro {n}"
+    return alias
+
+
+def dia(epoch):
     if not epoch:
         return ""
     return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%d")
 
 
-def fetch(token, include_free, include_non_games):
-    steamid = steamid_from_token(token)
+def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api_key=""):
+    yo = steamid_del_token(token)
 
-    fam = api_get(
-        "IFamilyGroupsService/GetFamilyGroupForUser/v1",
-        {
-            "access_token": token,
-            "steamid": steamid,
-            "include_family_group_response": "true",
-        },
-    )
-    group_id = fam.get("family_groupid")
-    if not group_id or fam.get("is_not_member_of_any_group"):
-        die("this account is not in a Steam Family group, so there is no "
-            "shared library to read")
+    fam = api_get("IFamilyGroupsService/GetFamilyGroupForUser/v1", {
+        "access_token": token,
+        "steamid": yo,
+        "include_family_group_response": "true",
+    })
+    grupo_id = fam.get("family_groupid")
+    if not grupo_id or fam.get("is_not_member_of_any_group"):
+        die("esta cuenta no esta en ningun grupo familiar de Steam, asi que no hay biblioteca compartida")
 
-    group = fam.get("family_group", {})
-    members = [m.get("steamid") for m in group.get("members", [])]
-    print(f"SteamID64:    {steamid}")
-    print(f"Family group: {group.get('name', '?')} ({group_id}), "
-          f"{len(members)} members")
+    grupo = fam.get("family_group", {})
+    miembros = [str(m.get("steamid")) for m in grupo.get("members", [])]
 
-    # include_own folds your own games into the same list, so one call returns
-    # the whole picture. include_excluded keeps titles the owner has withheld
-    # from sharing, so you can see and filter them rather than silently
-    # missing them.
-    lib = api_get(
-        "IFamilyGroupsService/GetSharedLibraryApps/v1",
-        {
-            "access_token": token,
-            "family_groupid": group_id,
-            "include_own": "true",
-            "include_excluded": "true",
-            "include_free": str(bool(include_free)).lower(),
-            "include_non_games": str(bool(include_non_games)).lower(),
-            "language": "english",
-        },
-    )
+    lib = api_get("IFamilyGroupsService/GetSharedLibraryApps/v1", {
+        "access_token": token,
+        "family_groupid": grupo_id,
+        "include_own": "true",
+        "include_excluded": "true",
+        "include_free": str(bool(con_free)).lower(),
+        "include_non_games": str(bool(con_no_juegos)).lower(),
+        "language": "spanish",
+    })
     apps = lib.get("apps", [])
     if not apps:
-        die("the API returned zero apps -- the token may belong to a "
-            "different account than expected")
+        die("la API no devolvio ninguna app. Puede que el token sea de otra cuenta")
 
-    me = str(steamid)
-    games = []
+    alias = {}
+    if con_nombres:
+        todos = set(miembros)
+        for a in apps:
+            todos.update(str(o) for o in a.get("owner_steamids", []))
+        alias = nombres(sorted(todos), (previo or {}).get("nombres"), api_key)
+        alias = rellenar_huecos(alias, miembros, yo)
+    alias.setdefault(yo, "tú")
+
+    juegos, csv_filas, snapshot = [], [], {}
     for a in apps:
-        owners = [str(o) for o in a.get("owner_steamids", [])]
-        reason = a.get("exclude_reason", 0)
-        games.append({
-            "appid": a.get("appid"),
-            "name": a.get("name", ""),
-            "source": "own" if me in owners else "family",
-            "owned_by_me": me in owners,
-            "owner_steamids": owners,
-            "playable": reason == 0,
-            "exclude_reason": EXCLUDE_REASONS.get(reason, f"unknown ({reason})"),
+        appid = a.get("appid")
+        duenos = [str(o) for o in a.get("owner_steamids", [])]
+        motivo = a.get("exclude_reason", 0)
+        nombre = a.get("name", "")
+        propio = yo in duenos
+        juego = {
+            "appid": appid,
+            "name": nombre,
+            "source": "own" if propio else "family",
+            "playable": motivo == 0,
+            "exclude_reason": EXCLUDE_REASONS.get(motivo, f"desconocido ({motivo})"),
             "playtime_minutes": a.get("rt_playtime", 0),
-            "acquired": day(a.get("rt_time_acquired")),
-            "last_played": day(a.get("rt_last_played")),
-            "store_url": f"https://store.steampowered.com/app/{a.get('appid')}",
-        })
+            "acquired": dia(a.get("rt_time_acquired")),
+            "last_played": dia(a.get("rt_last_played")),
+            "store_url": f"https://store.steampowered.com/app/{appid}",
+            "owners": [etiqueta(o) for o in duenos],
+        }
+        juegos.append(juego)
+        csv_filas.append({k: v for k, v in juego.items() if k in COLUMNAS})
+        snapshot[str(appid)] = {
+            "n": nombre,
+            "o": sorted(juego["owners"]),
+            "p": juego["playable"],
+        }
 
-    games.sort(key=lambda g: g["name"].lower())
+    juegos.sort(key=lambda g: g["name"].lower())
+    csv_filas.sort(key=lambda g: g["name"].lower())
+
     return {
-        "fetched_at": datetime.now(tz=timezone.utc).isoformat(),
-        "steamid": steamid,
-        "family_groupid": group_id,
-        "family_name": group.get("name", ""),
-        "members": members,
-        "count": len(games),
-        "games": games,
+        "yo": etiqueta(yo),
+        "grupo": {"id": grupo_id, "nombre": grupo.get("name", ""), "miembros": len(miembros)},
+        "alias": {etiqueta(k): v for k, v in alias.items()},
+        "juegos": juegos,
+        "csv": csv_filas,
+        "snapshot": {
+            "fecha": datetime.now(tz=timezone.utc).isoformat(timespec="seconds"),
+            "yo": etiqueta(yo),
+            "grupo": grupo.get("name", ""),
+            "nombres": {etiqueta(k): v for k, v in alias.items()},
+            "juegos": snapshot,
+        },
     }
 
 
-CSV_COLUMNS = [
-    "appid", "name", "source", "playable", "exclude_reason",
-    "playtime_minutes", "acquired", "last_played", "store_url",
-]
+def comparar(antes, despues, yo, alias):
+    """Novedades entre dos retratos de la biblioteca."""
+    previos = (antes or {}).get("juegos", {})
+    actuales = despues.get("juegos", {})
+    eventos = []
+
+    def quien(ids):
+        otros = [i for i in ids if i != yo]
+        nombres = [alias.get(i, i) for i in otros]
+        return ", ".join(sorted(nombres)) if nombres else ""
+
+    for appid, j in actuales.items():
+        if appid not in previos:
+            eventos.append({
+                "evento": "nuevo",
+                "appid": int(appid),
+                "nombre": j["n"],
+                "quien": quien(j["o"]),
+                "propio": yo in j["o"],
+            })
+        else:
+            nuevos = set(j["o"]) - set(previos[appid]["o"])
+            if nuevos:
+                eventos.append({
+                    "evento": "nuevo_dueno",
+                    "appid": int(appid),
+                    "nombre": j["n"],
+                    "quien": quien(nuevos),
+                    "propio": yo in nuevos,
+                })
+
+    for appid, j in previos.items():
+        if appid not in actuales:
+            eventos.append({
+                "evento": "fuera",
+                "appid": int(appid),
+                "nombre": j["n"],
+                "quien": quien(j["o"]),
+                "propio": yo in j["o"],
+            })
+
+    eventos.sort(key=lambda e: (e["evento"], e["nombre"].lower()))
+    return eventos
 
 
-def write_csv(path, games):
-    with open(path, "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.DictWriter(f, fieldnames=CSV_COLUMNS, extrasaction="ignore")
+def escribir_csv(ruta, filas):
+    with open(ruta, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.DictWriter(f, fieldnames=COLUMNAS, extrasaction="ignore")
         w.writeheader()
-        w.writerows(games)
+        w.writerows(filas)
+
+
+def anotar_historial(ruta, eventos, ahora):
+    nuevo = not Path(ruta).exists()
+    with open(ruta, "a", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f)
+        if nuevo:
+            w.writerow(["fecha", "evento", "appid", "nombre", "quien", "propio"])
+        for e in eventos:
+            w.writerow([ahora, e["evento"], e["appid"], e["nombre"], e["quien"], "si" if e["propio"] else "no"])
+
+
+def chivato(eventos, ahora):
+    def de(e):
+        return e["quien"] or ("ti" if e["propio"] else "otro miembro")
+
+    lineas = [f"Novedades del {ahora}", ""]
+    if not eventos:
+        lineas.append("Sin cambios desde la ultima vez.")
+    for e in eventos:
+        if e["evento"] == "nuevo":
+            lineas.append(f"+ {e['nombre']}  (de {de(e)})")
+        elif e["evento"] == "nuevo_dueno":
+            lineas.append(f"= {e['nombre']}  (ahora tambien de {de(e)})")
+        else:
+            lineas.append(f"- {e['nombre']}  (ya no esta; era de {de(e)})")
+    return "\n".join(lineas) + "\n"
 
 
 def main():
-    p = argparse.ArgumentParser(
-        description="Export your Steam library including Family Sharing games."
-    )
-    p.add_argument("--json", default="library.json", help="JSON output path")
-    p.add_argument("--csv", default="library.csv", help="CSV output path")
-    p.add_argument("--include-free", action="store_true",
-                   help="include free-to-play titles")
-    p.add_argument("--include-non-games", action="store_true",
-                   help="include tools, soundtracks, demos and similar")
-    p.add_argument("--token", default=os.environ.get("STEAM_WEBAPI_TOKEN", ""),
-                   help="webapi_token (defaults to $STEAM_WEBAPI_TOKEN)")
+    p = argparse.ArgumentParser(description="Exporta la biblioteca familiar de Steam y detecta novedades.")
+    p.add_argument("--datos", default=".", help="carpeta donde guardar los ficheros (por defecto, la actual)")
+    p.add_argument("--token", default="", help="webapi_token (si no, variable STEAM_WEBAPI_TOKEN)")
+    p.add_argument("--include-free", action="store_true", help="incluye free-to-play")
+    p.add_argument("--include-non-games", action="store_true", help="incluye herramientas, bandas sonoras y demos")
+    p.add_argument("--sin-nombres", action="store_true", help="no consulta los alias de los miembros")
+    p.add_argument("--api-key", default="", help="opcional, API key de Steam (ver README): resuelve nombres sin limites")
+    p.add_argument("--sin-historial", action="store_true", help="no toca historial.csv ni novedades")
     args = p.parse_args()
 
-    token = args.token.strip().strip("\"'")
+    token = (args.token or os.environ.get("STEAM_WEBAPI_TOKEN", "")).strip().strip("\"'")
     if not token:
-        die("no token supplied. Set STEAM_WEBAPI_TOKEN or pass --token. "
-            "See the README for how to get one.")
+        die("falta el token. Pasalo con --token o en la variable STEAM_WEBAPI_TOKEN")
+    api_key = (args.api_key or os.environ.get("STEAM_API_KEY", "")).strip()
 
-    data = fetch(token, args.include_free, args.include_non_games)
-    games = data["games"]
+    datos = Path(args.datos).resolve()
+    datos.mkdir(parents=True, exist_ok=True)
+    ruta_snap = datos / "snapshot.json"
 
-    with open(args.json, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-    write_csv(args.csv, games)
+    previo = {}
+    if ruta_snap.exists():
+        try:
+            previo = json.loads(ruta_snap.read_text(encoding="utf-8"))
+        except Exception:
+            previo = {}
 
-    mine = sum(1 for g in games if g["owned_by_me"])
-    blocked = sum(1 for g in games if not g["playable"])
-    print(f"\n{len(games)} games")
-    print(f"  {mine} owned by you")
-    print(f"  {len(games) - mine} from family sharing")
-    print(f"  {blocked} not currently playable")
-    print(f"\nwrote {args.json} and {args.csv}")
+    datos_nuevos = descargar(token, args.include_free, args.include_non_games, not args.sin_nombres, previo, api_key)
+    escribir_csv(datos / "library.csv", datos_nuevos["csv"])
+
+    juegos = datos_nuevos["juegos"]
+    prestados = [g for g in juegos if not g["owners"] or datos_nuevos["yo"] not in g["owners"]]
+    print(f"Grupo: {datos_nuevos['grupo']['nombre']} ({datos_nuevos['grupo']['miembros']} miembros)")
+    print(f"{len(juegos)} juegos | {len(juegos) - len(prestados)} tuyos | {len(prestados)} prestados")
+
+    eventos, ahora = [], datetime.now().strftime("%Y-%m-%d %H:%M")
+    if not args.sin_historial:
+        if previo:
+            eventos = comparar(previo, datos_nuevos["snapshot"], datos_nuevos["yo"], datos_nuevos["alias"])
+        ruta_snap.write_text(json.dumps(datos_nuevos["snapshot"], ensure_ascii=False, indent=1), encoding="utf-8")
+        (datos / "novedades.json").write_text(json.dumps({
+            "fecha": ahora,
+            "eventos": eventos,
+        }, ensure_ascii=False, indent=1), encoding="utf-8")
+        (datos / "novedades.txt").write_text(chivato(eventos, ahora), encoding="utf-8")
+        anotar_historial(datos / "historial.csv", eventos, ahora)
+
+        if not previo:
+            print("primera ejecucion: guardado el retrato inicial, sin novedades")
+        else:
+            print(f"novedades: {len([e for e in eventos if e['evento'] == 'nuevo'])} nuevos, "
+                  f"{len([e for e in eventos if e['evento'] == 'fuera'])} fuera")
+
+    print(f"escrito {datos / 'library.csv'}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
