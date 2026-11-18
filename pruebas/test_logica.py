@@ -4,6 +4,7 @@
 """
 
 import csv
+import base64
 import json
 import os
 import pathlib
@@ -202,6 +203,49 @@ class PruebaEstado(unittest.TestCase):
             self.assertEqual(e["prestados"], 1)
             self.assertEqual(e["jugables"], 1)
             self.assertEqual(e["horas"], 0.5)
+
+
+class PruebaTokenGuardado(unittest.TestCase):
+    def jwt(self, exp):
+        carga = base64.urlsafe_b64encode(json.dumps({"exp": exp}).encode()).decode().rstrip("=")
+        return "x." + carga + ".y"
+
+    def test_caduca_legible(self):
+        self.assertTrue(app.caduca_token(self.jwt(1893456000)))
+
+    def test_caducado_pasado(self):
+        self.assertTrue(app.token_caducado(self.jwt(1000000000)))
+
+    def test_no_caducado_futuro(self):
+        self.assertFalse(app.token_caducado(self.jwt(2000000000)))
+
+    def test_basura_se_trata_como_caducado(self):
+        self.assertTrue(app.token_caducado("no.es.un.jwt"))
+
+    @unittest.skipUnless(os.name == "nt", "DPAPI solo existe en Windows")
+    def test_guardar_leer_y_olvidar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            original = app.ruta_token
+            app.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
+            try:
+                tok = self.jwt(2000000000)
+                self.assertTrue(app.guardar_token(tok))
+                self.assertEqual(app.leer_token(), tok)
+                app.olvidar_token()
+                self.assertIsNone(app.leer_token())
+            finally:
+                app.ruta_token = original
+
+    @unittest.skipUnless(os.name == "nt", "DPAPI solo existe en Windows")
+    def test_no_guarda_un_token_caducado(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            original = app.ruta_token
+            app.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
+            try:
+                app.guardar_token(self.jwt(1000000000))
+                self.assertIsNone(app.leer_token())
+            finally:
+                app.ruta_token = original
 
 
 if __name__ == "__main__":

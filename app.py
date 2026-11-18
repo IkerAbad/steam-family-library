@@ -11,12 +11,15 @@ ordenador: el unico trafico externo es a la API de Steam.
 """
 
 import argparse
+import base64
+import ctypes
 import json
 import os
 import subprocess
 import sys
 import threading
 import webbrowser
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -38,6 +41,113 @@ def leer_json(ruta):
         return json.loads(Path(ruta).read_text(encoding="utf-8"))
     except Exception:
         return {}
+
+
+class _BLOB(ctypes.Structure):
+    _fields_ = [("cbData", ctypes.c_uint32), ("pbData", ctypes.POINTER(ctypes.c_char))]
+
+
+def _blob(datos):
+    buf = ctypes.create_string_buffer(datos, len(datos))
+    return _BLOB(len(datos), ctypes.cast(buf, ctypes.POINTER(ctypes.c_char)))
+
+
+def _proteger(datos):
+    entrada = _blob(datos)
+    salida = _BLOB()
+    ok = ctypes.windll.crypt32.CryptProtectData(
+        ctypes.byref(entrada), "steam-families", None, None, None, 0, ctypes.byref(salida))
+    if not ok:
+        raise OSError("CryptProtectData ha fallado")
+    try:
+        return ctypes.string_at(salida.pbData, salida.cbData)
+    finally:
+        ctypes.windll.kernel32.LocalFree(salida.pbData)
+
+
+def _desproteger(datos):
+    entrada = _blob(datos)
+    salida = _BLOB()
+    ok = ctypes.windll.crypt32.CryptUnprotectData(
+        ctypes.byref(entrada), None, None, None, None, 0, ctypes.byref(salida))
+    if not ok:
+        raise OSError("CryptUnprotectData ha fallado")
+    try:
+        return ctypes.string_at(salida.pbData, salida.cbData)
+    finally:
+        ctypes.windll.kernel32.LocalFree(salida.pbData)
+
+
+def ruta_token():
+    base = os.environ.get("LOCALAPPDATA")
+    if not base:
+        return None
+    return Path(base) / "SteamFamilies" / "token.bin"
+
+
+def caduca_token(token):
+    """Fecha de caducidad legible del JWT, o cadena vacia si no se puede leer."""
+    try:
+        parte = token.split(".")[1]
+        parte += "=" * (-len(parte) % 4)
+        datos = json.loads(base64.urlsafe_b64decode(parte))
+        exp = datos.get("exp")
+        if exp:
+            return datetime.fromtimestamp(exp, tz=timezone.utc).astimezone().strftime("%d/%m/%Y %H:%M")
+    except Exception:
+        pass
+    return ""
+
+
+def token_caducado(token):
+    try:
+        parte = token.split(".")[1]
+        parte += "=" * (-len(parte) % 4)
+        datos = json.loads(base64.urlsafe_b64decode(parte))
+        exp = datos.get("exp")
+        return bool(exp) and datetime.now(tz=timezone.utc).timestamp() > exp
+    except Exception:
+        return True
+
+
+def guardar_token(token):
+    """Cifra el token con DPAPI: solo tu usuario de Windows puede descifrarlo."""
+    if os.name != "nt":
+        return False
+    ruta = ruta_token()
+    if ruta is None:
+        return False
+    try:
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_bytes(_proteger(token.encode("utf-8")))
+        return True
+    except Exception:
+        return False
+
+
+def leer_token():
+    if os.name != "nt":
+        return None
+    ruta = ruta_token()
+    if ruta is None or not ruta.exists():
+        return None
+    try:
+        token = _desproteger(ruta.read_bytes()).decode("utf-8").strip()
+    except Exception:
+        return None
+    if not token or token_caducado(token):
+        olvidar_token()
+        return None
+    return token
+
+
+def olvidar_token():
+    ruta = ruta_token()
+    try:
+        if ruta and ruta.exists():
+            ruta.unlink()
+    except OSError:
+        pass
 
 
 def carpeta_de_datos(texto):
@@ -204,6 +314,11 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/estado":
             self._enviar(200, estado(self.datos))
             return
+        if self.path == "/api/token":
+            guardado = leer_token()
+            self._enviar(200, {"ok": True, "token": guardado, "guardado": bool(guardado),
+                               "caduca": caduca_token(guardado) if guardado else ""})
+            return
         if self.path in FICHEROS:
             nombre, tipo = FICHEROS[self.path]
             ruta = self.datos / nombre
@@ -262,14 +377,24 @@ class Handler(BaseHTTPRequestHandler):
             if not ok:
                 self._enviar(500, {"ok": False, "error": mensaje})
                 return
+            if cuerpo.get("guardar", True):
+                guardar_token(token)
+            else:
+                olvidar_token()
             datos = estado(self.datos)
             datos["log"] = mensaje
+            datos["caduca"] = caduca_token(token)
             self._enviar(200, datos)
             return
 
         if self.path == "/api/detener":
             self._enviar(200, {"ok": True})
             threading.Thread(target=self.servidor.shutdown, daemon=True).start()
+            return
+
+        if self.path == "/api/olvidar":
+            olvidar_token()
+            self._enviar(200, {"ok": True})
             return
 
         self._enviar(404, {"ok": False, "error": "no existe"})
@@ -367,6 +492,10 @@ td.quien { color:var(--suave); }
 details summary { cursor:pointer; color:var(--suave); font-size:13px; }
 details ol { margin:8px 0 0 18px; padding:0; color:var(--suave); font-size:13px; }
 .pie { margin-top:26px; color:var(--suave); font-size:12px; }
+label.check { display:flex; align-items:center; gap:8px; color:var(--suave); font-size:13px; }
+label.check input { accent-color:var(--acento); }
+.seguridad { margin:8px 0 0 18px; padding:0; color:var(--suave); font-size:13px; }
+.seguridad li { margin-bottom:6px; }
 </style>
 </head>
 <body>
@@ -411,6 +540,15 @@ details ol { margin:8px 0 0 18px; padding:0; color:var(--suave); font-size:13px;
       </p>
     </details>
     <details style="margin-top:8px">
+      <summary>Que guarda y que no</summary>
+      <ul class="seguridad">
+        <li><b>Ninguna cookie.</b> El programa no lee, no pide y no guarda cookies de Steam.</li>
+        <li>El token se guarda cifrado con DPAPI en <code>%LOCALAPPDATA%\SteamFamilies\token.bin</code>. Solo tu usuario de Windows puede descifrarlo, y caduca solo en 24 h.</li>
+        <li>No se envia nada a ningun servidor propio: las unicas conexiones son a la API de Steam.</li>
+        <li>Puedes borrarlo cuando quieras con <b>olvidar</b>.</li>
+      </ul>
+    </details>
+    <details style="margin-top:8px">
       <summary>¿Los dueños salen como «Miembro 1»?</summary>
       <p style="color:var(--suave);font-size:13px;margin:8px 0">
         Steam limita las consultas de nombres cuando se piden muchas seguidas. Con una
@@ -420,6 +558,11 @@ details ol { margin:8px 0 0 18px; padding:0; color:var(--suave); font-size:13px;
       <input id="apikey" type="text" placeholder="API key de Steam (opcional)" autocomplete="off" spellcheck="false" style="width:100%">
     </details>
     <div id="estado"></div>
+    <label class="check" style="margin-top:10px">
+      <input type="checkbox" id="recordar" checked>
+      Recordar el token en este equipo, cifrado
+      <a href="#" id="olvidar" style="margin-left:10px">olvidar</a>
+    </label>
   </section>
 
   <section class="paso" id="resultado" hidden>
@@ -512,17 +655,19 @@ async function cargar() {
   } catch (e) {}
 }
 
-$("lanzar").addEventListener("click", async () => {
+async function lanzar(auto) {
   const token = $("token").value.trim();
   if (!token) { $("estado").textContent = "Pega antes el token."; return; }
   $("lanzar").disabled = true;
   $("estado").className = "";
-  $("estado").textContent = "Consultando Steam. La primera vez tarda unos segundos más porque busca los nombres de los miembros...";
+  $("estado").textContent = auto
+    ? "Token guardado en este equipo. Actualizando..."
+    : "Consultando Steam. La primera vez tarda unos segundos mas porque busca los nombres de los miembros...";
   try {
     const r = await fetch("/api/actualizar", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({token, api_key: $("apikey").value.trim()})
+      body: JSON.stringify({token, api_key: $("apikey").value.trim(), guardar: $("recordar").checked})
     });
     const d = await r.json();
     if (!d.ok) {
@@ -530,8 +675,10 @@ $("lanzar").addEventListener("click", async () => {
       $("estado").textContent = d.error || "No se pudo actualizar.";
       return;
     }
-    $("token").value = "";
-    $("estado").textContent = "Listo.";
+    if (!$("recordar").checked) $("token").value = "";
+    $("estado").textContent = d.caduca
+      ? "Listo. Token " + ($("recordar").checked ? "guardado, caduca el " : "válido hasta el ") + d.caduca + "."
+      : "Listo.";
     pintar(d);
   } catch (e) {
     $("estado").className = "error";
@@ -540,15 +687,36 @@ $("lanzar").addEventListener("click", async () => {
   } finally {
     $("lanzar").disabled = false;
   }
+}
+$("lanzar").addEventListener("click", () => lanzar(false));
+
+$("olvidar").addEventListener("click", async e => {
+  e.preventDefault();
+  try { await fetch("/api/olvidar", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"}); } catch (x) {}
+  $("token").value = "";
+  $("estado").className = "";
+  $("estado").textContent = "Token olvidado. En la proxima ejecucion tendras que pegarlo.";
 });
+
+async function arranque() {
+  try {
+    const r = await fetch("/api/token");
+    const d = await r.json();
+    if (d && d.token) {
+      $("token").value = d.token;
+      $("recordar").checked = true;
+      await lanzar(true);
+    }
+  } catch (e) {}
+  await cargar();
+}
+arranque();
 
 $("detener").addEventListener("click", async e => {
   e.preventDefault();
   try { await fetch("/api/detener", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"}); } catch (x) {}
   document.body.innerHTML = '<main><h1>Interfaz detenida</h1><p class="sub">Puedes cerrar esta pestaña. Para volver a abrirla, doble clic en iniciar.cmd.</p></main>';
 });
-
-cargar();
 </script>
 </body>
 </html>
