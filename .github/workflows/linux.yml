@@ -1,0 +1,150 @@
+name: Linux
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pruebas:
+    name: Ubuntu ${{ matrix.os }} con Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            python: "3.8"
+          - os: ubuntu-latest
+            python: "3.12"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Compila los tres scripts
+        run: python -m py_compile steam_family_library.py panel.py app.py
+
+      - name: Sintaxis del lanzador
+        run: |
+          sh -n iniciar.sh
+          chmod +x iniciar.sh
+
+      - name: Datos de prueba
+        run: |
+          python - <<'PY'
+          import csv, json, pathlib
+
+          d = pathlib.Path("datos")
+          d.mkdir(exist_ok=True)
+
+          columnas = ["appid", "name", "source", "playable", "exclude_reason",
+                      "playtime_minutes", "acquired", "last_played", "store_url"]
+          filas = [
+              {"appid": "10", "name": "Counter-Strike", "source": "own", "playable": "True",
+               "exclude_reason": "", "playtime_minutes": "120", "acquired": "2020-01-01",
+               "last_played": "2026-01-01", "store_url": "https://store.steampowered.com/app/10"},
+              {"appid": "20", "name": "Half-Life", "source": "family", "playable": "True",
+               "exclude_reason": "", "playtime_minutes": "0", "acquired": "2021-01-01",
+               "last_played": "", "store_url": "https://store.steampowered.com/app/20"},
+              {"appid": "30", "name": "DayZ", "source": "family", "playable": "False",
+               "exclude_reason": "excluido por el dueno", "playtime_minutes": "0",
+               "acquired": "2021-01-01", "last_played": "",
+               "store_url": "https://store.steampowered.com/app/30"},
+          ]
+          with (d / "library.csv").open("w", newline="", encoding="utf-8-sig") as f:
+              w = csv.DictWriter(f, fieldnames=columnas)
+              w.writeheader()
+              w.writerows(filas)
+
+          snap = {
+              "fecha": "2026-01-01T00:00:00+00:00",
+              "yo": "aaaaaaaaaa",
+              "grupo": "Pruebas",
+              "nombres": {"aaaaaaaaaa": "tu", "bbbbbbbbbb": "V"},
+              "juegos": {
+                  "10": {"n": "Counter-Strike", "o": ["aaaaaaaaaa"], "p": True},
+                  "20": {"n": "Half-Life", "o": ["bbbbbbbbbb"], "p": True},
+                  "30": {"n": "DayZ", "o": ["bbbbbbbbbb"], "p": False},
+              },
+          }
+          (d / "snapshot.json").write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8")
+
+          nov = {"fecha": "2026-01-01 10:00",
+                 "eventos": [{"evento": "nuevo", "appid": 20, "nombre": "Half-Life",
+                              "quien": "V", "propio": False}]}
+          (d / "novedades.json").write_text(json.dumps(nov, ensure_ascii=False), encoding="utf-8")
+          PY
+
+      - name: Genera el panel y comprueba el resultado
+        run: |
+          python panel.py --datos datos
+          python - <<'PY'
+          import csv, pathlib, sys
+
+          d = pathlib.Path("datos")
+          html = (d / "panel.html").read_text(encoding="utf-8")
+          assert "Biblioteca familiar de Steam" in html, "el panel no tiene el titulo"
+          assert "Half-Life" in html, "el panel no lleva los juegos"
+          assert "V" in html, "el panel no lleva los duenos"
+
+          filas = list(csv.DictReader((d / "prestados.csv").open(encoding="utf-8-sig")))
+          assert len(filas) == 2, f"prestados.csv deberia tener 2 filas, tiene {len(filas)}"
+
+          nombres = (d / "prestados.txt").read_text(encoding="utf-8").split()
+          assert "Half-Life" in nombres, "prestados.txt no lleva Half-Life"
+          assert "DayZ" not in nombres, "DayZ esta bloqueado y no deberia estar en la lista corta"
+          print("panel, csv y txt correctos")
+          PY
+
+      - name: Error esperado sin token
+        run: |
+          if python steam_family_library.py --datos datos; then
+            echo "deberia haber fallado sin token" >&2
+            exit 1
+          fi
+          python steam_family_library.py --datos datos 2>&1 | grep -q "falta el token"
+
+      - name: Arranca la interfaz y la sondea
+        run: |
+          python app.py --datos datos --sin-navegador --puerto 8099 &
+          PID=$!
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:8099/api/estado > estado.json; then break; fi
+            sleep 0.5
+          done
+
+          python - <<'PY'
+          import json
+          d = json.load(open("estado.json", encoding="utf-8"))
+          assert d["ok"] is True
+          assert d["juegos"] == 3, d
+          assert d["prestados"] == 2, d
+          print("api/estado correcta")
+          PY
+
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8099/)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8099/panel.html)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8099/nada)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{roto' http://127.0.0.1:8099/api/actualizar)" = "400"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:8099/api/actualizar)" = "400"
+
+          curl -sf -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:8099/api/detener > /dev/null
+          wait $PID || true
+
+      - name: El lanzador tambien arranca
+        run: |
+          ./iniciar.sh datos > lanzador.log 2>&1 &
+          PID=$!
+          OK=0
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:8087/api/estado > /dev/null; then OK=1; break; fi
+            sleep 0.5
+          done
+          curl -s -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:8087/api/detener > /dev/null || true
+          wait $PID || true
+          cat lanzador.log
+          test "$OK" = "1"
