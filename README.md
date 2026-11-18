@@ -10,7 +10,7 @@ Steam fusiona todas las bibliotecas del grupo y no ofrece ningún filtro para ve
 - **Filtro de prestados**: qué no es tuyo, si se puede jugar ahora y por qué no.
 - **Novedades**: compara con la ejecución anterior y avisa de juegos nuevos, juegos que desaparecen y juegos que pasa a tener otro miembro.
 - **Nombres**: resuelve el alias de cada miembro, sin API key.
-- **Panel**: buscador sin acentos, filtros por origen y estado, orden por horas o última sesión, enlaces a la tienda.
+- **Panel**: buscador sin acentos, filtros por origen, estado y antigüedad, orden por fecha de adquisición, horas o última sesión, y un atajo «Compras de la familia (90 días)». Enlaces a la tienda.
 
 ## Empezar
 
@@ -52,7 +52,7 @@ Es un JWT que caduca a las 24 horas. No se guarda en ningún fichero: vive en me
 
 Los CSV van en UTF-8 con BOM para que Excel respete los acentos.
 
-El panel añade la columna **Desde** (el día en que ese juego apareció por primera vez en la biblioteca familiar), la marca **nuevo** en lo que entró en la última ejecución y **gratis** cuando la ficha de Steam lo marca como free-to-play, para no confundir un reclamo gratuito con una compra.
+El panel añade la columna **Añadido** con la fecha de adquisición que devuelve Steam, la marca **nuevo** en lo que entró en la última ejecución y **gratis** cuando la ficha de Steam lo marca como free-to-play, para no confundir un reclamo gratuito con una compra. Por defecto ordena por fecha de adquisición, de más reciente a más antiguo, y el atajo **Compras de la familia (90 días)** deja solo lo que han añadido los demás en ese periodo.
 
 ## Pruebas
 

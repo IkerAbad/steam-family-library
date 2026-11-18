@@ -124,7 +124,7 @@ class PruebaPanel(unittest.TestCase):
                  "exclude_reason": "", "playtime_minutes": "60", "acquired": "",
                  "last_played": "2026-01-01", "store_url": "u"},
                 {"appid": "20", "name": "Prestado", "source": "family", "playable": "True",
-                 "exclude_reason": "", "playtime_minutes": "0", "acquired": "",
+                 "exclude_reason": "", "playtime_minutes": "0", "acquired": "2026-03-04",
                  "last_played": "", "store_url": "u"},
                 {"appid": "30", "name": "Bloqueado", "source": "family", "playable": "False",
                  "exclude_reason": "excluido", "playtime_minutes": "0", "acquired": "",
@@ -149,6 +149,8 @@ class PruebaPanel(unittest.TestCase):
             self.assertIn("Prestado", html)
             self.assertIn("V", html)
             self.assertIn('"v":"2026-02-01"', html)
+            self.assertIn('"q":"2026-03-04"', html)
+            self.assertIn("Anadido", html)
 
             prestados = list(csv.DictReader((d / "prestados.csv").open(encoding="utf-8-sig")))
             self.assertEqual(len(prestados), 2)
