@@ -21,6 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
+PROHIBIDOS = set('"<>|*?')
 FICHEROS = {
     "/panel.html": ("panel.html", "text/html; charset=utf-8"),
     "/library.csv": ("library.csv", "text/csv; charset=utf-8"),
@@ -38,6 +39,40 @@ def leer_json(ruta):
         return {}
 
 
+def carpeta_de_datos(texto):
+    """Comprueba la ruta antes de tocar nada y explica el problema en castellano."""
+    texto = (texto or "").strip()
+    if not texto:
+        raise SystemExit("la carpeta de datos esta vacia. Pasa --datos <ruta>.")
+    raros = sorted({c for c in texto if c in PROHIBIDOS})
+    if raros:
+        raise SystemExit(
+            f"la ruta de datos lleva caracteres no validos: {texto}\n"
+            f"sobran {', '.join(raros)}. Suele pasar cuando el .cmd pasa \"%~dp0\" "
+            "y la barra final se come la comilla: usa \"%~dp0.\"."
+        )
+    ruta = Path(texto).expanduser()
+    try:
+        ruta = ruta.resolve()
+    except OSError as e:
+        raise SystemExit(f"no puedo resolver la ruta {texto}: {e}")
+    if ruta.exists() and not ruta.is_dir():
+        raise SystemExit(f"{ruta} existe y no es una carpeta.")
+    try:
+        ruta.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        raise SystemExit(f"no puedo crear o abrir la carpeta {ruta}: {e}")
+    if not ruta.is_dir():
+        raise SystemExit(f"{ruta} no es una carpeta.")
+    try:
+        prueba = ruta / ".escritura.tmp"
+        prueba.write_text("ok", encoding="utf-8")
+        prueba.unlink()
+    except OSError as e:
+        raise SystemExit(f"la carpeta {ruta} no admite escritura: {e}")
+    return ruta
+
+
 def estado(datos: Path):
     snap = leer_json(datos / "snapshot.json")
     nov = leer_json(datos / "novedades.json")
@@ -49,10 +84,17 @@ def estado(datos: Path):
     csv_path = datos / "library.csv"
     if csv_path.exists():
         import csv as _csv
-        with csv_path.open(encoding="utf-8-sig", newline="") as f:
-            for r in _csv.DictReader(f):
-                if r["source"] == "family":
-                    horas += int(r["playtime_minutes"] or 0)
+        try:
+            with csv_path.open(encoding="utf-8-sig", newline="") as f:
+                for r in _csv.DictReader(f):
+                    if (r.get("source") or "") != "family":
+                        continue
+                    try:
+                        horas += int(float(r.get("playtime_minutes") or 0))
+                    except (TypeError, ValueError):
+                        pass
+        except Exception:
+            pass
     return {
         "ok": True,
         "primera": not bool(juegos),
@@ -69,25 +111,43 @@ def estado(datos: Path):
     }
 
 
-def ejecutar(datos: Path, token: str):
+def ejecutar(datos: Path, token: str, api_key: str = ""):
     entorno = dict(os.environ, STEAM_WEBAPI_TOKEN=token, PYTHONIOENCODING="utf-8")
+    if api_key:
+        entorno["STEAM_API_KEY"] = api_key
     pasos = [
         [sys.executable, str(AQUI / "steam_family_library.py"), "--datos", str(datos)],
         [sys.executable, str(AQUI / "panel.py"), "--datos", str(datos)],
     ]
     salida = []
     for cmd in pasos:
-        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
-                           errors="replace", env=entorno, timeout=300)
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                               errors="replace", env=entorno, timeout=300)
+        except subprocess.TimeoutExpired:
+            return False, ("La consulta ha tardado mas de 5 minutos y la he cortado. "
+                           "Suele ser la conexion con Steam; prueba otra vez.")
+        except FileNotFoundError:
+            return False, ("No encuentro python. Comprueba que esta instalado y en el PATH.")
+        except OSError as e:
+            return False, f"No pude lanzar el proceso: {e}"
         salida.append((r.stdout or "") + (r.stderr or ""))
         if r.returncode != 0:
             return False, (salida[-1].strip() or f"fallo el paso {cmd[1]}")
     return True, "\n".join(salida).strip()
 
 
+class Servidor(ThreadingHTTPServer):
+    # En Windows, SO_REUSEADDR deja que dos procesos escuchen el mismo puerto:
+    # mejor que falle y que la app busque el siguiente libre.
+    allow_reuse_address = False
+    daemon_threads = True
+
+
 class Handler(BaseHTTPRequestHandler):
     datos = Path(".")
     servidor = None
+
 
     def log_message(self, formato, *args):
         pass
@@ -107,6 +167,28 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(datos)
 
     def do_GET(self):
+        try:
+            self._get()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as e:
+            self._fallo(e)
+
+    def do_POST(self):
+        try:
+            self._post()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as e:
+            self._fallo(e)
+
+    def _fallo(self, e):
+        try:
+            self._enviar(500, {"ok": False, "error": f"Fallo interno: {type(e).__name__}: {e}"})
+        except Exception:
+            pass
+
+    def _get(self):
         if self.path in ("/", "/index.html"):
             self._enviar(200, PAGINA, "text/html; charset=utf-8")
             return
@@ -119,13 +201,21 @@ class Handler(BaseHTTPRequestHandler):
             if not ruta.exists():
                 self._enviar(404, {"ok": False, "error": f"todavia no existe {nombre}"})
                 return
-            self._enviar(200, ruta.read_bytes(), tipo,
+            try:
+                contenido = ruta.read_bytes()
+            except OSError as e:
+                self._enviar(500, {"ok": False, "error": f"no puedo leer {nombre}: {e}"})
+                return
+            self._enviar(200, contenido, tipo,
                          {"Content-Disposition": f'inline; filename="{nombre}"'})
             return
         self._enviar(404, {"ok": False, "error": "no existe"})
 
-    def do_POST(self):
-        largo = int(self.headers.get("Content-Length", 0))
+    def _post(self):
+        try:
+            largo = int(self.headers.get("Content-Length", 0) or 0)
+        except ValueError:
+            largo = 0
         if largo > 100_000:
             self._enviar(413, {"ok": False, "error": "cuerpo demasiado grande"})
             return
@@ -134,13 +224,23 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             self._enviar(400, {"ok": False, "error": "JSON invalido"})
             return
+        if not isinstance(cuerpo, dict):
+            self._enviar(400, {"ok": False, "error": "esperaba un objeto JSON"})
+            return
 
         if self.path == "/api/actualizar":
-            token = (cuerpo.get("token") or "").strip().strip("\"'")
+            token = str(cuerpo.get("token") or "").strip().strip("\"'")
             if not token:
                 self._enviar(400, {"ok": False, "error": "falta el token"})
                 return
-            ok, mensaje = ejecutar(self.datos, token)
+            if len(token) > 4000:
+                self._enviar(400, {"ok": False, "error": "eso no es un token"})
+                return
+            api_key = str(cuerpo.get("api_key") or "").strip()
+            if api_key and (len(api_key) > 64 or not all(c.isalnum() for c in api_key)):
+                self._enviar(400, {"ok": False, "error": "la API key no tiene buena pinta: son 32 caracteres en hexadecimal"})
+                return
+            ok, mensaje = ejecutar(self.datos, token, api_key)
             if not ok:
                 self._enviar(500, {"ok": False, "error": mensaje})
                 return
@@ -164,19 +264,25 @@ def main():
     p.add_argument("--sin-navegador", action="store_true")
     args = p.parse_args()
 
-    datos = Path(args.datos).resolve()
-    datos.mkdir(parents=True, exist_ok=True)
+    for flujo in (sys.stdout, sys.stderr):
+        try:
+            flujo.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+    datos = carpeta_de_datos(args.datos)
 
     Handler.datos = datos
     servidor = None
     for puerto in range(args.puerto, args.puerto + 12):
         try:
-            servidor = ThreadingHTTPServer(("127.0.0.1", puerto), Handler)
+            servidor = Servidor(("127.0.0.1", puerto), Handler)
             break
         except OSError:
             continue
     if servidor is None:
-        print("No he encontrado un puerto libre.", file=sys.stderr)
+        print("No he encontrado un puerto libre entre "
+              f"{args.puerto} y {args.puerto + 11}. Cierra la otra ventana de Steam Families.", file=sys.stderr)
         return 1
 
     Handler.servidor = servidor
@@ -185,11 +291,19 @@ def main():
     print(f"Interfaz: {url}")
     print("Cierra esta ventana (o pulsa Detener en la pagina) para terminar.")
     if not args.sin_navegador:
-        threading.Timer(0.6, lambda: webbrowser.open(url)).start()
+        def abrir():
+            try:
+                webbrowser.open(url)
+            except Exception:
+                pass
+        threading.Timer(0.6, abrir).start()
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:
         pass
+    except OSError as e:
+        print(f"El servidor se ha parado: {e}", file=sys.stderr)
+        return 1
     finally:
         servidor.server_close()
     return 0
@@ -265,6 +379,15 @@ details ol { margin:8px 0 0 18px; padding:0; color:var(--suave); font-size:13px;
       <button id="ver" type="button" class="sec">Mostrar</button>
       <button id="lanzar" type="button">Actualizar</button>
     </div>
+    <details style="margin-top:12px">
+      <summary>¿Los dueños salen como «Miembro 1»?</summary>
+      <p style="color:var(--suave);font-size:13px;margin:8px 0">
+        Steam limita las consultas de nombres cuando se piden muchas seguidas. Con una
+        <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">API key gratuita</a>
+        salen siempre. Solo se usa durante esta consulta y no se guarda.
+      </p>
+      <input id="apikey" type="text" placeholder="API key de Steam (opcional)" autocomplete="off" spellcheck="false" style="width:100%">
+    </details>
     <div id="estado"></div>
   </section>
 
@@ -339,7 +462,7 @@ $("lanzar").addEventListener("click", async () => {
     const r = await fetch("/api/actualizar", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({token})
+      body: JSON.stringify({token, api_key: $("apikey").value.trim()})
     });
     const d = await r.json();
     if (!d.ok) {
