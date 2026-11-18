@@ -10,3 +10,5 @@ snapshot.json
 token.txt
 *.token
 .env
+__pycache__/
+*.pyc
