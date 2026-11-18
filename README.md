@@ -71,12 +71,20 @@ Campos que conviene entender:
 
 `library.json` lleva lo mismo más `owner_steamids`, la lista de miembros que poseen cada juego.
 
-Filtrar solo lo prestado es una línea:
+## Filtrar solo lo prestado es una línea:
 
 ```python
 import csv
 rows = list(csv.DictReader(open("library.csv", encoding="utf-8")))
 prestados = [r for r in rows if r["source"] == "family"]
+```
+
+## Panel HTML
+
+`panel.py` convierte el CSV en un `panel.html` de un solo fichero, sin dependencias ni conexión: buscador que ignora acentos, filtro por origen (prestados, tuyos), por estado (jugable, bloqueado, ya jugado, sin estrenar) y orden por nombre, horas o última sesión. Los datos van incrustados.
+
+```
+python panel.py library.csv panel.html
 ```
 
 ## Privacidad
