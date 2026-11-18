@@ -379,6 +379,7 @@ details ol { margin:8px 0 0 18px; padding:0; color:var(--suave); font-size:13px;
     <p style="margin:0 0 10px">
       Abre <a href="https://store.steampowered.com/pointssummary/ajaxgetasyncconfig" target="_blank" rel="noopener">esta página</a>
       con la sesión de Steam iniciada y copia el valor de <code>webapi_token</code>.
+      Vale el token suelto o el JSON entero: el programa saca el token de donde esté.
     </p>
     <details>
       <summary>¿Por qué hace falta y qué es?</summary>
@@ -393,11 +394,23 @@ details ol { margin:8px 0 0 18px; padding:0; color:var(--suave); font-size:13px;
   <section class="paso">
     <h2>Paso 2 · Pégalo aquí</h2>
     <div class="fila">
-      <input id="token" type="password" placeholder="eyJ0eXAiOiJKV1Qi..." autocomplete="off" spellcheck="false">
+      <input id="token" type="password" placeholder="Token, o el JSON entero de esa pagina" autocomplete="off" spellcheck="false">
+      <button id="pegar" type="button" class="sec">Pegar</button>
       <button id="ver" type="button" class="sec">Mostrar</button>
       <button id="lanzar" type="button">Actualizar</button>
     </div>
     <details style="margin-top:12px">
+      <summary>Copiar el token en un solo clic</summary>
+      <p style="color:var(--suave);font-size:13px;margin:8px 0">
+        Arrastra este botón a la barra de marcadores:
+        <a id="marcador" href="#" style="display:inline-block;padding:5px 10px;border:1px solid #2b5878;border-radius:6px;background:#22303c;text-decoration:none">Copiar token</a>
+      </p>
+      <p style="color:var(--suave);font-size:13px;margin:8px 0">
+        Después, en la página del token de Steam, pulsa ese marcador: copia el token al portapapeles y te avisa.
+        Vuelve aquí y pulsa <b>Pegar</b>.
+      </p>
+    </details>
+    <details style="margin-top:8px">
       <summary>¿Los dueños salen como «Miembro 1»?</summary>
       <p style="color:var(--suave);font-size:13px;margin:8px 0">
         Steam limita las consultas de nombres cuando se piden muchas seguidas. Con una
@@ -435,6 +448,35 @@ $("ver").addEventListener("click", () => {
   const t = $("token");
   t.type = t.type === "password" ? "text" : "password";
   $("ver").textContent = t.type === "password" ? "Mostrar" : "Ocultar";
+});
+
+const CODIGO = 'javascript:(async()=>{const r=await fetch("https://store.steampowered.com/pointssummary/ajaxgetasyncconfig",{credentials:"include"});const j=await r.json();let t=(j.data&&j.data.webapi_token)||j.webapi_token||"";t=t.replace(/^"|"$/g,"");if(!t){alert("Primero inicia sesion en Steam.");return;}try{await navigator.clipboard.writeText(t);alert("Token copiado. Vuelve a Steam Families y pulsa Pegar.");}catch(e){prompt("Copia el token:",t);}})();';
+$("marcador").setAttribute("href", CODIGO);
+$("marcador").addEventListener("click", e => {
+  e.preventDefault();
+  alert("No lo pulses aqui: arrastralo a la barra de marcadores y usalo en la pagina del token de Steam.");
+});
+
+$("pegar").addEventListener("click", async () => {
+  $("estado").className = "";
+  $("estado").textContent = "Leyendo el portapapeles...";
+  let t = "";
+  try {
+    t = await Promise.race([
+      navigator.clipboard.readText(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("tarda demasiado")), 3000))
+    ]);
+  } catch (e) {
+    $("estado").className = "error";
+    $("estado").textContent = "El navegador no deja leer el portapapeles. Pega con Ctrl+V.";
+    return;
+  }
+  if (!t || !t.trim()) { $("estado").textContent = "El portapapeles esta vacio."; return; }
+  $("token").value = t.trim();
+  $("token").type = "password";
+  $("ver").textContent = "Mostrar";
+  $("estado").className = "";
+  $("estado").textContent = "Token pegado. Pulsa Actualizar.";
 });
 
 function pintar(d) {

@@ -81,6 +81,20 @@ def api_get(metodo, params):
         die(f"no se pudo conectar con la API de Steam: {e.reason}")
 
 
+def normaliza_token(texto):
+    """Acepta el token suelto, entre comillas o el JSON entero del endpoint."""
+    t = (texto or "").strip().strip("\"'")
+    if t.startswith("{"):
+        try:
+            datos = json.loads(t)
+            interno = (datos.get("data") or {}).get("webapi_token") or datos.get("webapi_token")
+            if interno:
+                t = str(interno).strip().strip("\"'")
+        except Exception:
+            pass
+    return t
+
+
 def steamid_del_token(token):
     partes = token.split(".")
     if len(partes) != 3:
@@ -376,7 +390,7 @@ def main():
         except Exception:
             pass
 
-    token = (args.token or os.environ.get("STEAM_WEBAPI_TOKEN", "")).strip().strip("\"'")
+    token = normaliza_token(args.token or os.environ.get("STEAM_WEBAPI_TOKEN", ""))
     if not token:
         die("falta el token. Pasalo con --token o en la variable STEAM_WEBAPI_TOKEN")
     api_key = (args.api_key or os.environ.get("STEAM_API_KEY", "")).strip()

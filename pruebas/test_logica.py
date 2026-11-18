@@ -68,6 +68,21 @@ class PruebaEtiqueta(unittest.TestCase):
         self.assertNotIn(sid, sfl.etiqueta(sid))
 
 
+class PruebaToken(unittest.TestCase):
+    def test_suelto(self):
+        self.assertEqual(sfl.normaliza_token("  abc.def.ghi  "), "abc.def.ghi")
+
+    def test_entre_comillas(self):
+        self.assertEqual(sfl.normaliza_token('"abc.def.ghi"'), "abc.def.ghi")
+
+    def test_json_entero(self):
+        crudo = '{"success":1,"data":{"webapi_token":"abc.def.ghi"}}'
+        self.assertEqual(sfl.normaliza_token(crudo), "abc.def.ghi")
+
+    def test_json_roto_no_revienta(self):
+        self.assertEqual(sfl.normaliza_token('{"roto":'), '{"roto":')
+
+
 class PruebaNombres(unittest.TestCase):
     def test_rellena_huecos_sin_tocar_el_tuyo(self):
         alias = sfl.rellenar_huecos({"bbb": "V"}, ["bbb", "ccc", "ddd"], "aaa")
