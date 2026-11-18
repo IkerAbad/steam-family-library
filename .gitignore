@@ -1,0 +1,7 @@
+library.json
+library.csv
+prestados.csv
+prestados.txt
+token.txt
+*.token
+.env
