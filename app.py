@@ -493,7 +493,8 @@ $("lanzar").addEventListener("click", async () => {
     pintar(d);
   } catch (e) {
     $("estado").className = "error";
-    $("estado").textContent = "No se pudo hablar con el servidor local: " + e.message;
+    $("estado").textContent = "No hay conexion con la ventana de Steam Families. Suele pasar si esa ventana se ha cerrado: " +
+      "cierra esta pestana, haz doble clic en actualizar.cmd y vuelve a pegar el token. (" + e.message + ")";
   } finally {
     $("lanzar").disabled = false;
   }
