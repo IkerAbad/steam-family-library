@@ -12,3 +12,4 @@ token.txt
 .env
 __pycache__/
 *.pyc
+snapshot.corrupto.json

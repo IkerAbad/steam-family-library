@@ -26,13 +26,40 @@ def main():
     p.add_argument("--datos", default=".", help="carpeta con library.csv y snapshot.json")
     args = p.parse_args()
 
-    datos = Path(args.datos).resolve()
+    import sys
+    for flujo in (sys.stdout, sys.stderr):
+        try:
+            flujo.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+    datos = Path(args.datos).expanduser()
+    raros = sorted({c for c in str(datos) if c in '"<>|*?'})
+    if raros:
+        raise SystemExit(f"la ruta {datos} lleva caracteres no validos ({', '.join(raros)})")
+    try:
+        datos = datos.resolve()
+    except OSError as e:
+        raise SystemExit(f"no puedo resolver {datos}: {e}")
+    if not datos.is_dir():
+        raise SystemExit(f"{datos} no es una carpeta")
+
     csv_path = datos / "library.csv"
     if not csv_path.exists():
         raise SystemExit(f"no encuentro {csv_path}. Ejecuta antes steam_family_library.py")
 
-    with csv_path.open(encoding="utf-8-sig", newline="") as f:
-        filas = list(csv.DictReader(f))
+    try:
+        with csv_path.open(encoding="utf-8-sig", newline="") as f:
+            filas = list(csv.DictReader(f))
+    except OSError as e:
+        raise SystemExit(f"no puedo leer {csv_path}: {e}")
+    except UnicodeDecodeError:
+        raise SystemExit(f"{csv_path} no parece un CSV en UTF-8. Borralo y vuelve a exportar.")
+    if not filas:
+        raise SystemExit(f"{csv_path} esta vacio. Vuelve a exportar.")
+    for obligatoria in ("appid", "name", "source"):
+        if obligatoria not in filas[0]:
+            raise SystemExit(f"{csv_path} no tiene la columna {obligatoria}. Vuelve a exportar.")
 
     snap = leer_json(datos / "snapshot.json", {})
     alias = snap.get("nombres") or {}
@@ -56,13 +83,17 @@ def main():
     for r in filas:
         appid = str(r["appid"])
         e = marca.get(appid)
+        try:
+            minutos = int(float(r.get("playtime_minutes") or 0))
+        except (TypeError, ValueError):
+            minutos = 0
         juegos.append({
             "n": r["name"],
             "a": appid,
             "s": r["source"],
             "p": r["playable"] == "True",
             "e": r["exclude_reason"],
-            "m": int(r["playtime_minutes"] or 0),
+            "m": minutos,
             "u": r["last_played"],
             "d": dueno(r),
             "w": e["evento"] if e else "",
@@ -71,16 +102,19 @@ def main():
 
     prestados = [j for j in juegos if j["s"] == "family"]
     prestados.sort(key=lambda j: j["n"].lower())
-    if prestados:
-        with (datos / "prestados.csv").open("w", encoding="utf-8-sig", newline="") as f:
-            campos = [k for k in filas[0].keys()]
-            w = csv.DictWriter(f, fieldnames=campos, extrasaction="ignore")
-            w.writeheader()
-            por_id = {str(r["appid"]): r for r in filas}
-            w.writerows(por_id[j["a"]] for j in prestados)
+    try:
+        if prestados:
+            with (datos / "prestados.csv").open("w", encoding="utf-8-sig", newline="") as f:
+                campos = [k for k in filas[0].keys()]
+                w = csv.DictWriter(f, fieldnames=campos, extrasaction="ignore")
+                w.writeheader()
+                por_id = {str(r["appid"]): r for r in filas}
+                w.writerows(por_id[j["a"]] for j in prestados)
 
-    jugables = sorted((j["n"] for j in prestados if j["p"]), key=str.lower)
-    (datos / "prestados.txt").write_text("\n".join(jugables) + "\n", encoding="utf-8")
+        jugables = sorted((j["n"] for j in prestados if j["p"]), key=str.lower)
+        (datos / "prestados.txt").write_text("\n".join(jugables) + "\n", encoding="utf-8")
+    except OSError as e:
+        raise SystemExit(f"no puedo escribir los ficheros de prestados en {datos}: {e}")
 
     blob = json.dumps(juegos, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     fecha_nov = nov.get("fecha", "")
@@ -92,7 +126,10 @@ def main():
     html = html.replace("__HAY_NOV__", "true" if hay_nov else "false")
 
     salida = datos / "panel.html"
-    salida.write_text(html, encoding="utf-8")
+    try:
+        salida.write_text(html, encoding="utf-8")
+    except OSError as e:
+        raise SystemExit(f"no puedo escribir {salida}: {e}")
     print(f"escrito {salida} ({salida.stat().st_size // 1024} KB, {len(juegos)} juegos, {len(prestados)} prestados)")
     return 0
 

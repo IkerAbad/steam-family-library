@@ -61,7 +61,17 @@ Opciones de `steam_family_library.py`:
 | `--sin-nombres` | No consulta alias (más rápido) |
 | `--sin-historial` | No toca snapshot, novedades ni historial |
 
-La API key es opcional y se saca gratis en `https://steamcommunity.com/dev/apikey`. Sin ella, los nombres salen del endpoint de la comunidad de Steam, que a veces responde 429 y deja «Miembro 1», «Miembro 2» hasta la siguiente ejecución.
+La API key es opcional y se saca gratis en `https://steamcommunity.com/dev/apikey`. Sin ella, los nombres salen del endpoint de la comunidad de Steam, que a veces responde 429 y deja «Miembro 1», «Miembro 2» hasta la siguiente ejecución. En la interfaz hay un desplegable para pegarla sin guardarla en disco.
+
+## Si algo falla
+
+- **La ventana se cierra al instante**: falta Python o no está en el PATH. Abre `cmd` y escribe `python --version`.
+- **«No he encontrado un puerto libre»**: tienes otra ventana de Steam Families abierta. Cierra la anterior.
+- **«La ruta de datos lleva caracteres no válidos»**: el lanzador está pasando `"%~dp0"` y la barra final se come la comilla. Tiene que ser `"%~dp0."`.
+- **«El token no parece un JWT»**: has copiado el JSON entero o una comilla de más. Es solo el valor de `webapi_token`.
+- **HTTP 401/403**: el token caducó. Recarga la página del token.
+- **«Miembro 1», «Miembro 2»**: Steam ha frenado la consulta de alias. Se reintenta solo en la siguiente ejecución.
+- **El retrato anterior estaba roto**: no pasa nada, se guarda como `snapshot.corrupto.json` y se empieza de cero sin inventar novedades.
 
 ## Cómo funciona
 

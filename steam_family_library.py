@@ -51,6 +51,22 @@ def die(msg):
     sys.exit(1)
 
 
+def carpeta(texto):
+    """Valida y prepara la carpeta de datos. Falla con un mensaje util, no con un traceback."""
+    raros = sorted({c for c in texto if c in '"<>|*?'})
+    if raros:
+        die(f"la ruta {texto} lleva caracteres no validos ({', '.join(raros)}). "
+            "Suele ser una comilla colada por la barra final de la ruta.")
+    try:
+        p = Path(texto).expanduser().resolve()
+        if p.exists() and not p.is_dir():
+            die(f"{p} existe y no es una carpeta")
+        p.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        die(f"no puedo usar la carpeta {texto}: {e}")
+    return p
+
+
 def api_get(metodo, params):
     url = f"{API}/{metodo}/?" + urllib.parse.urlencode(params, doseq=True)
     req = urllib.request.Request(url, headers={"User-Agent": UA})
@@ -326,24 +342,39 @@ def main():
     p.add_argument("--sin-historial", action="store_true", help="no toca historial.csv ni novedades")
     args = p.parse_args()
 
+    for flujo in (sys.stdout, sys.stderr):
+        try:
+            flujo.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     token = (args.token or os.environ.get("STEAM_WEBAPI_TOKEN", "")).strip().strip("\"'")
     if not token:
         die("falta el token. Pasalo con --token o en la variable STEAM_WEBAPI_TOKEN")
     api_key = (args.api_key or os.environ.get("STEAM_API_KEY", "")).strip()
 
-    datos = Path(args.datos).resolve()
-    datos.mkdir(parents=True, exist_ok=True)
+    datos = carpeta(args.datos)
     ruta_snap = datos / "snapshot.json"
 
     previo = {}
     if ruta_snap.exists():
         try:
             previo = json.loads(ruta_snap.read_text(encoding="utf-8"))
+            if not isinstance(previo, dict) or "juegos" not in previo:
+                raise ValueError("formato inesperado")
         except Exception:
             previo = {}
+            try:
+                ruta_snap.replace(datos / "snapshot.corrupto.json")
+                print("aviso: el retrato anterior estaba roto; lo he guardado como snapshot.corrupto.json")
+            except Exception:
+                pass
 
     datos_nuevos = descargar(token, args.include_free, args.include_non_games, not args.sin_nombres, previo, api_key)
-    escribir_csv(datos / "library.csv", datos_nuevos["csv"])
+    try:
+        escribir_csv(datos / "library.csv", datos_nuevos["csv"])
+    except OSError as e:
+        die(f"no puedo escribir library.csv en {datos}: {e}")
 
     juegos = datos_nuevos["juegos"]
     prestados = [g for g in juegos if not g["owners"] or datos_nuevos["yo"] not in g["owners"]]
@@ -354,13 +385,16 @@ def main():
     if not args.sin_historial:
         if previo:
             eventos = comparar(previo, datos_nuevos["snapshot"], datos_nuevos["yo"], datos_nuevos["alias"])
-        ruta_snap.write_text(json.dumps(datos_nuevos["snapshot"], ensure_ascii=False, indent=1), encoding="utf-8")
-        (datos / "novedades.json").write_text(json.dumps({
-            "fecha": ahora,
-            "eventos": eventos,
-        }, ensure_ascii=False, indent=1), encoding="utf-8")
-        (datos / "novedades.txt").write_text(chivato(eventos, ahora), encoding="utf-8")
-        anotar_historial(datos / "historial.csv", eventos, ahora)
+        try:
+            ruta_snap.write_text(json.dumps(datos_nuevos["snapshot"], ensure_ascii=False, indent=1), encoding="utf-8")
+            (datos / "novedades.json").write_text(json.dumps({
+                "fecha": ahora,
+                "eventos": eventos,
+            }, ensure_ascii=False, indent=1), encoding="utf-8")
+            (datos / "novedades.txt").write_text(chivato(eventos, ahora), encoding="utf-8")
+            anotar_historial(datos / "historial.csv", eventos, ahora)
+        except OSError as e:
+            die(f"no puedo escribir el historial en {datos}: {e}")
 
         if not previo:
             print("primera ejecucion: guardado el retrato inicial, sin novedades")
