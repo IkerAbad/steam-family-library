@@ -56,7 +56,7 @@ python3 steam_family_library.py --include-free
 
 ## Salida
 
-`library.csv` tiene una fila por juego, ordenado por nombre:
+`library.csv` se escribe en UTF-8 con BOM para que Excel respete los acentos, con una fila por juego ordenado por nombre:
 
 ```csv
 appid,name,source,playable,exclude_reason,playtime_minutes,acquired,last_played,store_url
