@@ -28,6 +28,9 @@ jobs:
       - name: Compila los tres scripts
         run: python -m py_compile steam_family_library.py panel.py app.py
 
+      - name: Pruebas unitarias
+        run: python -m unittest discover -s pruebas -v
+
       - name: Sintaxis del lanzador
         run: |
           sh -n iniciar.sh

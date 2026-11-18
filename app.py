@@ -22,6 +22,7 @@ from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
 PROHIBIDOS = set('"<>|*?')
+CANDADO = threading.Lock()
 FICHEROS = {
     "/panel.html": ("panel.html", "text/html; charset=utf-8"),
     "/library.csv": ("library.csv", "text/csv; charset=utf-8"),
@@ -188,6 +189,14 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             pass
 
+    def _origen_ok(self):
+        """Solo acepta POST de la propia pagina: evita que otra web toque los datos."""
+        origen = self.headers.get("Origin")
+        if not origen:
+            return True
+        puerto = self.servidor.server_address[1]
+        return origen in (f"http://127.0.0.1:{puerto}", f"http://localhost:{puerto}")
+
     def _get(self):
         if self.path in ("/", "/index.html"):
             self._enviar(200, PAGINA, "text/html; charset=utf-8")
@@ -212,6 +221,9 @@ class Handler(BaseHTTPRequestHandler):
         self._enviar(404, {"ok": False, "error": "no existe"})
 
     def _post(self):
+        if not self._origen_ok():
+            self._enviar(403, {"ok": False, "error": "peticion de otro sitio: solo vale desde esta pagina"})
+            return
         try:
             largo = int(self.headers.get("Content-Length", 0) or 0)
         except ValueError:
@@ -240,7 +252,13 @@ class Handler(BaseHTTPRequestHandler):
             if api_key and (len(api_key) > 64 or not all(c.isalnum() for c in api_key)):
                 self._enviar(400, {"ok": False, "error": "la API key no tiene buena pinta: son 32 caracteres en hexadecimal"})
                 return
-            ok, mensaje = ejecutar(self.datos, token, api_key)
+            if not CANDADO.acquire(blocking=False):
+                self._enviar(409, {"ok": False, "error": "Ya hay una actualizacion en curso. Espera a que termine."})
+                return
+            try:
+                ok, mensaje = ejecutar(self.datos, token, api_key)
+            finally:
+                CANDADO.release()
             if not ok:
                 self._enviar(500, {"ok": False, "error": mensaje})
                 return
