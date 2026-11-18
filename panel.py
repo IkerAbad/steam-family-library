@@ -11,6 +11,7 @@ la misma carpeta: un fichero unico, sin dependencias ni conexion.
 import argparse
 import csv
 import json
+import os
 from pathlib import Path
 
 
@@ -34,7 +35,7 @@ def main():
             pass
 
     datos = Path(args.datos).expanduser()
-    raros = sorted({c for c in str(datos) if c in '"<>|*?'})
+    raros = sorted({c for c in str(datos) if c in '"<>|*?'}) if os.name == "nt" else []
     if raros:
         raise SystemExit(f"la ruta {datos} lleva caracteres no validos ({', '.join(raros)})")
     try:

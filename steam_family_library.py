@@ -53,7 +53,7 @@ def die(msg):
 
 def carpeta(texto):
     """Valida y prepara la carpeta de datos. Falla con un mensaje util, no con un traceback."""
-    raros = sorted({c for c in texto if c in '"<>|*?'})
+    raros = sorted({c for c in texto if c in '"<>|*?'}) if os.name == "nt" else []
     if raros:
         die(f"la ruta {texto} lleva caracteres no validos ({', '.join(raros)}). "
             "Suele ser una comilla colada por la barra final de la ruta.")

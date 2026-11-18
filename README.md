@@ -20,6 +20,17 @@ Steam fusiona todas las bibliotecas del grupo y no ofrece ningún filtro para ve
 
 Todo queda en tu ordenador. No hay servidor, no hay cuenta, no hay telemetría.
 
+### Linux y macOS
+
+```
+chmod +x iniciar.sh    # solo la primera vez
+./iniciar.sh
+```
+
+O directamente `python3 app.py --datos .`. Si le pasas una ruta, la usa como carpeta de datos: `./iniciar.sh ~/steam`.
+
+El código es Python estándar sin dependencias, así que no hay nada que instalar aparte de Python 3.8 o superior. El lanzador es `sh` puro. Lo he probado a fondo en Windows; en Linux está sin probar porque en esta máquina no hay ninguna distribución instalada.
+
 ### El token
 
 1. Con la sesión de Steam abierta en el navegador, entra en `https://store.steampowered.com/pointssummary/ajaxgetasyncconfig`.

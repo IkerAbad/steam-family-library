@@ -44,7 +44,7 @@ def carpeta_de_datos(texto):
     texto = (texto or "").strip()
     if not texto:
         raise SystemExit("la carpeta de datos esta vacia. Pasa --datos <ruta>.")
-    raros = sorted({c for c in texto if c in PROHIBIDOS})
+    raros = sorted({c for c in texto if c in PROHIBIDOS}) if os.name == "nt" else []
     if raros:
         raise SystemExit(
             f"la ruta de datos lleva caracteres no validos: {texto}\n"
