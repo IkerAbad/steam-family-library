@@ -21,8 +21,8 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Compila los tres scripts
-        run: python -m py_compile steam_family_library.py panel.py app.py
+      - name: Compila
+        run: python -m py_compile steam_families.py
 
       - name: Pruebas unitarias
         run: python -m unittest discover -s pruebas -v
@@ -31,7 +31,7 @@ jobs:
         shell: pwsh
         run: |
           $err = Join-Path $env:TEMP "error_ruta.txt"
-          python steam_family_library.py --datos 'C:\x<y' --token x 2> $err
+          python steam_families.py --exportar --datos 'C:\x<y' --token x 2> $err
           $codigo = $LASTEXITCODE
           if ($codigo -ne 1) { throw "una ruta con < deberia salir con 1, salio con $codigo" }
           if (-not (Select-String -Path $err -Pattern "caracteres no validos" -Quiet)) {

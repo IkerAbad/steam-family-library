@@ -25,8 +25,8 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Compila los tres scripts
-        run: python -m py_compile steam_family_library.py panel.py app.py
+      - name: Compila
+        run: python -m py_compile steam_families.py
 
       - name: Pruebas unitarias
         run: python -m unittest discover -s pruebas -v
@@ -84,7 +84,7 @@ jobs:
 
       - name: Genera el panel y comprueba el resultado
         run: |
-          python panel.py --datos datos
+          python steam_families.py --panel --datos datos
           python - <<'PY'
           import csv, pathlib, sys
 
@@ -105,15 +105,15 @@ jobs:
 
       - name: Error esperado sin token
         run: |
-          if python steam_family_library.py --datos datos; then
+          if python steam_families.py --exportar --datos datos; then
             echo "deberia haber fallado sin token" >&2
             exit 1
           fi
-          python steam_family_library.py --datos datos 2>&1 | grep -q "falta el token"
+          python steam_families.py --exportar --datos datos 2>&1 | grep -q "falta el token"
 
       - name: Arranca la interfaz y la sondea
         run: |
-          python app.py --datos datos --sin-navegador --puerto 8099 &
+          python steam_families.py --datos datos --sin-navegador --puerto 8099 &
           PID=$!
           for i in $(seq 1 20); do
             if curl -sf http://127.0.0.1:8099/api/estado > estado.json; then break; fi

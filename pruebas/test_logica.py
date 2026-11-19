@@ -8,7 +8,6 @@ import base64
 import json
 import os
 import pathlib
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -16,9 +15,7 @@ import unittest
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 
-import app  # noqa: E402
-import panel  # noqa: E402
-import steam_family_library as sfl  # noqa: E402
+import steam_families as sfl  # noqa: E402
 
 
 def juego(nombre, duenos, playable=True):
@@ -157,9 +154,8 @@ class PruebaPanel(unittest.TestCase):
                                "30": {"n": "Bloqueado", "o": ["bbb"], "p": False, "v": "2026-02-01"}}}
             (d / "snapshot.json").write_text(json.dumps(snap), encoding="utf-8")
 
-            r = subprocess.run([sys.executable, str(RAIZ / "panel.py"), "--datos", str(d)],
-                               capture_output=True, text=True)
-            self.assertEqual(r.returncode, 0, r.stderr)
+            resumen = sfl.generar_panel(d)
+            self.assertEqual(resumen["prestados"], 2)
 
             html = (d / "panel.html").read_text(encoding="utf-8")
             self.assertIn("Prestado", html)
@@ -198,7 +194,7 @@ class PruebaEstado(unittest.TestCase):
                                             "20": {"o": ["bbb"], "p": True}}}
             (d / "snapshot.json").write_text(json.dumps(snap), encoding="utf-8")
 
-            e = app.estado(d)
+            e = sfl.estado(d)
             self.assertEqual(e["juegos"], 2)
             self.assertEqual(e["prestados"], 1)
             self.assertEqual(e["jugables"], 1)
@@ -211,41 +207,41 @@ class PruebaTokenGuardado(unittest.TestCase):
         return "x." + carga + ".y"
 
     def test_caduca_legible(self):
-        self.assertTrue(app.caduca_token(self.jwt(1893456000)))
+        self.assertTrue(sfl.caduca_token(self.jwt(1893456000)))
 
     def test_caducado_pasado(self):
-        self.assertTrue(app.token_caducado(self.jwt(1000000000)))
+        self.assertTrue(sfl.token_caducado(self.jwt(1000000000)))
 
     def test_no_caducado_futuro(self):
-        self.assertFalse(app.token_caducado(self.jwt(2000000000)))
+        self.assertFalse(sfl.token_caducado(self.jwt(2000000000)))
 
     def test_basura_se_trata_como_caducado(self):
-        self.assertTrue(app.token_caducado("no.es.un.jwt"))
+        self.assertTrue(sfl.token_caducado("no.es.un.jwt"))
 
     @unittest.skipUnless(os.name == "nt", "DPAPI solo existe en Windows")
     def test_guardar_leer_y_olvidar(self):
         with tempfile.TemporaryDirectory() as tmp:
-            original = app.ruta_token
-            app.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
+            original = sfl.ruta_token
+            sfl.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
             try:
                 tok = self.jwt(2000000000)
-                self.assertTrue(app.guardar_token(tok))
-                self.assertEqual(app.leer_token(), tok)
-                app.olvidar_token()
-                self.assertIsNone(app.leer_token())
+                self.assertTrue(sfl.guardar_token(tok))
+                self.assertEqual(sfl.leer_token(), tok)
+                sfl.olvidar_token()
+                self.assertIsNone(sfl.leer_token())
             finally:
-                app.ruta_token = original
+                sfl.ruta_token = original
 
     @unittest.skipUnless(os.name == "nt", "DPAPI solo existe en Windows")
     def test_no_guarda_un_token_caducado(self):
         with tempfile.TemporaryDirectory() as tmp:
-            original = app.ruta_token
-            app.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
+            original = sfl.ruta_token
+            sfl.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
             try:
-                app.guardar_token(self.jwt(1000000000))
-                self.assertIsNone(app.leer_token())
+                sfl.guardar_token(self.jwt(1000000000))
+                self.assertIsNone(sfl.leer_token())
             finally:
-                app.ruta_token = original
+                sfl.ruta_token = original
 
 
 if __name__ == "__main__":
