@@ -8,6 +8,8 @@ Ve qué juegos te presta tu familia en Steam, cuáles son tuyos y qué ha entrad
 
 Steam fusiona todas las bibliotecas del grupo y no tiene ningún filtro para separarlas. Esto sí.
 
+![Panel de Steam Families](docs/panel.png)
+
 ## Empezar
 
 1. Instala [Python 3.8 o superior](https://www.python.org/downloads/). En Windows, marca «Add python.exe to PATH».
@@ -40,7 +42,7 @@ Los CSV van en UTF-8 con BOM para que Excel respete los acentos.
 ## Seguridad
 
 - **Ninguna cookie.** No lee, no pide y no guarda cookies de Steam.
-- El token se guarda cifrado con DPAPI en `%LOCALAPPDATA%\SteamFamilies\token.bin`. Solo tu usuario de Windows puede descifrarlo y caduca solo en 24 h. Hay un enlace **olvidar**.
+- El token se guarda para tu usuario y caduca en 24 h: cifrado con DPAPI en `%LOCALAPPDATA%\SteamFamilies\token.bin` en Windows, y con permisos 600 en `~/.local/share/steam-families/` en Linux y macOS. Hay un enlace **olvidar**.
 - Nada sale de tu equipo: las únicas conexiones son a `api.steampowered.com` y `steamcommunity.com`.
 - El servidor local escucha solo en `127.0.0.1` y rechaza peticiones de otras webs por `Origin`.
 - Los SteamID se guardan como un hash de 10 caracteres, nunca en claro. Los ficheros de datos están en `.gitignore`.
@@ -78,7 +80,7 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 python -m unittest discover -s pruebas -v
 ```
 
-23 pruebas sin red. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`.
+35 pruebas sin red. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`.
 
 ## Créditos
 

@@ -232,6 +232,22 @@ class PruebaTokenGuardado(unittest.TestCase):
             finally:
                 sfl.ruta_token = original
 
+    @unittest.skipIf(os.name == "nt", "en Windows se usa DPAPI")
+    def test_guardar_en_linux(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            original = sfl.ruta_token
+            sfl.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
+            try:
+                tok = self.jwt(2000000000)
+                self.assertTrue(sfl.guardar_token(tok))
+                self.assertEqual(sfl.leer_token(), tok)
+                modo = pathlib.Path(tmp).joinpath("token.bin").stat().st_mode & 0o777
+                self.assertEqual(modo, 0o600)
+                sfl.olvidar_token()
+                self.assertIsNone(sfl.leer_token())
+            finally:
+                sfl.ruta_token = original
+
     @unittest.skipUnless(os.name == "nt", "DPAPI solo existe en Windows")
     def test_no_guarda_un_token_caducado(self):
         with tempfile.TemporaryDirectory() as tmp:
