@@ -1,134 +1,84 @@
-# steam-family-library
+# Steam Families
 
-Exporta tu biblioteca familiar de Steam, separa lo que te prestan de lo que es tuyo y detecta qué ha entrado nuevo desde la última vez. Sin instalar nada más que Python, con una interfaz local en el navegador.
+[![Linux](https://github.com/IkerAbad/steam-family-library/actions/workflows/linux.yml/badge.svg)](https://github.com/IkerAbad/steam-family-library/actions/workflows/linux.yml)
+[![Windows](https://github.com/IkerAbad/steam-family-library/actions/workflows/windows.yml/badge.svg)](https://github.com/IkerAbad/steam-family-library/actions/workflows/windows.yml)
+[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
 
-Steam fusiona todas las bibliotecas del grupo y no ofrece ningún filtro para ver solo lo prestado. Este programa sí.
+Ve qué juegos te presta tu familia en Steam, cuáles son tuyos y qué ha entrado nuevo desde la última vez. Un solo archivo de Python, sin dependencias, con interfaz en el navegador.
 
-## Lo que hace
-
-- **Biblioteca completa**: todos los juegos que el grupo puede jugar, con la etiqueta `own` (tuyo) o `family` (de otro).
-- **Filtro de prestados**: qué no es tuyo, si se puede jugar ahora y por qué no.
-- **Novedades**: compara con la ejecución anterior y avisa de juegos nuevos, juegos que desaparecen y juegos que pasa a tener otro miembro.
-- **Nombres**: resuelve el alias de cada miembro, sin API key.
-- **Panel**: buscador sin acentos, filtros por origen, estado y antigüedad, orden por fecha de adquisición, horas o última sesión, y un atajo «Compras de la familia (90 días)». Enlaces a la tienda.
+Steam fusiona todas las bibliotecas del grupo y no tiene ningún filtro para separarlas. Esto sí.
 
 ## Empezar
 
 1. Instala [Python 3.8 o superior](https://www.python.org/downloads/). En Windows, marca «Add python.exe to PATH».
-2. Doble clic en `iniciar.cmd`. Se abre una página en `127.0.0.1`.
-3. Pega el token la primera vez. A partir de ahí se guarda cifrado y se reutiliza hasta que caduque: abres la app y se actualiza sola.
-
-Todo queda en tu ordenador. No hay servidor, no hay cuenta, no hay telemetría.
-
-### Linux y macOS
-
-```
-chmod +x iniciar.sh    # solo la primera vez
-./iniciar.sh
-```
-
-O directamente `python3 app.py --datos .`. Si le pasas una ruta, la usa como carpeta de datos: `./iniciar.sh ~/steam`.
-
-El código es Python estándar sin dependencias, así que no hay nada que instalar aparte de Python 3.8 o superior. El lanzador es `sh` puro. Lo he probado a fondo en Windows; en Linux está sin probar porque en esta máquina no hay ninguna distribución instalada.
+2. Windows: doble clic en `iniciar.cmd`. Linux o macOS: `chmod +x iniciar.sh && ./iniciar.sh`.
+3. Se abre una página en `127.0.0.1`. Pega el token la primera vez; a partir de ahí se guarda cifrado y la app se actualiza sola hasta que caduque.
 
 ### El token
 
-1. Con la sesión de Steam abierta en el navegador, entra en `https://store.steampowered.com/pointssummary/ajaxgetasyncconfig`.
-2. Copia el valor de `webapi_token` (dentro de `data`).
+1. Abre `https://store.steampowered.com/pointssummary/ajaxgetasyncconfig` con la sesión de Steam iniciada.
+2. Copia el valor de `webapi_token`. Vale el token suelto o el JSON entero.
 3. Pégalo en la interfaz.
 
-Atajo: en la propia interfaz, dentro de «Copiar el token en un solo clic», arrastra el botón **Copiar token** a la barra de marcadores. Luego, en la página del token, pulsa ese marcador: deja el token en el portapapeles (o lo muestra solo para copiarlo) y vuelves a la interfaz a pulsar **Pegar**.
-
-Es un JWT que caduca a las 24 horas. No se guarda en ningún fichero: vive en memoria mientras dura la consulta.
+En la propia página hay un marcador **Copiar token** que lo deja en el portapapeles de un clic, y un botón **Pegar**.
 
 ## Qué genera
 
 | Fichero | Contenido |
 |---|---|
-| `panel.html` | Panel completo, un solo fichero, sin conexión |
-| `library.csv` | Biblioteca entera con la columna `source` |
-| `prestados.csv` / `prestados.txt` | Solo lo que te prestan |
-| `novedades.txt` / `novedades.json` | Lo que cambió en la última ejecución |
+| `panel.html` | Panel completo en un solo fichero, sin conexión |
+| `library.csv` | Biblioteca entera con la columna `source` (`own` / `family`) |
+| `prestados.csv`, `prestados.txt` | Solo lo que te prestan |
+| `novedades.txt`, `novedades.json` | Lo que cambió en la última ejecución |
 | `historial.csv` | Una fila por novedad, con fecha |
 | `snapshot.json` | Retrato de la biblioteca para poder comparar |
 
+El panel trae buscador sin acentos, filtros por origen, estado y antigüedad, columna **Añadido** con la fecha de adquisición, marca **nuevo**, marca **gratis** y el atajo **Compras de la familia (90 días)**.
+
 Los CSV van en UTF-8 con BOM para que Excel respete los acentos.
 
-El panel añade la columna **Añadido** con la fecha de adquisición que devuelve Steam, la marca **nuevo** en lo que entró en la última ejecución y **gratis** cuando la ficha de Steam lo marca como free-to-play, para no confundir un reclamo gratuito con una compra. Por defecto ordena por fecha de adquisición, de más reciente a más antiguo, y el atajo **Compras de la familia (90 días)** deja solo lo que han añadido los demás en ese periodo.
+## Seguridad
 
-## Pruebas
+- **Ninguna cookie.** No lee, no pide y no guarda cookies de Steam.
+- El token se guarda cifrado con DPAPI en `%LOCALAPPDATA%\SteamFamilies\token.bin`. Solo tu usuario de Windows puede descifrarlo y caduca solo en 24 h. Hay un enlace **olvidar**.
+- Nada sale de tu equipo: las únicas conexiones son a `api.steampowered.com` y `steamcommunity.com`.
+- El servidor local escucha solo en `127.0.0.1` y rechaza peticiones de otras webs por `Origin`.
+- Los SteamID se guardan como un hash de 10 caracteres, nunca en claro. Los ficheros de datos están en `.gitignore`.
+
+## Terminal
+
+```
+python steam_families.py                      # interfaz en el navegador
+python steam_families.py --exportar --token X # exporta sin interfaz
+python steam_families.py --panel              # solo regenera el panel
+```
+
+Opciones: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin-nombres`, `--sin-historial`, `--sin-precios`, `--puerto`, `--sin-navegador`.
+
+## Cómo funciona
+
+1. El token es un JWT firmado por Steam; su campo `sub` es tu SteamID64 y `exp` la caducidad.
+2. `IFamilyGroupsService/GetFamilyGroupForUser` devuelve el grupo y sus miembros.
+3. `IFamilyGroupsService/GetSharedLibraryApps` con `include_own=true` devuelve todas las apps con `owner_steamids`, `exclude_reason` y `rt_playtime`.
+4. Si tu SteamID está entre los dueños, el juego es `own`; si no, `family`.
+5. Las novedades son la diferencia entre el `snapshot.json` anterior y el actual.
+
+Los tres endpoints de familia están sin documentar: funcionan hoy y pueden cambiar mañana.
+
+## Límites
+
+- El token caduca cada 24 horas. Sin guardar una cookie de sesión no hay forma de renovarlo solo, y guardar cookies queda descartado.
+- Los free-to-play cuentan como biblioteca: un juego gratis reclamado también sale como novedad.
+- «Comprado», «key» y «regalo» no se distinguen: el endpoint solo dice que alguien lo tiene.
+- `rt_time_acquired` se usa como fecha de adquisición porque cuadra con compras reales, pero Valve no documenta su significado exacto.
+
+## Desarrollo
 
 ```
 python -m unittest discover -s pruebas -v
 ```
 
-13 pruebas de la lógica, sin red: comparación de novedades, etiquetas, nombres, textos, validación de rutas y generación del panel.
-
-En cada `push`, GitHub Actions ejecuta además:
-
-- **Linux**: Ubuntu 22.04 con Python 3.8 y Ubuntu latest con Python 3.12.
-- **Windows**: Python 3.9 y 3.12, incluido el lanzador `.cmd` real, comprobando que responde y que no deja procesos vivos.
-
-## Uso desde la terminal
-
-```
-$env:STEAM_WEBAPI_TOKEN = "eyJ0eXAi..."
-python steam_family_library.py --datos .
-python panel.py --datos .
-```
-
-Opciones de `steam_family_library.py`:
-
-| Opción | Para qué |
-|---|---|
-| `--datos RUTA` | Carpeta de salida (por defecto, la actual) |
-| `--token TOKEN` | Token en línea, sin variable de entorno |
-| `--api-key CLAVE` | API key opcional de Steam, resuelve nombres sin límites |
-| `--include-free` | Incluye free-to-play |
-| `--include-non-games` | Incluye herramientas, bandas sonoras y demos |
-| `--sin-nombres` | No consulta alias (más rápido) |
-| `--sin-historial` | No toca snapshot, novedades ni historial |
-| `--sin-precios` | No consulta la tienda para marcar los juegos gratis |
-
-La API key es opcional y se saca gratis en `https://steamcommunity.com/dev/apikey`. Sin ella, los nombres salen del endpoint de la comunidad de Steam, que a veces responde 429 y deja «Miembro 1», «Miembro 2» hasta la siguiente ejecución. En la interfaz hay un desplegable para pegarla sin guardarla en disco.
-
-## Si algo falla
-
-- **La ventana se cierra al instante**: falta Python o no está en el PATH. Abre `cmd` y escribe `python --version`.
-- **«No he encontrado un puerto libre»**: tienes otra ventana de Steam Families abierta. Cierra la anterior.
-- **«La ruta de datos lleva caracteres no válidos»**: el lanzador está pasando `"%~dp0"` y la barra final se come la comilla. Tiene que ser `"%~dp0."`.
-- **«El token no parece un JWT»**: has copiado el JSON entero o una comilla de más. Es solo el valor de `webapi_token`.
-- **HTTP 401/403**: el token caducó. Recarga la página del token.
-- **«Miembro 1», «Miembro 2»**: Steam ha frenado la consulta de alias. Se reintenta solo en la siguiente ejecución.
-- **El retrato anterior estaba roto**: no pasa nada, se guarda como `snapshot.corrupto.json` y se empieza de cero sin inventar novedades.
-
-## Cómo funciona
-
-1. El token es un JWT firmado por Steam; su campo `sub` es tu SteamID64 y `exp` la caducidad.
-2. `IFamilyGroupsService/GetFamilyGroupForUser` devuelve el id del grupo y sus miembros.
-3. `IFamilyGroupsService/GetSharedLibraryApps` con `include_own=true` devuelve todas las apps del grupo con `owner_steamids`, `exclude_reason` y `rt_playtime`.
-4. Si tu SteamID está entre los dueños, el juego es `own`; si no, `family`.
-5. `panel.py` incrusta los datos en un HTML y filtra en JavaScript.
-6. Las novedades son una comparación entre el `snapshot.json` anterior y el actual.
-
-Los tres endpoints de familia están sin documentar. Funcionan hoy y pueden cambiar mañana.
-
-## Privacidad y seguridad
-
-- **Ninguna cookie.** El programa no lee, no pide y no guarda cookies de Steam. No hay navegador embebido ni automatización del tuyo.
-- **El token se guarda cifrado.** Con la casilla «Recordar el token en este equipo», el JWT se cifra con DPAPI en `%LOCALAPPDATA%\SteamFamilies\token.bin`. Solo tu usuario de Windows puede descifrarlo, y el token muere solo a las 24 horas. La página trae un enlace **olvidar** para borrarlo.
-- **Nada sale de tu equipo.** No hay servidor propio ni telemetría: las únicas conexiones son a `api.steampowered.com` y `steamcommunity.com`.
-- **Identificadores en hash.** `snapshot.json`, `historial.csv` y `novedades.*` guardan los SteamID convertidos en un hash de 10 caracteres, no los IDs reales. Los ficheros de datos están en `.gitignore`, igual que `library.csv`, `panel.html` y `prestados.*`.
-- **El servidor local solo escucha en 127.0.0.1** y rechaza peticiones de otras webs por cabecera `Origin`.
-- Si compartes el panel, compartes la lista de juegos y tus horas jugadas. No lleva identificadores de nadie.
-
-## Límites
-
-- El token caduca a las 24 horas. Con «recordar» no hay que pegarlo cada vez, pero un día sí y otro también.
-- Los free-to-play cuentan como biblioteca: un juego gratis reclamado también sale como novedad.
-- «Comprado», «key» y «regalo» no se distinguen: el endpoint solo dice que alguien lo tiene.
-- `rt_time_acquired` se usa como fecha de adquisición porque cuadra con compras reales, pero Valve no documenta su significado exacto.
-- Los juegos excluidos del préstamo por su dueño aparecen como bloqueados, no desaparecen.
+23 pruebas sin red. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`.
 
 ## Créditos
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Lanzador para Linux y macOS: abre la interfaz en el navegador.
+# Lanzador para Linux y macOS.
 set -eu
 
 AQUI=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -14,4 +14,4 @@ if ! command -v python3 >/dev/null 2>&1; then
     fi
 fi
 
-exec "$PY" "$AQUI/app.py" --datos "${1:-$AQUI}"
+exec "$PY" "$AQUI/steam_families.py" --datos "${1:-$AQUI}"

@@ -1,13 +1,6 @@
 @echo off
 setlocal
 title Steam Families
-set "AQUI=%~dp0."
-set "PROGRAMA=%~dp0app.py"
-if not exist "%PROGRAMA%" (
-  echo No encuentro app.py junto a este fichero.
-  pause
-  exit /b 1
-)
 where python >nul 2>nul
 if errorlevel 1 (
   echo.
@@ -17,5 +10,5 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-python "%PROGRAMA%" --datos "%AQUI%"
+python "%~dp0steam_families.py" --datos "%~dp0."
 if errorlevel 1 pause
