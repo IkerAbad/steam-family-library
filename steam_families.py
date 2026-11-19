@@ -392,6 +392,7 @@ PLANTILLA = r"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%2366c0f4'/><text x='8' y='12' font-size='10' font-family='sans-serif' text-anchor='middle' fill='%2312151a'>S</text></svg>">
 <title>Biblioteca familiar de Steam</title>
 <style>
 :root { --fondo:#12151a; --panel:#1a1f26; --borde:#2a313b; --texto:#dfe6ee; --suave:#8b98a8; --acento:#66c0f4; --verde:#7bd88f; --ambar:#e0b341; --rojo:#e06c6c; }
@@ -1188,6 +1189,7 @@ PAGINA = r"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%2366c0f4'/><text x='8' y='12' font-size='10' font-family='sans-serif' text-anchor='middle' fill='%2312151a'>S</text></svg>">
 <title>Steam Families</title>
 <style>
 :root { --fondo:#12151a; --panel:#1a1f26; --borde:#2a313b; --texto:#dfe6ee; --suave:#8b98a8; --acento:#66c0f4; --verde:#7bd88f; --rojo:#e06c6c; }
