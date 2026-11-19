@@ -889,10 +889,13 @@ def _desproteger(datos):
 
 
 def ruta_token():
-    base = os.environ.get("LOCALAPPDATA")
-    if not base:
-        return None
-    return Path(base) / "SteamFamilies" / "token.bin"
+    if os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA")
+        if not base:
+            return None
+        return Path(base) / "SteamFamilies" / "token.bin"
+    base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
+    return Path(base) / "steam-families" / "token.bin"
 
 
 def caduca_token(token):
@@ -921,28 +924,31 @@ def token_caducado(token):
 
 
 def guardar_token(token):
-    """Cifra el token con DPAPI: solo tu usuario de Windows puede descifrarlo."""
-    if os.name != "nt":
-        return False
+    """Windows: cifrado con DPAPI. Linux y macOS: fichero con permisos 600."""
     ruta = ruta_token()
     if ruta is None:
         return False
     try:
         ruta.parent.mkdir(parents=True, exist_ok=True)
-        ruta.write_bytes(_proteger(token.encode("utf-8")))
+        if os.name == "nt":
+            ruta.write_bytes(_proteger(token.encode("utf-8")))
+        else:
+            ruta.write_text(token, encoding="utf-8")
+            os.chmod(ruta, 0o600)
         return True
     except Exception:
         return False
 
 
 def leer_token():
-    if os.name != "nt":
-        return None
     ruta = ruta_token()
     if ruta is None or not ruta.exists():
         return None
     try:
-        token = _desproteger(ruta.read_bytes()).decode("utf-8").strip()
+        if os.name == "nt":
+            token = _desproteger(ruta.read_bytes()).decode("utf-8").strip()
+        else:
+            token = ruta.read_text(encoding="utf-8").strip()
     except Exception:
         return None
     if not token or token_caducado(token):
@@ -1276,7 +1282,7 @@ label.check input { accent-color:var(--acento); }
       <summary>Que guarda y que no</summary>
       <ul class="seguridad">
         <li><b>Ninguna cookie.</b> El programa no lee, no pide y no guarda cookies de Steam.</li>
-        <li>El token se guarda cifrado con DPAPI en <code>%LOCALAPPDATA%\SteamFamilies\token.bin</code>. Solo tu usuario de Windows puede descifrarlo, y caduca solo en 24 h.</li>
+        <li>El token caduca en 24 h. En Windows se guarda cifrado con DPAPI en <code>%LOCALAPPDATA%\SteamFamilies\token.bin</code>; en Linux y macOS, con permisos 600 en <code>~/.local/share/steam-families/</code>.</li>
         <li>No se envia nada a ningun servidor propio: las unicas conexiones son a la API de Steam.</li>
         <li>Puedes borrarlo cuando quieras con <b>olvidar</b>.</li>
       </ul>
@@ -1311,7 +1317,7 @@ label.check input { accent-color:var(--acento); }
   </section>
 
   <p class="pie">
-    Todo se ejecuta en tu ordenador y no se guarda ninguna cookie de Steam. Si marcas «recordar», el token queda cifrado con DPAPI y solo lo puede leer tu usuario de Windows.
+    Todo se ejecuta en tu ordenador y no se guarda ninguna cookie de Steam. Si marcas «recordar», el token queda guardado solo para tu usuario: cifrado con DPAPI en Windows, permisos 600 en Linux y macOS.
     <a href="#" id="detener">Detener la interfaz</a>
   </p>
 </main>
