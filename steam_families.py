@@ -94,8 +94,11 @@ def api_get(metodo, params):
             return json.load(resp).get("response", {})
     except urllib.error.HTTPError as e:
         cuerpo = e.read().decode("utf-8", "replace")[:400]
-        pista = tr("\nEl token caduca a las 24 h: saca uno nuevo.",
-                   "\nThe token expires after 24 h: get a new one.") if e.code in (401, 403) else ""
+        if e.code in (401, 403):
+            pista = tr("\nSteam ha rechazado el token. Saca uno nuevo y cópialo entero con el marcador «Copiar token».",
+                       "\nSteam rejected the token. Get a new one and copy it whole with the “Copy token” bookmark.")
+        else:
+            pista = ""
         die(tr(f"{metodo} devolvió HTTP {e.code}\n{cuerpo}{pista}",
                f"{metodo} returned HTTP {e.code}\n{cuerpo}{pista}"))
     except urllib.error.URLError as e:
@@ -122,6 +125,11 @@ def steamid_del_token(token):
     if len(partes) != 3:
         die(tr("el token no parece un JWT. Copia solo el valor de webapi_token, sin comillas",
                "that does not look like a JWT. Copy only the webapi_token value, without quotes"))
+    if len(partes[2]) < 40:
+        die(tr(f"el token está cortado: la firma tiene {len(partes[2])} caracteres y deberían ser 43. "
+               "Cópialo entero con el marcador «Copiar token».",
+               f"the token is truncated: the signature has {len(partes[2])} characters and should be 43. "
+               "Copy it whole with the “Copy token” bookmark."))
     try:
         relleno = partes[1] + "=" * (-len(partes[1]) % 4)
         claims = json.loads(base64.urlsafe_b64decode(relleno))
