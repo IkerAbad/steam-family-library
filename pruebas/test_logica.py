@@ -12,6 +12,7 @@ import sys
 import tempfile
 import unittest
 import urllib.error
+from datetime import datetime, timedelta
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
@@ -176,6 +177,19 @@ class PruebaNombresRed(unittest.TestCase):
         self.assertEqual(llamadas, ["111", "111"])
 
 
+class PruebaNombresCaducados(unittest.TestCase):
+    def test_hoy_no_caduca(self):
+        self.assertFalse(sfl.nombres_caducados(datetime.now().strftime("%Y-%m-%d")))
+
+    def test_ocho_dias_caduca(self):
+        viejo = (datetime.now() - timedelta(days=8)).strftime("%Y-%m-%d")
+        self.assertTrue(sfl.nombres_caducados(viejo))
+
+    def test_vacio_caduca(self):
+        self.assertTrue(sfl.nombres_caducados(""))
+        self.assertTrue(sfl.nombres_caducados(None))
+
+
 class PruebaChivato(unittest.TestCase):
     def test_texto_legible(self):
         eventos = [
@@ -234,7 +248,7 @@ class PruebaPanel(unittest.TestCase):
                 w.writeheader()
                 w.writerows(filas)
 
-            snap = {"yo": "aaa", "nombres": {"bbb": "V"},
+            snap = {"yo": "aaa", "fecha": "2026-11-21T10:00:00+00:00", "nombres": {"bbb": "V"},
                     "juegos": {"10": {"n": "Mio", "o": ["aaa"], "p": True, "v": "2026-01-01"},
                                "20": {"n": "Prestado", "o": ["bbb"], "p": True, "v": "2026-02-01"},
                                "30": {"n": "Bloqueado", "o": ["bbb"], "p": False, "v": "2026-02-01"}}}
@@ -249,6 +263,8 @@ class PruebaPanel(unittest.TestCase):
             self.assertIn('"v":"2026-02-01"', html)
             self.assertIn('"q":"2026-03-04"', html)
             self.assertIn("Añadido", html)
+            self.assertIn('const ACTUALIZADO = "2026-11-21T10:00:00+00:00"', html)
+            self.assertIn("const SIN_NOMBRE = 0", html)
 
             prestados = list(csv.DictReader((d / "prestados.csv").open(encoding="utf-8-sig")))
             self.assertEqual(len(prestados), 2)

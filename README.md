@@ -35,6 +35,8 @@ En la propia página hay un marcador **Copiar token** que lo deja en el portapap
 
 El panel trae buscador sin acentos, filtros por origen, estado y antigüedad, columna **Añadido** con la fecha de adquisición, marca **nuevo**, marca **gratis** y el atajo **Compras de la familia (90 días)**. La interfaz y el panel están en español y en inglés: el botón **ES / EN** de la esquina cambia el idioma y la elección se recuerda. Los ficheros de datos (`novedades.txt`, `prestados.txt`) siguen en español.
 
+Debajo del título, el panel muestra la fecha de la última actualización y la pone en ámbar si tiene más de un día. También avisa si algún miembro sigue como «Miembro N», con enlace a la API key.
+
 Los CSV van en UTF-8 con BOM para que Excel respete los acentos.
 
 ## Seguridad
@@ -63,6 +65,7 @@ Opciones: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--si
 3. `IFamilyGroupsService/GetSharedLibraryApps` con `include_own=true` devuelve todas las apps con `owner_steamids`, `exclude_reason` y `rt_playtime`.
 4. Si tu SteamID está entre los dueños, el juego es `own`; si no, `family`.
 5. Las novedades son la diferencia entre el `snapshot.json` anterior y el actual.
+6. Los nombres son el alias público de cada miembro. Se guardan en el snapshot y se refrescan cada 7 días; con API key, en cada ejecución.
 
 Los tres endpoints de familia están sin documentar: funcionan hoy y pueden cambiar mañana.
 
@@ -73,6 +76,7 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 - «Comprado», «key» y «regalo» no se distinguen: el endpoint solo dice que alguien lo tiene.
 - `rt_time_acquired` se usa como fecha de adquisición porque cuadra con compras reales, pero Valve no documenta su significado exacto.
 - Sin API key, los nombres se piden de uno en uno al endpoint público de Steam. Si responde 429, espera 20 s y reintenta, con tres esperas como máximo por ejecución; si sigue frenando, esos miembros quedan como «Miembro 1», «Miembro 2»… hasta la siguiente.
+- Los nombres guardados se refrescan a los 7 días para que un cambio de alias no se quede pegado. Con API key se refrescan en cada ejecución.
 
 ## Desarrollo
 
@@ -80,7 +84,7 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 python -m unittest discover -s pruebas -v
 ```
 
-39 pruebas sin red (3 son solo de Windows y se saltan en otros sistemas). GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`.
+51 pruebas sin red (3 son solo de Windows y se saltan en otros sistemas). GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`.
 
 ## Créditos
 
@@ -121,6 +125,8 @@ The page itself has a **Copiar token** bookmarklet that puts the token on the cl
 
 The dashboard has accent-insensitive search, filters by origin, status and age, an **Añadido** (added) column with the acquisition date, a **nuevo** (new) tag, a **gratis** (free) tag and the **Compras de la familia (90 días)** shortcut (family purchases, last 90 days). The interface and the dashboard come in Spanish and English: the **ES / EN** button in the corner switches the language and the choice is remembered. The data files (`novedades.txt`, `prestados.txt`) stay in Spanish.
 
+Under the title, the dashboard shows the last update time and turns it amber when the data is over a day old. It also warns when a member is still "Miembro N", with a link to the API key.
+
 CSVs are UTF-8 with BOM so Excel respects accents.
 
 ## Security
@@ -149,6 +155,7 @@ Options: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin
 3. `IFamilyGroupsService/GetSharedLibraryApps` with `include_own=true` returns all apps with `owner_steamids`, `exclude_reason` and `rt_playtime`.
 4. If your SteamID is among the owners, the game is `own`; otherwise `family`.
 5. What is new is the difference between the previous `snapshot.json` and the current one.
+6. Names are each member's public alias. They are stored in the snapshot and refreshed every 7 days; with an API key, on every run.
 
 The three family endpoints are undocumented: they work today and may change tomorrow.
 
@@ -159,6 +166,7 @@ The three family endpoints are undocumented: they work today and may change tomo
 - "Bought", "key" and "gift" cannot be told apart: the endpoint only says that someone has it.
 - `rt_time_acquired` is used as the acquisition date because it matches real purchases, but Valve does not document what it exactly means.
 - Without an API key, names are requested one by one from Steam's public endpoint. If it answers 429, it waits 20 s and retries, with at most three waits per run; if it keeps throttling, those members stay as "Miembro 1", "Miembro 2"... until the next run.
+- Stored names are refreshed after 7 days so an alias change does not stay stuck. With an API key they are refreshed on every run.
 
 ## Development
 
@@ -166,7 +174,7 @@ The three family endpoints are undocumented: they work today and may change tomo
 python -m unittest discover -s pruebas -v
 ```
 
-39 tests with no network (3 are Windows-only and are skipped elsewhere). GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher.
+51 tests with no network (3 are Windows-only and are skipped elsewhere). GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher.
 
 ## Credits
 

@@ -36,6 +36,8 @@ from pathlib import Path
 # =====================  exportador  =====================
 
 API = "https://api.steampowered.com"
+COMUNIDAD = "https://steamcommunity.com"
+TIENDA = "https://store.steampowered.com"
 UA = "steam-family-library/2.0"
 EXCLUDE_REASONS = {
     0: "",
@@ -47,6 +49,7 @@ COLUMNAS = [
     "appid", "name", "source", "playable", "exclude_reason",
     "playtime_minutes", "acquired", "last_played", "store_url",
 ]
+DIAS_NOMBRES = 7
 
 
 _IDIOMA = threading.local()
@@ -195,7 +198,7 @@ def nombres(steamids, previos=None, api_key=""):
             time.sleep(1.1)
         while True:
             try:
-                url = "https://steamcommunity.com/actions/ajaxresolveusers?steamids=" + sid
+                url = COMUNIDAD + "/actions/ajaxresolveusers?steamids=" + sid
                 req = urllib.request.Request(url, headers={"User-Agent": UA})
                 with urllib.request.urlopen(req, timeout=20) as r:
                     for u in json.load(r):
@@ -233,6 +236,15 @@ def dia(epoch):
     return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%d")
 
 
+def nombres_caducados(fecha, dias=DIAS_NOMBRES):
+    """True si la fecha (YYYY-MM-DD) no se puede leer o ya tiene `dias` o más."""
+    try:
+        cuando = datetime.strptime(str(fecha)[:10], "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return True
+    return (datetime.now().date() - cuando).days >= dias
+
+
 def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api_key=""):
     yo = steamid_del_token(token)
 
@@ -268,9 +280,13 @@ def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api
         todos = set(miembros)
         for a in apps:
             todos.update(str(o) for o in a.get("owner_steamids", []))
-        alias = nombres(sorted(todos), (previo or {}).get("nombres"), api_key)
+        previos_nombres = (previo or {}).get("nombres") or {}
+        # Con API key se refrescan siempre (una sola llamada); sin ella, cada semana.
+        if api_key or nombres_caducados((previo or {}).get("nombres_fecha")):
+            previos_nombres = {}
+        alias = nombres([s for s in sorted(todos) if s != yo], previos_nombres, api_key)
         alias = rellenar_huecos(alias, miembros, yo)
-    alias.setdefault(yo, "tú")
+    alias[yo] = "tú"
 
     juegos, csv_filas, snapshot = [], [], {}
     previos_juegos = (previo or {}).get("juegos") or {}
@@ -317,7 +333,10 @@ def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api
             "fecha": datetime.now(tz=timezone.utc).isoformat(timespec="seconds"),
             "yo": etiqueta(yo),
             "grupo": grupo.get("name", ""),
-            "nombres": {etiqueta(k): v for k, v in alias.items()},
+            "nombres": ({etiqueta(k): v for k, v in alias.items()} if con_nombres
+                        else (previo or {}).get("nombres", {})),
+            "nombres_fecha": (datetime.now().strftime("%Y-%m-%d") if con_nombres
+                              else (previo or {}).get("nombres_fecha", "")),
             "juegos": snapshot,
         },
     }
@@ -326,7 +345,7 @@ def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api
 def es_gratis(appid):
     """True/False si la ficha de la tienda lo dice; None si no se puede saber."""
     try:
-        url = (f"https://store.steampowered.com/api/appdetails?appids={appid}"
+        url = (f"{TIENDA}/api/appdetails?appids={appid}"
                "&filters=basic&l=spanish")
         req = urllib.request.Request(url, headers={"User-Agent": UA})
         with urllib.request.urlopen(req, timeout=15) as r:
@@ -487,6 +506,11 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
 .atajo { background:#22303c; color:var(--acento); border:1px solid #2b5878; border-radius:6px; padding:7px 12px; font:inherit; cursor:pointer; }
 .atajo:hover { background:#2a3d4d; }
 #vacio { padding:30px 24px; color:var(--suave); }
+#actualizado { margin:4px 0 0; color:var(--suave); font-size:12px; }
+#actualizado.viejo { color:var(--ambar); }
+.aviso.ambar { background:#241f11; border-color:#5a4a22; color:var(--ambar); }
+.aviso.ambar a, .aviso.ambar span { color:var(--ambar); }
+.aviso a { float:right; }
 </style>
 </head>
 <body>
@@ -494,6 +518,7 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
   <div class="titulo">
     <h1 data-t="titulo">Biblioteca familiar de Steam</h1>
     <p id="stats"></p>
+    <p id="actualizado"></p>
   </div>
   <div class="idiomas" role="group" aria-label="Idioma" data-ta="idioma">
     <button type="button" data-idioma="es" aria-pressed="true" title="Español">ES</button>
@@ -503,6 +528,10 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
 <div class="aviso" id="aviso" hidden>
   <span id="avisoTexto"></span>
   <button id="verNuevos" type="button" data-t="verNuevos">Ver solo novedades</button>
+</div>
+<div class="aviso ambar" id="avisoNombres" hidden>
+  <span id="avisoNombresTexto"></span>
+  <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener" data-t="pedirClave">consíguela aquí</a>
 </div>
 <div class="controles">
   <input id="q" type="search" data-tp="buscar" placeholder="Buscar por nombre… (los acentos dan igual)" autocomplete="off">
@@ -555,6 +584,8 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
 const DATOS = __DATOS__;
 const FECHA_NOV = __FECHA_NOV__;
 const HAY_NOV = __HAY_NOV__;
+const ACTUALIZADO = __ACTUALIZADO__;
+const SIN_NOMBRE = __SIN_NOMBRE__;
 
 const TEXTOS = {
   es: {
@@ -597,6 +628,11 @@ const TEXTOS = {
     resumenNovedades: "Novedades desde la última vez",
     juegosNuevos: "juegos nuevos",
     yaNoEstan: "que ya no están",
+    actualizado: "Actualizado el",
+    viejo: "datos de hace más de un día: abre la app y actualiza con un token nuevo",
+    sinNombre: "Hay %n% miembros sin nombre.",
+    sinNombreUno: "Hay 1 miembro sin nombre.",
+    pedirClave: "consíguela aquí",
     marcaPrestado: "prestado",
     marcaTuyo: "tuyo",
     nuevo: "nuevo",
@@ -654,6 +690,11 @@ const TEXTOS = {
     resumenNovedades: "Changes since last run",
     juegosNuevos: "new games",
     yaNoEstan: "gone",
+    actualizado: "Updated",
+    viejo: "data is over a day old: open the app and update with a new token",
+    sinNombre: "%n% members have no name yet.",
+    sinNombreUno: "1 member has no name yet.",
+    pedirClave: "get one here",
     marcaPrestado: "shared",
     marcaTuyo: "yours",
     nuevo: "new",
@@ -863,6 +904,25 @@ function pinta() {
   cuerpo.replaceChildren(frag);
 }
 
+function pintaActualizado() {
+  const el = $("actualizado");
+  if (!ACTUALIZADO) { el.textContent = ""; el.className = ""; return; }
+  const f = new Date(ACTUALIZADO);
+  if (isNaN(f)) { el.textContent = ""; el.className = ""; return; }
+  const horas = (Date.now() - f.getTime()) / 3600000;
+  el.textContent = T("actualizado") + " " + f.toLocaleString(LOCALE(), {year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"});
+  el.className = horas > 24 ? "viejo" : "";
+  if (horas > 24) el.textContent += " — " + T("viejo");
+}
+
+function pintaNombres() {
+  const caja = $("avisoNombres");
+  if (!SIN_NOMBRE) { caja.hidden = true; return; }
+  caja.hidden = false;
+  $("avisoNombresTexto").textContent = SIN_NOMBRE === 1
+    ? T("sinNombreUno") : T("sinNombre").replace("%n%", SIN_NOMBRE);
+}
+
 function aplicaIdioma() {
   document.documentElement.lang = IDIOMA;
   document.title = T("titulo");
@@ -874,6 +934,8 @@ function aplicaIdioma() {
   });
   pintaStats();
   pintaAviso();
+  pintaActualizado();
+  pintaNombres();
   pinta();
 }
 
@@ -1052,6 +1114,9 @@ def generar_panel(datos):
     html = PLANTILLA.replace("__DATOS__", blob)
     html = html.replace("__FECHA_NOV__", json.dumps(nov.get("fecha", ""), ensure_ascii=False))
     html = html.replace("__HAY_NOV__", "true" if marca else "false")
+    html = html.replace("__ACTUALIZADO__", json.dumps(snap.get("fecha", ""), ensure_ascii=False))
+    sin_nombre = sum(1 for v in alias.values() if str(v).startswith("Miembro "))
+    html = html.replace("__SIN_NOMBRE__", str(sin_nombre))
 
     salida = datos / "panel.html"
     try:
@@ -1297,6 +1362,7 @@ def estado(datos: Path):
         "horas": round(horas / 60, 1),
         "nombres": nombres,
         "sin_nombre": sum(1 for v in nombres.values() if str(v).startswith("Miembro ")),
+        "actualizado": snap.get("fecha", ""),
         "yo": yo,
         "novedades": nov.get("eventos", []),
         "fecha_novedades": nov.get("fecha", ""),
@@ -1519,6 +1585,8 @@ button.sec:hover { background:#2b333d; }
 .tarjeta span { color:var(--suave); font-size:12px; }
 .nota { margin:10px 0 0; padding:9px 12px; border-radius:8px; background:#241f11; border:1px solid #5a4a22; color:#e0b341; font-size:13px; }
 .nota a { color:#e0b341; }
+#actualizado { margin:8px 0 0; color:var(--suave); font-size:12px; }
+#actualizado.viejo { color:#e0b341; }
 table { width:100%; border-collapse:collapse; margin-top:8px; }
 th, td { text-align:left; padding:7px 8px; border-bottom:1px solid #1e242c; font-size:13px; }
 th { color:var(--suave); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
@@ -1613,6 +1681,7 @@ label.check input { accent-color:var(--acento); }
     <h2 data-t="resultado">Resultado</h2>
     <div class="tarjetas" id="tarjetas"></div>
     <div id="avisoNombres"></div>
+    <p id="actualizado"></p>
     <div id="novedades"></div>
     <div class="fila" style="margin-top:14px">
       <button class="sec" onclick="window.open('/panel.html','_blank')" data-t="abrirPanel">Abrir panel</button>
@@ -1661,6 +1730,8 @@ const TEXTOS = {
     sinNombreAviso: "Hay %n% miembros sin nombre. Pega una API key gratuita y vuelve a actualizar:",
     sinNombreUno: "Hay 1 miembro sin nombre. Pega una API key gratuita y vuelve a actualizar:",
     pedirClave: "consíguela aquí",
+    actualizado: "Actualizado el",
+    viejo: "datos de hace más de un día: vuelve a actualizar con un token nuevo",
     resultado: "Resultado",
     abrirPanel: "Abrir panel",
     abrirCsv: "Abrir CSV de prestados",
@@ -1734,6 +1805,8 @@ const TEXTOS = {
     sinNombreAviso: "%n% members have no name yet. Paste a free API key and update again:",
     sinNombreUno: "1 member has no name yet. Paste a free API key and update again:",
     pedirClave: "get one here",
+    actualizado: "Updated",
+    viejo: "data is over a day old: update again with a new token",
     resultado: "Result",
     abrirPanel: "Open panel",
     abrirCsv: "Open shared CSV",
@@ -1899,6 +1972,23 @@ function pintar(d) {
       T("pedirClave") + '</a></p>';
   } else {
     aviso.innerHTML = "";
+  }
+
+  const cuando = $("actualizado");
+  if (d.actualizado) {
+    const f = new Date(d.actualizado);
+    if (!isNaN(f)) {
+      const horas = (Date.now() - f.getTime()) / 3600000;
+      cuando.textContent = T("actualizado") + " " + f.toLocaleString(LOCALE(), {year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"});
+      cuando.className = horas > 24 ? "viejo" : "";
+      if (horas > 24) cuando.textContent += " — " + T("viejo");
+    } else {
+      cuando.textContent = "";
+      cuando.className = "";
+    }
+  } else {
+    cuando.textContent = "";
+    cuando.className = "";
   }
 
   const ev = d.novedades || [];
