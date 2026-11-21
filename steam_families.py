@@ -1425,7 +1425,7 @@ class Handler(BaseHTTPRequestHandler):
         idioma(cuerpo.get("idioma"))
 
         if self.path == "/api/actualizar":
-            token = str(cuerpo.get("token") or "").strip().strip("\"'")
+            token = normaliza_token(str(cuerpo.get("token") or ""))
             if not token:
                 self._enviar(400, {"ok": False, "error": tr("falta el token", "the token is missing")})
                 return

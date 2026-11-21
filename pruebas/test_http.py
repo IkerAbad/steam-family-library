@@ -122,6 +122,20 @@ class PruebaHttp(unittest.TestCase):
     def test_sin_token(self):
         self.assertEqual(self.post("/api/actualizar", {})[0], 400)
 
+    def test_acepta_el_json_entero(self):
+        vistos = []
+        original = sfl.ejecutar
+        sfl.ejecutar = lambda datos, token, api_key="": (vistos.append((token, api_key)) or (True, "ok"))
+        try:
+            codigo, _ = self.post("/api/actualizar", {
+                "token": '{"success":1,"data":{"webapi_token":"aaa.bbb.ccc"}}',
+                "guardar": False,
+            })
+        finally:
+            sfl.ejecutar = original
+        self.assertEqual(codigo, 200)
+        self.assertEqual(vistos, [("aaa.bbb.ccc", "")])
+
     def test_token_larguisimo(self):
         self.assertEqual(self.post("/api/actualizar", {"token": "x" * 5000})[0], 400)
 
