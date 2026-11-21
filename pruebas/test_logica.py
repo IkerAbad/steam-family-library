@@ -81,6 +81,10 @@ class PruebaToken(unittest.TestCase):
     def test_json_roto_no_revienta(self):
         self.assertEqual(sfl.normaliza_token('{"roto":'), '{"roto":')
 
+    def test_firma_cortada(self):
+        with self.assertRaises(SystemExit):
+            sfl.steamid_del_token("x.eyJleHAiOjIwMDAwMDAwMDB9.abc")
+
 
 class PruebaNombres(unittest.TestCase):
     def test_rellena_huecos_sin_tocar_el_tuyo(self):
