@@ -11,6 +11,7 @@ import pathlib
 import sys
 import tempfile
 import unittest
+import urllib.error
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
@@ -88,6 +89,58 @@ class PruebaNombres(unittest.TestCase):
         self.assertEqual(alias["ccc"], "Miembro 1")
         self.assertEqual(alias["ddd"], "Miembro 2")
         self.assertNotIn("aaa", alias)
+
+
+class PruebaNombresRed(unittest.TestCase):
+    """Sin red: se sustituye urlopen y la pausa entre peticiones."""
+
+    def setUp(self):
+        self.urlopen = sfl.urllib.request.urlopen
+        self.sleep = sfl.time.sleep
+        sfl.time.sleep = lambda s: None
+
+    def tearDown(self):
+        sfl.urllib.request.urlopen = self.urlopen
+        sfl.time.sleep = self.sleep
+
+    def test_pide_uno_a_uno(self):
+        llamadas = []
+
+        class Respuesta:
+            def __init__(self, sid):
+                self.sid = sid
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return json.dumps([{"steamid": self.sid,
+                                    "persona_name": "Nombre " + self.sid}]).encode()
+
+        def falso(req, timeout=0):
+            sid = req.full_url.rsplit("=", 1)[1]
+            llamadas.append(sid)
+            return Respuesta(sid)
+
+        sfl.urllib.request.urlopen = falso
+        alias = sfl.nombres(["111", "222"], {}, "")
+        self.assertEqual(alias, {"111": "Nombre 111", "222": "Nombre 222"})
+        self.assertEqual(llamadas, ["111", "222"])
+
+    def test_para_cuando_steam_frena(self):
+        llamadas = []
+
+        def falso(req, timeout=0):
+            llamadas.append(req.full_url.rsplit("=", 1)[1])
+            raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
+
+        sfl.urllib.request.urlopen = falso
+        alias = sfl.nombres(["111", "222"], {}, "")
+        self.assertEqual(alias, {})
+        self.assertEqual(llamadas, ["111"])
 
 
 class PruebaChivato(unittest.TestCase):
@@ -199,6 +252,7 @@ class PruebaEstado(unittest.TestCase):
             self.assertEqual(e["prestados"], 1)
             self.assertEqual(e["jugables"], 1)
             self.assertEqual(e["horas"], 0.5)
+            self.assertEqual(e["sin_nombre"], 0)
 
 
 class PruebaTokenGuardado(unittest.TestCase):
@@ -256,6 +310,22 @@ class PruebaTokenGuardado(unittest.TestCase):
             try:
                 sfl.guardar_token(self.jwt(1000000000))
                 self.assertIsNone(sfl.leer_token())
+            finally:
+                sfl.ruta_token = original
+
+
+class PruebaClaveGuardada(unittest.TestCase):
+    def test_guardar_leer_y_olvidar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            original = sfl.ruta_token
+            sfl.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
+            try:
+                self.assertIsNone(sfl.leer_clave())
+                self.assertTrue(sfl.guardar_clave("0123456789abcdef"))
+                self.assertEqual(sfl.leer_clave(), "0123456789abcdef")
+                self.assertTrue((pathlib.Path(tmp) / "apikey.bin").exists())
+                sfl.olvidar_clave()
+                self.assertIsNone(sfl.leer_clave())
             finally:
                 sfl.ruta_token = original
 

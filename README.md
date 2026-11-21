@@ -41,6 +41,7 @@ Los CSV van en UTF-8 con BOM para que Excel respete los acentos.
 
 - **Ninguna cookie.** No lee, no pide y no guarda cookies de Steam.
 - El token se guarda cifrado con DPAPI en `%LOCALAPPDATA%\SteamFamilies\token.bin`. Solo tu usuario de Windows puede descifrarlo y caduca solo en 24 h. Hay un enlace **olvidar**.
+- La API key, si la pegas, se guarda igual en `apikey.bin`, en la misma carpeta. **olvidar** borra los dos.
 - Nada sale de tu equipo: las únicas conexiones son a `api.steampowered.com` y `steamcommunity.com`.
 - El servidor local escucha solo en `127.0.0.1` y rechaza peticiones de otras webs por `Origin`.
 - Los SteamID se guardan como un hash de 10 caracteres, nunca en claro. Los ficheros de datos están en `.gitignore`.
@@ -71,6 +72,7 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 - Los free-to-play cuentan como biblioteca: un juego gratis reclamado también sale como novedad.
 - «Comprado», «key» y «regalo» no se distinguen: el endpoint solo dice que alguien lo tiene.
 - `rt_time_acquired` se usa como fecha de adquisición porque cuadra con compras reales, pero Valve no documenta su significado exacto.
+- Sin API key, los nombres se piden de uno en uno al endpoint público de Steam. Si aun así devuelve 429, esos miembros quedan como «Miembro 1», «Miembro 2»… hasta la siguiente ejecución.
 
 ## Desarrollo
 

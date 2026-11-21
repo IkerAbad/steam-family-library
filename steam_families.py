@@ -175,22 +175,24 @@ def nombres(steamids, previos=None, api_key=""):
             pass
 
     pendientes = [s for s in faltan if s not in out]
-    for espera in (0, 2, 6):
-        if not pendientes:
-            break
-        if espera:
-            time.sleep(espera)
+    # Uno por uno: Steam devuelve 429 si se piden varios SteamID en la misma llamada.
+    for i, sid in enumerate(pendientes):
+        if not sid:
+            continue
+        if i:
+            time.sleep(1.1)
         try:
-            url = "https://steamcommunity.com/actions/ajaxresolveusers?steamids=" + ",".join(pendientes)
+            url = "https://steamcommunity.com/actions/ajaxresolveusers?steamids=" + sid
             req = urllib.request.Request(url, headers={"User-Agent": UA})
             with urllib.request.urlopen(req, timeout=20) as r:
                 for u in json.load(r):
-                    sid = str(u.get("steamid", ""))
-                    if sid in pendientes and u.get("persona_name"):
+                    if str(u.get("steamid", "")) == sid and u.get("persona_name"):
                         out[sid] = u["persona_name"].strip()
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                break
         except Exception:
-            pass
-        pendientes = [s for s in pendientes if s not in out]
+            continue
 
     return out
 
@@ -1139,34 +1141,48 @@ def token_caducado(token):
         return True
 
 
-def guardar_token(token):
+def _guardar_secreto(ruta, texto):
     """Windows: cifrado con DPAPI. Linux y macOS: fichero con permisos 600."""
-    ruta = ruta_token()
     if ruta is None:
         return False
     try:
         ruta.parent.mkdir(parents=True, exist_ok=True)
         if os.name == "nt":
-            ruta.write_bytes(_proteger(token.encode("utf-8")))
+            ruta.write_bytes(_proteger(texto.encode("utf-8")))
         else:
-            ruta.write_text(token, encoding="utf-8")
+            ruta.write_text(texto, encoding="utf-8")
             os.chmod(ruta, 0o600)
         return True
     except Exception:
         return False
 
 
-def leer_token():
-    ruta = ruta_token()
+def _leer_secreto(ruta):
     if ruta is None or not ruta.exists():
         return None
     try:
         if os.name == "nt":
-            token = _desproteger(ruta.read_bytes()).decode("utf-8").strip()
-        else:
-            token = ruta.read_text(encoding="utf-8").strip()
+            return _desproteger(ruta.read_bytes()).decode("utf-8").strip()
+        return ruta.read_text(encoding="utf-8").strip()
     except Exception:
         return None
+
+
+def _olvidar_secreto(ruta):
+    try:
+        if ruta and ruta.exists():
+            ruta.unlink()
+    except OSError:
+        pass
+
+
+def guardar_token(token):
+    """Windows: cifrado con DPAPI. Linux y macOS: fichero con permisos 600."""
+    return _guardar_secreto(ruta_token(), token)
+
+
+def leer_token():
+    token = _leer_secreto(ruta_token())
     if not token or token_caducado(token):
         olvidar_token()
         return None
@@ -1174,12 +1190,25 @@ def leer_token():
 
 
 def olvidar_token():
+    _olvidar_secreto(ruta_token())
+
+
+def ruta_clave():
+    """Misma carpeta que el token, fichero aparte."""
     ruta = ruta_token()
-    try:
-        if ruta and ruta.exists():
-            ruta.unlink()
-    except OSError:
-        pass
+    return None if ruta is None else ruta.with_name("apikey.bin")
+
+
+def guardar_clave(clave):
+    return _guardar_secreto(ruta_clave(), clave)
+
+
+def leer_clave():
+    return _leer_secreto(ruta_clave())
+
+
+def olvidar_clave():
+    _olvidar_secreto(ruta_clave())
 
 
 def carpeta_de_datos(texto):
@@ -1238,6 +1267,7 @@ def estado(datos: Path):
                         pass
         except Exception:
             pass
+    nombres = snap.get("nombres", {}) or {}
     return {
         "ok": True,
         "primera": not bool(juegos),
@@ -1246,7 +1276,8 @@ def estado(datos: Path):
         "prestados": prestados,
         "jugables": jugables,
         "horas": round(horas / 60, 1),
-        "nombres": snap.get("nombres", {}),
+        "nombres": nombres,
+        "sin_nombre": sum(1 for v in nombres.values() if str(v).startswith("Miembro ")),
         "yo": yo,
         "novedades": nov.get("eventos", []),
         "fecha_novedades": nov.get("fecha", ""),
@@ -1330,6 +1361,10 @@ class Handler(BaseHTTPRequestHandler):
             self._enviar(200, {"ok": True, "token": guardado, "guardado": bool(guardado),
                                "caduca": caduca_token(guardado) if guardado else ""})
             return
+        if pedida == "/api/clave":
+            clave = leer_clave()
+            self._enviar(200, {"ok": True, "clave": clave or "", "guardada": bool(clave)})
+            return
         if pedida in FICHEROS:
             nombre, tipo = FICHEROS[pedida]
             ruta = self.datos / nombre
@@ -1384,6 +1419,8 @@ class Handler(BaseHTTPRequestHandler):
                     "la API key no tiene buena pinta: son 32 caracteres en hexadecimal",
                     "the API key does not look right: it is 32 hexadecimal characters")})
                 return
+            if not api_key:
+                api_key = leer_clave() or ""
             if not CANDADO.acquire(blocking=False):
                 self._enviar(409, {"ok": False, "error": tr(
                     "Ya hay una actualización en curso. Espera a que termine.",
@@ -1398,8 +1435,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if cuerpo.get("guardar", True):
                 guardar_token(token)
+                if api_key:
+                    guardar_clave(api_key)
             else:
                 olvidar_token()
+                olvidar_clave()
             datos = estado(self.datos)
             datos["log"] = mensaje
             datos["caduca"] = caduca_token(token)
@@ -1413,6 +1453,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == "/api/olvidar":
             olvidar_token()
+            olvidar_clave()
             self._enviar(200, {"ok": True})
             return
 
@@ -1457,6 +1498,8 @@ button.sec:hover { background:#2b333d; }
 .tarjeta { flex:1 1 130px; background:#0e1116; border:1px solid var(--borde); border-radius:8px; padding:12px 14px; }
 .tarjeta b { display:block; font-size:22px; font-weight:600; }
 .tarjeta span { color:var(--suave); font-size:12px; }
+.nota { margin:10px 0 0; padding:9px 12px; border-radius:8px; background:#241f11; border:1px solid #5a4a22; color:#e0b341; font-size:13px; }
+.nota a { color:#e0b341; }
 table { width:100%; border-collapse:collapse; margin-top:8px; }
 th, td { text-align:left; padding:7px 8px; border-bottom:1px solid #1e242c; font-size:13px; }
 th { color:var(--suave); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
@@ -1542,7 +1585,7 @@ label.check input { accent-color:var(--acento); }
     <div id="estado"></div>
     <label class="check" style="margin-top:10px">
       <input type="checkbox" id="recordar" checked>
-      <span data-t="recordar">Recordar el token en este equipo, cifrado</span>
+      <span data-t="recordar">Recordar el token y la API key en este equipo, cifrados</span>
       <a href="#" id="olvidar" style="margin-left:10px" data-t="olvidar">olvidar</a>
     </label>
   </section>
@@ -1550,6 +1593,7 @@ label.check input { accent-color:var(--acento); }
   <section class="paso" id="resultado" hidden>
     <h2 data-t="resultado">Resultado</h2>
     <div class="tarjetas" id="tarjetas"></div>
+    <div id="avisoNombres"></div>
     <div id="novedades"></div>
     <div class="fila" style="margin-top:14px">
       <button class="sec" onclick="window.open('/panel.html','_blank')" data-t="abrirPanel">Abrir panel</button>
@@ -1593,8 +1637,11 @@ const TEXTOS = {
     duenosTitulo: "¿Los dueños salen como «Miembro 1»?",
     duenosTexto: 'Steam limita las consultas de nombres cuando se piden muchas seguidas. Con una <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">API key gratuita</a> salen siempre. Solo se usa durante esta consulta y no se guarda.',
     apiKeyPlaceholder: "API key de Steam (opcional)",
-    recordar: "Recordar el token en este equipo, cifrado",
+    recordar: "Recordar el token y la API key en este equipo, cifrados",
     olvidar: "olvidar",
+    sinNombreAviso: "Hay %n% miembros sin nombre. Pega una API key gratuita y vuelve a actualizar:",
+    sinNombreUno: "Hay 1 miembro sin nombre. Pega una API key gratuita y vuelve a actualizar:",
+    pedirClave: "consíguela aquí",
     resultado: "Resultado",
     abrirPanel: "Abrir panel",
     abrirCsv: "Abrir CSV de prestados",
@@ -1663,8 +1710,11 @@ const TEXTOS = {
     duenosTitulo: "Owners show up as “Member 1”?",
     duenosTexto: 'Steam rate-limits name lookups when too many are requested in a row. With a <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">free API key</a> they always resolve. It is only used for this request and is not stored.',
     apiKeyPlaceholder: "Steam API key (optional)",
-    recordar: "Remember the token on this computer, encrypted",
+    recordar: "Remember the token and the API key on this computer, encrypted",
     olvidar: "forget",
+    sinNombreAviso: "%n% members have no name yet. Paste a free API key and update again:",
+    sinNombreUno: "1 member has no name yet. Paste a free API key and update again:",
+    pedirClave: "get one here",
     resultado: "Result",
     abrirPanel: "Open panel",
     abrirCsv: "Open shared CSV",
@@ -1822,6 +1872,16 @@ function pintar(d) {
     '<div class="tarjeta"><b>' + fmt(d.jugables) + '</b><span>' + T("jugablesAhora") + '</span></div>' +
     '<div class="tarjeta"><b>' + fmtHoras(d.horas) + '</b><span>' + T("horasPrestados") + '</span></div>';
 
+  const aviso = $("avisoNombres");
+  if (d.sin_nombre) {
+    const texto = d.sin_nombre === 1 ? T("sinNombreUno") : T("sinNombreAviso").replace("%n%", d.sin_nombre);
+    aviso.innerHTML = '<p class="nota">' + texto + ' ' +
+      '<a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">' +
+      T("pedirClave") + '</a></p>';
+  } else {
+    aviso.innerHTML = "";
+  }
+
   const ev = d.novedades || [];
   if (!d.primera && ev.length) {
     const filas = ev.slice(0, 40).map(e => {
@@ -1889,7 +1949,16 @@ $("olvidar").addEventListener("click", async e => {
   ponEstado("olvidado");
 });
 
+async function cargaClave() {
+  try {
+    const r = await fetch("/api/clave");
+    const d = await r.json();
+    if (d && d.clave) $("apikey").value = d.clave;
+  } catch (e) {}
+}
+
 async function arranque() {
+  await cargaClave();
   try {
     const r = await fetch("/api/token");
     const d = await r.json();
