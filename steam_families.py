@@ -8,7 +8,7 @@ Un solo archivo, sin dependencias. Hace tres cosas:
   python steam_families.py --exportar exporta sin interfaz (necesita token)
   python steam_families.py --panel    regenera el panel a partir del CSV
 
-El token se pide una vez y se guarda cifrado con DPAPI; a partir de ahi la
+El token se pide una vez y se guarda cifrado con DPAPI; a partir de ahí la
 interfaz se actualiza sola hasta que caduque (24 h). No se guarda ninguna
 cookie de Steam.
 """
@@ -39,9 +39,9 @@ API = "https://api.steampowered.com"
 UA = "steam-family-library/2.0"
 EXCLUDE_REASONS = {
     0: "",
-    1: "excluido por el dueno",
+    1: "excluido por el dueño",
     2: "no se puede compartir",
-    3: "restringido por region o DRM",
+    3: "restringido por región o DRM",
 }
 COLUMNAS = [
     "appid", "name", "source", "playable", "exclude_reason",
@@ -49,23 +49,40 @@ COLUMNAS = [
 ]
 
 
+_IDIOMA = threading.local()
+
+
+def idioma(valor=None):
+    """Idioma de la petición en curso: «es» por defecto, «en» si la interfaz está en inglés."""
+    if valor is not None:
+        _IDIOMA.valor = "en" if str(valor).lower().startswith("en") else "es"
+    return getattr(_IDIOMA, "valor", "es")
+
+
+def tr(es, en):
+    """Devuelve el texto en el idioma de la petición en curso."""
+    return en if idioma() == "en" else es
+
+
 def die(msg):
     raise SystemExit(msg)
 
 
 def carpeta(texto):
-    """Valida y prepara la carpeta de datos. Falla con un mensaje util, no con un traceback."""
+    """Valida y prepara la carpeta de datos. Falla con un mensaje útil, no con un traceback."""
     raros = sorted({c for c in texto if c in '"<>|*?'}) if os.name == "nt" else []
     if raros:
-        die(f"la ruta {texto} lleva caracteres no validos ({', '.join(raros)}). "
-            "Suele ser una comilla colada por la barra final de la ruta.")
+        die(tr(f"la ruta {texto} lleva caracteres no válidos ({', '.join(raros)}). "
+               "Suele ser una comilla colada por la barra final de la ruta.",
+               f"the path {texto} has invalid characters ({', '.join(raros)}). "
+               "It is usually a quote swallowed by the trailing slash of the path."))
     try:
         p = Path(texto).expanduser().resolve()
         if p.exists() and not p.is_dir():
-            die(f"{p} existe y no es una carpeta")
+            die(tr(f"{p} existe y no es una carpeta", f"{p} exists and it is not a folder"))
         p.mkdir(parents=True, exist_ok=True)
     except OSError as e:
-        die(f"no puedo usar la carpeta {texto}: {e}")
+        die(tr(f"no puedo usar la carpeta {texto}: {e}", f"cannot use the folder {texto}: {e}"))
     return p
 
 
@@ -77,10 +94,13 @@ def api_get(metodo, params):
             return json.load(resp).get("response", {})
     except urllib.error.HTTPError as e:
         cuerpo = e.read().decode("utf-8", "replace")[:400]
-        pista = "\nEl token caduca a las 24 h: saca uno nuevo." if e.code in (401, 403) else ""
-        die(f"{metodo} devolvio HTTP {e.code}\n{cuerpo}{pista}")
+        pista = tr("\nEl token caduca a las 24 h: saca uno nuevo.",
+                   "\nThe token expires after 24 h: get a new one.") if e.code in (401, 403) else ""
+        die(tr(f"{metodo} devolvió HTTP {e.code}\n{cuerpo}{pista}",
+               f"{metodo} returned HTTP {e.code}\n{cuerpo}{pista}"))
     except urllib.error.URLError as e:
-        die(f"no se pudo conectar con la API de Steam: {e.reason}")
+        die(tr(f"no se pudo conectar con la API de Steam: {e.reason}",
+               f"could not connect to the Steam API: {e.reason}"))
 
 
 def normaliza_token(texto):
@@ -100,32 +120,34 @@ def normaliza_token(texto):
 def steamid_del_token(token):
     partes = token.split(".")
     if len(partes) != 3:
-        die("el token no parece un JWT. Copia solo el valor de webapi_token, sin comillas")
+        die(tr("el token no parece un JWT. Copia solo el valor de webapi_token, sin comillas",
+               "that does not look like a JWT. Copy only the webapi_token value, without quotes"))
     try:
         relleno = partes[1] + "=" * (-len(partes[1]) % 4)
         claims = json.loads(base64.urlsafe_b64decode(relleno))
     except Exception:
-        die("no se pudo leer el contenido del token")
+        die(tr("no se pudo leer el contenido del token", "could not read the token contents"))
     exp = claims.get("exp")
     if exp and datetime.now(tz=timezone.utc).timestamp() > exp:
-        die("ese token ya ha caducado. Recarga la pagina del token para tener uno nuevo")
+        die(tr("ese token ya ha caducado. Recarga la página del token para tener uno nuevo",
+               "that token has already expired. Reload the token page to get a new one"))
     sid = claims.get("sub")
     if not sid:
-        die("el token no lleva SteamID")
+        die(tr("el token no lleva SteamID", "the token has no SteamID"))
     return str(sid)
 
 
 def etiqueta(steamid):
-    """Identificador estable sin exponer el SteamID: mismo numero siempre, sin nombre."""
+    """Identificador estable sin exponer el SteamID: mismo número siempre, sin nombre."""
     return hashlib.sha256(steamid.encode()).hexdigest()[:10]
 
 
 def nombres(steamids, previos=None, api_key=""):
-    """Alias publico de cada miembro. Sin API key: endpoint de la comunidad.
+    """Alias público de cada miembro. Sin API key: endpoint de la comunidad.
 
     `previos` va por etiqueta (hash), no por SteamID, para no guardar los IDs.
     429 significa que Steam ha frenado las peticiones: se devuelve lo que haya y
-    se reintenta en la siguiente ejecucion.
+    se reintenta en la siguiente ejecución.
     """
     previos = dict(previos or {})
     out = {}
@@ -200,7 +222,8 @@ def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api
     })
     grupo_id = fam.get("family_groupid")
     if not grupo_id or fam.get("is_not_member_of_any_group"):
-        die("esta cuenta no esta en ningun grupo familiar de Steam, asi que no hay biblioteca compartida")
+        die(tr("esta cuenta no está en ningún grupo familiar de Steam, así que no hay biblioteca compartida",
+               "this account is not in a Steam family group, so there is no shared library"))
 
     grupo = fam.get("family_group", {})
     miembros = [str(m.get("steamid")) for m in grupo.get("members", [])]
@@ -216,7 +239,8 @@ def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api
     })
     apps = lib.get("apps", [])
     if not apps:
-        die("la API no devolvio ninguna app. Puede que el token sea de otra cuenta")
+        die(tr("la API no devolvió ninguna app. Puede que el token sea de otra cuenta",
+               "the API returned no apps. The token may belong to another account"))
 
     alias = {}
     if con_nombres:
@@ -362,15 +386,15 @@ def chivato(eventos, ahora):
 
     lineas = [f"Novedades del {ahora}", ""]
     if not eventos:
-        lineas.append("Sin cambios desde la ultima vez.")
+        lineas.append("Sin cambios desde la última vez.")
     for e in eventos:
         extra = "  [gratis]" if e.get("gratis") else ""
         if e["evento"] == "nuevo":
             lineas.append(f"+ {e['nombre']}  (de {de(e)}){extra}")
         elif e["evento"] == "nuevo_dueno":
-            lineas.append(f"= {e['nombre']}  (ahora tambien de {de(e)})")
+            lineas.append(f"= {e['nombre']}  (ahora también de {de(e)})")
         else:
-            lineas.append(f"- {e['nombre']}  (ya no esta; era de {de(e)})")
+            lineas.append(f"- {e['nombre']}  (ya no está; era de {de(e)})")
     return "\n".join(lineas) + "\n"
 
 
@@ -398,10 +422,15 @@ PLANTILLA = r"""<!doctype html>
 :root { --fondo:#12151a; --panel:#1a1f26; --borde:#2a313b; --texto:#dfe6ee; --suave:#8b98a8; --acento:#66c0f4; --verde:#7bd88f; --ambar:#e0b341; --rojo:#e06c6c; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--fondo); color:var(--texto); font-family:"Segoe UI",system-ui,-apple-system,sans-serif; font-size:14px; }
-header { padding:22px 24px 6px; }
+header { padding:22px 24px 6px; display:flex; align-items:flex-start; gap:14px; }
+header .titulo { flex:1 1 auto; min-width:0; }
 h1 { font-size:20px; margin:0 0 6px; font-weight:600; }
 #stats { margin:0; color:var(--suave); font-size:13px; }
 #stats b { color:var(--texto); font-weight:600; }
+.idiomas { display:flex; border:1px solid var(--borde); border-radius:6px; overflow:hidden; flex:0 0 auto; }
+.idiomas button { background:var(--panel); color:var(--suave); border:0; padding:5px 9px; font:inherit; font-size:12px; line-height:1; cursor:pointer; }
+.idiomas button:hover { color:var(--texto); }
+.idiomas button[aria-pressed="true"] { background:#22303c; color:var(--acento); }
 .aviso { margin:10px 24px 0; padding:9px 12px; border-radius:8px; background:#16241a; border:1px solid #2f5c3b; color:var(--verde); font-size:13px; }
 .aviso button { float:right; background:none; border:none; color:var(--verde); cursor:pointer; font:inherit; text-decoration:underline; }
 .controles { display:flex; flex-wrap:wrap; gap:8px; padding:14px 24px 8px; align-items:center; }
@@ -441,67 +470,219 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
 </head>
 <body>
 <header>
-  <h1>Biblioteca familiar de Steam</h1>
-  <p id="stats"></p>
+  <div class="titulo">
+    <h1 data-t="titulo">Biblioteca familiar de Steam</h1>
+    <p id="stats"></p>
+  </div>
+  <div class="idiomas" role="group" aria-label="Idioma" data-ta="idioma">
+    <button type="button" data-idioma="es" aria-pressed="true" title="Español">ES</button>
+    <button type="button" data-idioma="en" aria-pressed="false" title="English">EN</button>
+  </div>
 </header>
 <div class="aviso" id="aviso" hidden>
   <span id="avisoTexto"></span>
-  <button id="verNuevos" type="button">Ver solo novedades</button>
+  <button id="verNuevos" type="button" data-t="verNuevos">Ver solo novedades</button>
 </div>
 <div class="controles">
-  <input id="q" type="search" placeholder="Buscar por nombre... (los acentos dan igual)" autocomplete="off">
-  <select id="origen">
-    <option value="todo">Todo</option>
-    <option value="family">Solo prestados</option>
-    <option value="own">Solo mios</option>
+  <input id="q" type="search" data-tp="buscar" placeholder="Buscar por nombre… (los acentos dan igual)" autocomplete="off">
+  <select id="origen" aria-label="Origen" data-ta="origen">
+    <option value="todo" data-t="todo">Todo</option>
+    <option value="family" data-t="soloPrestados">Solo prestados</option>
+    <option value="own" data-t="soloMios">Solo míos</option>
   </select>
-  <select id="estado">
-    <option value="todo">Cualquier estado</option>
-    <option value="jugable">Jugables ahora</option>
-    <option value="bloqueado">Bloqueados</option>
-    <option value="jugados">Ya jugados</option>
-    <option value="sinestrenar">Sin estrenar</option>
+  <select id="estado" aria-label="Estado" data-ta="estado">
+    <option value="todo" data-t="cualquierEstado">Cualquier estado</option>
+    <option value="jugable" data-t="jugables">Jugables ahora</option>
+    <option value="bloqueado" data-t="bloqueados">Bloqueados</option>
+    <option value="jugados" data-t="jugados">Ya jugados</option>
+    <option value="sinestrenar" data-t="sinEstrenar">Sin estrenar</option>
   </select>
-  <select id="orden">
-    <option value="anadido">Anadido (mas reciente)</option>
-    <option value="nombre">Nombre A-Z</option>
-    <option value="horas">Mas horas jugadas</option>
-    <option value="reciente">Ultima sesion</option>
-    <option value="dueno">Dueno A-Z</option>
+  <select id="orden" aria-label="Orden" data-ta="orden">
+    <option value="anadido" data-t="ordenAnadido">Añadido (más reciente)</option>
+    <option value="nombre" data-t="ordenNombre">Nombre A-Z</option>
+    <option value="horas" data-t="ordenHoras">Más horas jugadas</option>
+    <option value="reciente" data-t="ordenReciente">Última sesión</option>
+    <option value="dueno" data-t="ordenDueno">Dueño A-Z</option>
   </select>
-  <select id="antiguedad">
-    <option value="todo">Cualquier fecha</option>
-    <option value="30">Anadidos en 30 dias</option>
-    <option value="90">Anadidos en 90 dias</option>
-    <option value="anio">Anadidos este anio</option>
+  <select id="antiguedad" aria-label="Fecha" data-ta="fecha">
+    <option value="todo" data-t="cualquierFecha">Cualquier fecha</option>
+    <option value="30" data-t="dias30">Añadidos en 30 días</option>
+    <option value="90" data-t="dias90">Añadidos en 90 días</option>
+    <option value="anio" data-t="esteAnio">Añadidos este año</option>
   </select>
-  <label class="check"><input type="checkbox" id="soloNuevos"> Solo novedades</label>
-  <button type="button" id="presetCompras" class="atajo">Compras de la familia (90 dias)</button>
+  <label class="check"><input type="checkbox" id="soloNuevos"> <span data-t="soloNuevos">Solo novedades</span></label>
+  <button type="button" id="presetCompras" class="atajo" data-t="preset">Compras de la familia (90 días)</button>
 </div>
 <div id="resumen"></div>
 <table>
   <thead>
     <tr>
-      <th>Juego</th>
-      <th>Dueno</th>
-      <th>Origen</th>
-      <th>Estado</th>
-      <th class="der">Tus horas</th>
-      <th class="der">Ultima sesion</th>
-      <th class="der">Anadido</th>
+      <th data-t="juego">Juego</th>
+      <th data-t="dueno">Dueño</th>
+      <th data-t="origen">Origen</th>
+      <th data-t="estado">Estado</th>
+      <th class="der" data-t="tusHoras">Tus horas</th>
+      <th class="der" data-t="ultimaSesion">Última sesión</th>
+      <th class="der" data-t="anadido">Añadido</th>
     </tr>
   </thead>
   <tbody id="cuerpo"></tbody>
 </table>
-<div id="vacio" hidden>Ningun juego cumple esos filtros.</div>
+<div id="vacio" hidden data-t="vacio">Ningún juego cumple esos filtros.</div>
 
 <script>
 const DATOS = __DATOS__;
 const FECHA_NOV = __FECHA_NOV__;
 const HAY_NOV = __HAY_NOV__;
 
+const TEXTOS = {
+  es: {
+    titulo: "Biblioteca familiar de Steam",
+    buscar: "Buscar por nombre… (los acentos dan igual)",
+    todo: "Todo",
+    soloPrestados: "Solo prestados",
+    soloMios: "Solo míos",
+    cualquierEstado: "Cualquier estado",
+    jugables: "Jugables ahora",
+    bloqueados: "Bloqueados",
+    jugados: "Ya jugados",
+    sinEstrenar: "Sin estrenar",
+    ordenAnadido: "Añadido (más reciente)",
+    ordenNombre: "Nombre A-Z",
+    ordenHoras: "Más horas jugadas",
+    ordenReciente: "Última sesión",
+    ordenDueno: "Dueño A-Z",
+    cualquierFecha: "Cualquier fecha",
+    dias30: "Añadidos en 30 días",
+    dias90: "Añadidos en 90 días",
+    esteAnio: "Añadidos este año",
+    soloNuevos: "Solo novedades",
+    verNuevos: "Ver solo novedades",
+    preset: "Compras de la familia (90 días)",
+    juego: "Juego",
+    dueno: "Dueño",
+    origen: "Origen",
+    estado: "Estado",
+    tusHoras: "Tus horas",
+    ultimaSesion: "Última sesión",
+    anadido: "Añadido",
+    vacio: "Ningún juego cumple esos filtros.",
+    juegos: "juegos",
+    prestados: "prestados",
+    jugablesAhora: "jugables ahora",
+    yaJugados: "ya jugados de ellos",
+    horasPrestados: "h acumuladas en prestados",
+    anadidosAnio: "añadidos este año",
+    resumenNovedades: "Novedades desde la última vez",
+    juegosNuevos: "juegos nuevos",
+    yaNoEstan: "que ya no están",
+    marcaPrestado: "prestado",
+    marcaTuyo: "tuyo",
+    nuevo: "nuevo",
+    gratis: "gratis",
+    fuera: "fuera",
+    masDueno: "+ dueño",
+    jugable: "jugable",
+    bloqueado: "bloqueado",
+    tu: "tú",
+    de: "de",
+    tipEntro: "Entró después del ",
+    tipGratis: "La ficha de Steam lo marca como free-to-play",
+    tipAdquirido: "Fecha en la que Steam dice que se adquirió",
+    idioma: "Idioma",
+    orden: "Orden",
+    fecha: "Fecha"
+  },
+  en: {
+    titulo: "Steam family library",
+    buscar: "Search by name… (accents don't matter)",
+    todo: "All",
+    soloPrestados: "Shared with me",
+    soloMios: "Only mine",
+    cualquierEstado: "Any status",
+    jugables: "Playable now",
+    bloqueados: "Locked",
+    jugados: "Already played",
+    sinEstrenar: "Never played",
+    ordenAnadido: "Recently added",
+    ordenNombre: "Name A-Z",
+    ordenHoras: "Most hours played",
+    ordenReciente: "Last session",
+    ordenDueno: "Owner A-Z",
+    cualquierFecha: "Any date",
+    dias30: "Added in 30 days",
+    dias90: "Added in 90 days",
+    esteAnio: "Added this year",
+    soloNuevos: "Only new",
+    verNuevos: "Show only new",
+    preset: "Family purchases (90 days)",
+    juego: "Game",
+    dueno: "Owner",
+    origen: "Source",
+    estado: "Status",
+    tusHoras: "Your hours",
+    ultimaSesion: "Last session",
+    anadido: "Added",
+    vacio: "No game matches those filters.",
+    juegos: "games",
+    prestados: "shared with you",
+    jugablesAhora: "playable now",
+    yaJugados: "of them played",
+    horasPrestados: "h played in shared games",
+    anadidosAnio: "added this year",
+    resumenNovedades: "Changes since last run",
+    juegosNuevos: "new games",
+    yaNoEstan: "gone",
+    marcaPrestado: "shared",
+    marcaTuyo: "yours",
+    nuevo: "new",
+    gratis: "free",
+    fuera: "gone",
+    masDueno: "+ owner",
+    jugable: "playable",
+    bloqueado: "locked",
+    tu: "you",
+    de: "of",
+    tipEntro: "Added after ",
+    tipGratis: "Steam lists it as free-to-play",
+    tipAdquirido: "Date Steam reports it was acquired",
+    idioma: "Language",
+    orden: "Sort by",
+    fecha: "Date"
+  }
+};
+
+function idiomaInicial() {
+  try {
+    const guardado = localStorage.getItem("sf-idioma");
+    if (guardado === "es" || guardado === "en") return guardado;
+  } catch (e) {}
+  const navegador = (navigator.language || "es").toLowerCase();
+  return navegador.startsWith("es") ? "es" : "en";
+}
+let IDIOMA = idiomaInicial();
+const T = clave => (TEXTOS[IDIOMA] && TEXTOS[IDIOMA][clave]) || TEXTOS.es[clave] || clave;
+const LOCALE = () => IDIOMA === "es" ? "es-ES" : "en-GB";
+const num = opciones => new Intl.NumberFormat(LOCALE(), opciones || {});
+const numero = n => num().format(n);
+const horas = m => num({minimumFractionDigits: 1, maximumFractionDigits: 1}).format(m / 60);
+const fecha = u => u ? u.split("-").reverse().join("/") : "";
+
 const plano = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 DATOS.forEach(d => { d.b = plano(d.n); });
+
+const MOTIVOS = {
+  "excluido por el dueno": {es: "excluido por el dueño", en: "excluded by the owner"},
+  "no se puede compartir": {es: "no se puede compartir", en: "can't be shared"},
+  "restringido por region o drm": {es: "restringido por región o DRM", en: "region or DRM restricted"}
+};
+function motivo(texto) {
+  const clave = plano(texto || "");
+  if (MOTIVOS[clave]) return MOTIVOS[clave][IDIOMA];
+  const desconocido = /^desconocido \((\d+)\)$/.exec(clave);
+  if (desconocido) return IDIOMA === "es" ? "desconocido (" + desconocido[1] + ")" : "unknown (" + desconocido[1] + ")";
+  return texto || T("bloqueado");
+}
 
 const $ = id => document.getElementById(id);
 const cuerpo = $("cuerpo");
@@ -516,22 +697,26 @@ const totales = {
 const hoyISO = new Date().toISOString().slice(0, 10);
 const isoDias = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 const recientesAnio = DATOS.filter(d => d.q && d.q >= hoyISO.slice(0, 4) + "-01-01").length;
-$("stats").innerHTML =
-  "<b>" + totales.juegos + "</b> juegos &middot; <b>" + totales.prestados + "</b> prestados &middot; " +
-  "<b>" + totales.jugables + "</b> jugables ahora &middot; <b>" + totales.jugados + "</b> ya jugados de ellos &middot; " +
-  "<b>" + (totales.horas / 60).toFixed(1).replace(".", ",") + "</b> h acumuladas en prestados &middot; " +
-  "<b>" + recientesAnio + "</b> anadidos este anio";
 
-if (HAY_NOV) {
+function pintaStats() {
+  $("stats").innerHTML = [
+    "<b>" + numero(totales.juegos) + "</b> " + T("juegos"),
+    "<b>" + numero(totales.prestados) + "</b> " + T("prestados"),
+    "<b>" + numero(totales.jugables) + "</b> " + T("jugablesAhora"),
+    "<b>" + numero(totales.jugados) + "</b> " + T("yaJugados"),
+    "<b>" + horas(totales.horas) + "</b> " + T("horasPrestados"),
+    "<b>" + numero(recientesAnio) + "</b> " + T("anadidosAnio")
+  ].join(" &middot; ");
+}
+
+function pintaAviso() {
+  if (!HAY_NOV) { $("aviso").hidden = true; return; }
   const nuevos = DATOS.filter(d => d.w === "nuevo").length;
   const fuera = DATOS.filter(d => d.w === "fuera").length;
   $("aviso").hidden = false;
-  $("avisoTexto").textContent = "Novedades desde la ultima vez (" + FECHA_NOV + "): " +
-    nuevos + " juegos nuevos, " + fuera + " que ya no estan.";
+  $("avisoTexto").textContent = T("resumenNovedades") + " (" + FECHA_NOV + "): " +
+    nuevos + " " + T("juegosNuevos") + ", " + fuera + " " + T("yaNoEstan") + ".";
 }
-
-const horas = m => (m / 60).toFixed(1).replace(".", ",");
-const fecha = u => u ? u.split("-").reverse().join("/") : "";
 
 function pinta() {
   const q = plano($("q").value.trim());
@@ -560,13 +745,14 @@ function pinta() {
     return true;
   });
 
-  if (orden === "anadido") lista.sort((a, b) => (b.q || "").localeCompare(a.q || "") || a.n.localeCompare(b.n, "es"));
-  else if (orden === "horas") lista.sort((a, b) => b.m - a.m || a.n.localeCompare(b.n, "es"));
-  else if (orden === "reciente") lista.sort((a, b) => (b.u || "").localeCompare(a.u || "") || a.n.localeCompare(b.n, "es"));
-  else if (orden === "dueno") lista.sort((a, b) => (a.d || "zz").localeCompare(b.d || "zz", "es") || a.n.localeCompare(b.n, "es"));
-  else lista.sort((a, b) => a.n.localeCompare(b.n, "es"));
+  const compara = (a, b) => a.localeCompare(b, IDIOMA);
+  if (orden === "anadido") lista.sort((a, b) => (b.q || "").localeCompare(a.q || "") || compara(a.n, b.n));
+  else if (orden === "horas") lista.sort((a, b) => b.m - a.m || compara(a.n, b.n));
+  else if (orden === "reciente") lista.sort((a, b) => (b.u || "").localeCompare(a.u || "") || compara(a.n, b.n));
+  else if (orden === "dueno") lista.sort((a, b) => compara(a.d || "zz", b.d || "zz") || compara(a.n, b.n));
+  else lista.sort((a, b) => compara(a.n, b.n));
 
-  $("resumen").textContent = lista.length + " de " + DATOS.length + " juegos";
+  $("resumen").textContent = numero(lista.length) + " " + T("de") + " " + numero(DATOS.length) + " " + T("juegos");
   $("vacio").hidden = lista.length > 0;
 
   const frag = document.createDocumentFragment();
@@ -586,51 +772,54 @@ function pinta() {
     if (d.w === "nuevo") {
       const b = document.createElement("span");
       b.className = "marca nuevo";
-      b.textContent = "nuevo";
-      b.title = "Entro despues del " + d.wf;
+      b.textContent = T("nuevo");
+      b.title = T("tipEntro") + d.wf;
       cont.appendChild(b);
       if (d.g) {
         const g = document.createElement("span");
         g.className = "marca dim";
-        g.textContent = "gratis";
-        g.title = "La ficha de Steam lo marca como free-to-play";
+        g.textContent = T("gratis");
+        g.title = T("tipGratis");
         cont.appendChild(g);
       }
     } else if (d.w === "fuera") {
       const b = document.createElement("span");
       b.className = "marca fuera";
-      b.textContent = "fuera";
+      b.textContent = T("fuera");
       cont.appendChild(b);
     } else if (d.w === "nuevo_dueno") {
       const b = document.createElement("span");
       b.className = "marca nuevo";
-      b.textContent = "+ dueno";
+      b.textContent = T("masDueno");
       cont.appendChild(b);
     }
     td1.appendChild(cont);
 
     const td2 = document.createElement("td");
     td2.className = "dim";
-    td2.textContent = d.d || "";
-    td2.title = d.d || "";
+    const miembro = /^Miembro (\d+)$/.exec(d.d || "");
+    const quien = (d.d === "tú" || d.d === "tu") ? T("tu")
+      : (miembro && IDIOMA === "en") ? "Member " + miembro[1] : d.d;
+    td2.textContent = quien || "";
+    td2.title = quien || "";
 
     const td3 = document.createElement("td");
     const m3 = document.createElement("span");
     m3.className = "marca " + (d.s === "family" ? "prestado" : "propio");
-    m3.textContent = d.s === "family" ? "prestado" : "tuyo";
+    m3.textContent = d.s === "family" ? T("marcaPrestado") : T("marcaTuyo");
     td3.appendChild(m3);
 
     const td4 = document.createElement("td");
     if (!d.p) {
       const m4 = document.createElement("span");
       m4.className = "marca bloqueado";
-      m4.textContent = d.e || "bloqueado";
-      m4.title = d.e;
+      m4.textContent = motivo(d.e);
+      m4.title = m4.textContent;
       td4.appendChild(m4);
     } else {
       const sp = document.createElement("span");
       sp.className = "dim";
-      sp.textContent = "jugable";
+      sp.textContent = T("jugable");
       td4.appendChild(sp);
     }
 
@@ -645,13 +834,33 @@ function pinta() {
     const td7 = document.createElement("td");
     td7.className = "der dim";
     td7.textContent = fecha(d.q);
-    td7.title = "Fecha en la que Steam dice que se adquirio";
+    td7.title = T("tipAdquirido");
 
     tr.append(td1, td2, td3, td4, td5, td6, td7);
     frag.appendChild(tr);
   }
   cuerpo.replaceChildren(frag);
 }
+
+function aplicaIdioma() {
+  document.documentElement.lang = IDIOMA;
+  document.title = T("titulo");
+  document.querySelectorAll("[data-t]").forEach(el => { el.textContent = T(el.dataset.t); });
+  document.querySelectorAll("[data-tp]").forEach(el => { el.placeholder = T(el.dataset.tp); });
+  document.querySelectorAll("[data-ta]").forEach(el => { el.setAttribute("aria-label", T(el.dataset.ta)); });
+  document.querySelectorAll("[data-idioma]").forEach(b => {
+    b.setAttribute("aria-pressed", String(b.dataset.idioma === IDIOMA));
+  });
+  pintaStats();
+  pintaAviso();
+  pinta();
+}
+
+document.querySelectorAll("[data-idioma]").forEach(b => b.addEventListener("click", () => {
+  IDIOMA = b.dataset.idioma;
+  try { localStorage.setItem("sf-idioma", IDIOMA); } catch (e) {}
+  aplicaIdioma();
+}));
 
 ["q", "origen", "estado", "orden", "antiguedad", "soloNuevos"].forEach(id => $(id).addEventListener("input", pinta));
 $("verNuevos").addEventListener("click", () => {
@@ -667,7 +876,7 @@ $("presetCompras").addEventListener("click", () => {
   $("soloNuevos").checked = false;
   pinta();
 });
-pinta();
+aplicaIdioma();
 </script>
 </body>
 </html>
@@ -701,7 +910,8 @@ def exportar(datos, token, api_key="", include_free=False, include_non_games=Fal
     try:
         escribir_csv(Path(datos) / "library.csv", datos_nuevos["csv"])
     except OSError as e:
-        die(f"no puedo escribir library.csv en {datos}: {e}")
+        die(tr(f"no puedo escribir library.csv en {datos}: {e}",
+               f"cannot write library.csv in {datos}: {e}"))
 
     juegos = datos_nuevos["juegos"]
     prestados = sum(1 for g in juegos if datos_nuevos["yo"] not in g["owners"])
@@ -724,7 +934,8 @@ def exportar(datos, token, api_key="", include_free=False, include_non_games=Fal
             (Path(datos) / "novedades.txt").write_text(chivato(eventos, ahora), encoding="utf-8")
             anotar_historial(Path(datos) / "historial.csv", eventos, ahora)
         except OSError as e:
-            die(f"no puedo escribir el historial en {datos}: {e}")
+            die(tr(f"no puedo escribir el historial en {datos}: {e}",
+                   f"cannot write the history in {datos}: {e}"))
 
     return {
         "juegos": len(juegos),
@@ -740,20 +951,24 @@ def generar_panel(datos):
     datos = Path(datos)
     csv_path = datos / "library.csv"
     if not csv_path.exists():
-        die(f"no encuentro {csv_path}. Ejecuta antes la exportacion")
+        die(tr(f"no encuentro {csv_path}. Ejecuta antes la exportación",
+               f"cannot find {csv_path}. Run the export first"))
 
     try:
         with csv_path.open(encoding="utf-8-sig", newline="") as f:
             filas = list(csv.DictReader(f))
     except OSError as e:
-        die(f"no puedo leer {csv_path}: {e}")
+        die(tr(f"no puedo leer {csv_path}: {e}", f"cannot read {csv_path}: {e}"))
     except UnicodeDecodeError:
-        die(f"{csv_path} no parece un CSV en UTF-8. Borralo y vuelve a exportar.")
+        die(tr(f"{csv_path} no parece un CSV en UTF-8. Bórralo y vuelve a exportar.",
+               f"{csv_path} does not look like a UTF-8 CSV. Delete it and export again."))
     if not filas:
-        die(f"{csv_path} esta vacio. Vuelve a exportar.")
+        die(tr(f"{csv_path} está vacío. Vuelve a exportar.",
+               f"{csv_path} is empty. Export again."))
     for obligatoria in ("appid", "name", "source"):
         if obligatoria not in filas[0]:
-            die(f"{csv_path} no tiene la columna {obligatoria}. Vuelve a exportar.")
+            die(tr(f"{csv_path} no tiene la columna {obligatoria}. Vuelve a exportar.",
+                   f"{csv_path} has no {obligatoria} column. Export again."))
 
     snap = leer_json(datos / "snapshot.json", {})
     alias = snap.get("nombres") or {}
@@ -770,7 +985,7 @@ def generar_panel(datos):
         otros = [alias.get(o, "") for o in j.get("o", []) if o != yo]
         otros = [o for o in otros if o]
         if not otros:
-            return "tu" if yo in j.get("o", []) else ""
+            return "tú" if yo in j.get("o", []) else ""
         return ", ".join(sorted(otros))
 
     juegos = []
@@ -809,7 +1024,8 @@ def generar_panel(datos):
         jugables = sorted((j["n"] for j in prestados if j["p"]), key=str.lower)
         (datos / "prestados.txt").write_text("\n".join(jugables) + "\n", encoding="utf-8")
     except OSError as e:
-        die(f"no puedo escribir los ficheros de prestados en {datos}: {e}")
+        die(tr(f"no puedo escribir los ficheros de prestados en {datos}: {e}",
+               f"cannot write the shared files in {datos}: {e}"))
 
     blob = json.dumps(juegos, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     html = PLANTILLA.replace("__DATOS__", blob)
@@ -826,7 +1042,7 @@ def generar_panel(datos):
 
 
 def ejecutar(datos, token, api_key=""):
-    """Lo que hace el boton Actualizar: todo en el mismo proceso."""
+    """Lo que hace el botón Actualizar: todo en el mismo proceso."""
     try:
         resumen = exportar(datos, token, api_key)
         panel = generar_panel(datos)
@@ -970,11 +1186,11 @@ def carpeta_de_datos(texto):
     """Comprueba la ruta antes de tocar nada y explica el problema en castellano."""
     texto = (texto or "").strip()
     if not texto:
-        raise SystemExit("la carpeta de datos esta vacia. Pasa --datos <ruta>.")
+        raise SystemExit("la carpeta de datos está vacía. Pasa --datos <ruta>.")
     raros = sorted({c for c in texto if c in PROHIBIDOS}) if os.name == "nt" else []
     if raros:
         raise SystemExit(
-            f"la ruta de datos lleva caracteres no validos: {texto}\n"
+            f"la ruta de datos lleva caracteres no válidos: {texto}\n"
             f"sobran {', '.join(raros)}. Suele pasar cuando el .cmd pasa \"%~dp0\" "
             "y la barra final se come la comilla: usa \"%~dp0.\"."
         )
@@ -1085,12 +1301,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def _fallo(self, e):
         try:
-            self._enviar(500, {"ok": False, "error": f"Fallo interno: {type(e).__name__}: {e}"})
+            self._enviar(500, {"ok": False,
+                               "error": tr(f"Fallo interno: {type(e).__name__}: {e}",
+                                          f"Internal error: {type(e).__name__}: {e}")})
         except Exception:
             pass
 
     def _origen_ok(self):
-        """Solo acepta POST de la propia pagina: evita que otra web toque los datos."""
+        """Solo acepta POST de la propia página: evita que otra web toque los datos."""
         origen = self.headers.get("Origin")
         if not origen:
             return True
@@ -1098,67 +1316,78 @@ class Handler(BaseHTTPRequestHandler):
         return origen in (f"http://127.0.0.1:{puerto}", f"http://localhost:{puerto}")
 
     def _get(self):
-        if self.path in ("/", "/index.html"):
+        consulta = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        idioma((consulta.get("lang") or [""])[0])
+        pedida = urllib.parse.urlparse(self.path).path
+        if pedida in ("/", "/index.html"):
             self._enviar(200, PAGINA, "text/html; charset=utf-8")
             return
-        if self.path == "/api/estado":
+        if pedida == "/api/estado":
             self._enviar(200, estado(self.datos))
             return
-        if self.path == "/api/token":
+        if pedida == "/api/token":
             guardado = leer_token()
             self._enviar(200, {"ok": True, "token": guardado, "guardado": bool(guardado),
                                "caduca": caduca_token(guardado) if guardado else ""})
             return
-        if self.path in FICHEROS:
-            nombre, tipo = FICHEROS[self.path]
+        if pedida in FICHEROS:
+            nombre, tipo = FICHEROS[pedida]
             ruta = self.datos / nombre
             if not ruta.exists():
-                self._enviar(404, {"ok": False, "error": f"todavia no existe {nombre}"})
+                self._enviar(404, {"ok": False, "error": tr(f"todavía no existe {nombre}",
+                                                            f"{nombre} does not exist yet")})
                 return
             try:
                 contenido = ruta.read_bytes()
             except OSError as e:
-                self._enviar(500, {"ok": False, "error": f"no puedo leer {nombre}: {e}"})
+                self._enviar(500, {"ok": False, "error": tr(f"no puedo leer {nombre}: {e}",
+                                                            f"cannot read {nombre}: {e}")})
                 return
             self._enviar(200, contenido, tipo,
                          {"Content-Disposition": f'inline; filename="{nombre}"'})
             return
-        self._enviar(404, {"ok": False, "error": "no existe"})
+        self._enviar(404, {"ok": False, "error": tr("no existe", "not found")})
 
     def _post(self):
         if not self._origen_ok():
-            self._enviar(403, {"ok": False, "error": "peticion de otro sitio: solo vale desde esta pagina"})
+            self._enviar(403, {"ok": False, "error": tr("petición de otro sitio: solo vale desde esta página",
+                                                        "request from another site: only this page is allowed")})
             return
         try:
             largo = int(self.headers.get("Content-Length", 0) or 0)
         except ValueError:
             largo = 0
         if largo > 100_000:
-            self._enviar(413, {"ok": False, "error": "cuerpo demasiado grande"})
+            self._enviar(413, {"ok": False, "error": tr("cuerpo demasiado grande", "body too large")})
             return
         try:
             cuerpo = json.loads(self.rfile.read(largo) or b"{}")
         except Exception:
-            self._enviar(400, {"ok": False, "error": "JSON invalido"})
+            self._enviar(400, {"ok": False, "error": tr("JSON inválido", "invalid JSON")})
             return
         if not isinstance(cuerpo, dict):
-            self._enviar(400, {"ok": False, "error": "esperaba un objeto JSON"})
+            self._enviar(400, {"ok": False, "error": tr("esperaba un objeto JSON", "expected a JSON object")})
             return
+        idioma(cuerpo.get("idioma"))
 
         if self.path == "/api/actualizar":
             token = str(cuerpo.get("token") or "").strip().strip("\"'")
             if not token:
-                self._enviar(400, {"ok": False, "error": "falta el token"})
+                self._enviar(400, {"ok": False, "error": tr("falta el token", "the token is missing")})
                 return
             if len(token) > 4000:
-                self._enviar(400, {"ok": False, "error": "eso no es un token"})
+                self._enviar(400, {"ok": False, "error": tr("eso no es un token", "that is not a token")})
                 return
             api_key = str(cuerpo.get("api_key") or "").strip()
             if api_key and (len(api_key) > 64 or not all(c.isalnum() for c in api_key)):
-                self._enviar(400, {"ok": False, "error": "la API key no tiene buena pinta: son 32 caracteres en hexadecimal"})
+                self._enviar(400, {"ok": False, "error": tr(
+                    "la API key no tiene buena pinta: son 32 caracteres en hexadecimal",
+                    "the API key does not look right: it is 32 hexadecimal characters")})
                 return
             if not CANDADO.acquire(blocking=False):
-                self._enviar(409, {"ok": False, "error": "Ya hay una actualizacion en curso. Espera a que termine."})
+                self._enviar(409, {"ok": False, "error": tr(
+                    "Ya hay una actualización en curso. Espera a que termine.",
+                    "An update is already running. Wait until it finishes.")})
                 return
             try:
                 ok, mensaje = ejecutar(self.datos, token, api_key)
@@ -1187,7 +1416,7 @@ class Handler(BaseHTTPRequestHandler):
             self._enviar(200, {"ok": True})
             return
 
-        self._enviar(404, {"ok": False, "error": "no existe"})
+        self._enviar(404, {"ok": False, "error": tr("no existe", "not found")})
 
 
 PAGINA = r"""<!doctype html>
@@ -1202,8 +1431,14 @@ PAGINA = r"""<!doctype html>
 * { box-sizing:border-box; }
 body { margin:0; background:var(--fondo); color:var(--texto); font-family:"Segoe UI",system-ui,-apple-system,sans-serif; font-size:14px; line-height:1.5; }
 main { max-width:880px; margin:0 auto; padding:32px 22px 60px; }
+.cabecera { display:flex; align-items:flex-start; gap:12px; }
+.cabecera .texto { flex:1 1 auto; min-width:0; }
 h1 { font-size:24px; margin:0 0 4px; }
 .sub { color:var(--suave); margin:0 0 26px; }
+.idiomas { display:flex; border:1px solid var(--borde); border-radius:6px; overflow:hidden; margin-top:4px; flex:0 0 auto; }
+.idiomas button { background:#232a33; color:var(--suave); border:0; border-radius:0; padding:5px 9px; font-size:12px; line-height:1; font-family:inherit; cursor:pointer; }
+.idiomas button:hover { background:#2b333d; color:var(--texto); }
+.idiomas button[aria-pressed="true"] { background:#22303c; color:var(--acento); }
 .paso { background:var(--panel); border:1px solid var(--borde); border-radius:10px; padding:18px 20px; margin-bottom:14px; }
 .paso h2 { font-size:14px; margin:0 0 10px; text-transform:uppercase; letter-spacing:.05em; color:var(--suave); }
 a { color:var(--acento); }
@@ -1239,150 +1474,372 @@ label.check input { accent-color:var(--acento); }
 </head>
 <body>
 <main>
-  <h1>Steam Families</h1>
-  <p class="sub">Exporta tu biblioteca familiar, separa lo que te prestan y detecta qué ha entrado nuevo.</p>
+  <div class="cabecera">
+    <div class="texto">
+      <h1>Steam Families</h1>
+      <p class="sub" data-t="sub">Exporta tu biblioteca familiar, separa lo que te prestan y detecta qué ha entrado nuevo.</p>
+    </div>
+    <div class="idiomas" role="group" aria-label="Idioma" data-ta="idioma">
+      <button type="button" data-idioma="es" aria-pressed="true" title="Español">ES</button>
+      <button type="button" data-idioma="en" aria-pressed="false" title="English">EN</button>
+    </div>
+  </div>
 
   <section class="paso">
-    <h2>Paso 1 · El token</h2>
-    <p style="margin:0 0 10px">
+    <h2 data-t="paso1">Paso 1 · El token</h2>
+    <p style="margin:0 0 10px" data-th="paso1Texto">
       Abre <a href="https://store.steampowered.com/pointssummary/ajaxgetasyncconfig" target="_blank" rel="noopener">esta página</a>
       con la sesión de Steam iniciada y copia el valor de <code>webapi_token</code>.
       Vale el token suelto o el JSON entero: el programa saca el token de donde esté.
     </p>
     <details>
-      <summary>¿Por qué hace falta y qué es?</summary>
+      <summary data-t="porQue">¿Por qué hace falta y qué es?</summary>
       <ol>
-        <li>Es un JWT de Steam que caduca en unas 24 horas.</li>
-        <li>Solo sirve para leer tu biblioteca familiar. No se guarda en disco.</li>
-        <li>La página que abres es la oficial de Steam: devuelve un JSON y dentro está el token.</li>
+        <li data-t="porQue1">Es un JWT de Steam que caduca en unas 24 horas.</li>
+        <li data-t="porQue2">Solo sirve para leer tu biblioteca familiar.</li>
+        <li data-t="porQue3">La página que abres es la oficial de Steam: devuelve un JSON y dentro está el token.</li>
       </ol>
     </details>
   </section>
 
   <section class="paso">
-    <h2>Paso 2 · Pégalo aquí</h2>
+    <h2 data-t="paso2">Paso 2 · Pégalo aquí</h2>
     <div class="fila">
-      <input id="token" type="password" placeholder="Token, o el JSON entero de esa pagina" autocomplete="off" spellcheck="false">
-      <button id="pegar" type="button" class="sec">Pegar</button>
-      <button id="ver" type="button" class="sec">Mostrar</button>
-      <button id="lanzar" type="button">Actualizar</button>
+      <input id="token" type="password" data-tp="tokenPlaceholder" placeholder="Token, o el JSON entero de esa página" autocomplete="off" spellcheck="false">
+      <button id="pegar" type="button" class="sec" data-t="pegar">Pegar</button>
+      <button id="ver" type="button" class="sec" data-t="mostrar">Mostrar</button>
+      <button id="lanzar" type="button" data-t="lanzar">Actualizar</button>
     </div>
     <details style="margin-top:12px">
-      <summary>Copiar el token en un solo clic</summary>
+      <summary data-t="copiarTitulo">Copiar el token en un solo clic</summary>
       <p style="color:var(--suave);font-size:13px;margin:8px 0">
-        Arrastra este botón a la barra de marcadores:
-        <a id="marcador" href="#" style="display:inline-block;padding:5px 10px;border:1px solid #2b5878;border-radius:6px;background:#22303c;text-decoration:none">Copiar token</a>
+        <span data-th="copiarTexto">Arrastra este botón a la barra de marcadores:</span>
+        <a id="marcador" href="#" style="display:inline-block;padding:5px 10px;border:1px solid #2b5878;border-radius:6px;background:#22303c;text-decoration:none" data-t="copiarEnlace">Copiar token</a>
       </p>
-      <p style="color:var(--suave);font-size:13px;margin:8px 0">
+      <p style="color:var(--suave);font-size:13px;margin:8px 0" data-th="copiarPasos">
         Después, en la página del token de Steam, pulsa ese marcador: copia el token al portapapeles y te avisa.
         Vuelve aquí y pulsa <b>Pegar</b>.
       </p>
     </details>
     <details style="margin-top:8px">
-      <summary>Que guarda y que no</summary>
+      <summary data-t="guardaTitulo">Qué guarda y qué no</summary>
       <ul class="seguridad">
-        <li><b>Ninguna cookie.</b> El programa no lee, no pide y no guarda cookies de Steam.</li>
-        <li>El token caduca en 24 h. En Windows se guarda cifrado con DPAPI en <code>%LOCALAPPDATA%\SteamFamilies\token.bin</code>; en Linux y macOS, con permisos 600 en <code>~/.local/share/steam-families/</code>.</li>
-        <li>No se envia nada a ningun servidor propio: las unicas conexiones son a la API de Steam.</li>
-        <li>Puedes borrarlo cuando quieras con <b>olvidar</b>.</li>
+        <li data-th="guarda1"><b>Ninguna cookie.</b> El programa no lee, no pide y no guarda cookies de Steam.</li>
+        <li data-th="guarda2">El token caduca en 24 h. En Windows se guarda cifrado con DPAPI en <code>%LOCALAPPDATA%\SteamFamilies\token.bin</code>; en Linux y macOS, con permisos 600 en <code>~/.local/share/steam-families/</code>.</li>
+        <li data-t="guarda3">No se envía nada a ningún servidor propio: las únicas conexiones son a la API de Steam.</li>
+        <li data-th="guarda4">Puedes borrarlo cuando quieras con <b>olvidar</b>.</li>
       </ul>
     </details>
     <details style="margin-top:8px">
-      <summary>¿Los dueños salen como «Miembro 1»?</summary>
-      <p style="color:var(--suave);font-size:13px;margin:8px 0">
+      <summary data-t="duenosTitulo">¿Los dueños salen como «Miembro 1»?</summary>
+      <p style="color:var(--suave);font-size:13px;margin:8px 0" data-th="duenosTexto">
         Steam limita las consultas de nombres cuando se piden muchas seguidas. Con una
         <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">API key gratuita</a>
         salen siempre. Solo se usa durante esta consulta y no se guarda.
       </p>
-      <input id="apikey" type="text" placeholder="API key de Steam (opcional)" autocomplete="off" spellcheck="false" style="width:100%">
+      <input id="apikey" type="text" data-tp="apiKeyPlaceholder" placeholder="API key de Steam (opcional)" autocomplete="off" spellcheck="false" style="width:100%">
     </details>
     <div id="estado"></div>
     <label class="check" style="margin-top:10px">
       <input type="checkbox" id="recordar" checked>
-      Recordar el token en este equipo, cifrado
-      <a href="#" id="olvidar" style="margin-left:10px">olvidar</a>
+      <span data-t="recordar">Recordar el token en este equipo, cifrado</span>
+      <a href="#" id="olvidar" style="margin-left:10px" data-t="olvidar">olvidar</a>
     </label>
   </section>
 
   <section class="paso" id="resultado" hidden>
-    <h2>Resultado</h2>
+    <h2 data-t="resultado">Resultado</h2>
     <div class="tarjetas" id="tarjetas"></div>
     <div id="novedades"></div>
     <div class="fila" style="margin-top:14px">
-      <button class="sec" onclick="window.open('/panel.html','_blank')">Abrir panel</button>
-      <button class="sec" onclick="window.open('/prestados.csv','_blank')">Abrir CSV de prestados</button>
-      <button class="sec" onclick="window.open('/novedades.txt','_blank')">Abrir novedades</button>
-      <button class="sec" onclick="window.open('/historial.csv','_blank')">Historial</button>
+      <button class="sec" onclick="window.open('/panel.html','_blank')" data-t="abrirPanel">Abrir panel</button>
+      <button class="sec" onclick="window.open('/prestados.csv','_blank')" data-t="abrirCsv">Abrir CSV de prestados</button>
+      <button class="sec" onclick="window.open('/novedades.txt','_blank')" data-t="abrirNovedades">Abrir novedades</button>
+      <button class="sec" onclick="window.open('/historial.csv','_blank')" data-t="historial">Historial</button>
     </div>
   </section>
 
   <p class="pie">
-    Todo se ejecuta en tu ordenador y no se guarda ninguna cookie de Steam. Si marcas «recordar», el token queda guardado solo para tu usuario: cifrado con DPAPI en Windows, permisos 600 en Linux y macOS.
-    <a href="#" id="detener">Detener la interfaz</a>
+    <span data-th="pie">Todo se ejecuta en tu ordenador y no se guarda ninguna cookie de Steam. Si marcas «recordar», el token queda guardado solo para tu usuario: cifrado con DPAPI en Windows, permisos 600 en Linux y macOS.</span>
+    <a href="#" id="detener" data-t="detener">Detener la interfaz</a>
   </p>
 </main>
 
 <script>
+const TEXTOS = {
+  es: {
+    sub: "Exporta tu biblioteca familiar, separa lo que te prestan y detecta qué ha entrado nuevo.",
+    paso1: "Paso 1 · El token",
+    paso1Texto: 'Abre <a href="https://store.steampowered.com/pointssummary/ajaxgetasyncconfig" target="_blank" rel="noopener">esta página</a> con la sesión de Steam iniciada y copia el valor de <code>webapi_token</code>. Vale el token suelto o el JSON entero: el programa saca el token de donde esté.',
+    porQue: "¿Por qué hace falta y qué es?",
+    porQue1: "Es un JWT de Steam que caduca en unas 24 horas.",
+    porQue2: "Solo sirve para leer tu biblioteca familiar.",
+    porQue3: "La página que abres es la oficial de Steam: devuelve un JSON y dentro está el token.",
+    paso2: "Paso 2 · Pégalo aquí",
+    tokenPlaceholder: "Token, o el JSON entero de esa página",
+    pegar: "Pegar",
+    mostrar: "Mostrar",
+    ocultar: "Ocultar",
+    lanzar: "Actualizar",
+    copiarTitulo: "Copiar el token en un solo clic",
+    copiarTexto: "Arrastra este botón a la barra de marcadores:",
+    copiarEnlace: "Copiar token",
+    copiarPasos: 'Después, en la página del token de Steam, pulsa ese marcador: copia el token al portapapeles y te avisa. Vuelve aquí y pulsa <b>Pegar</b>.',
+    guardaTitulo: "Qué guarda y qué no",
+    guarda1: "<b>Ninguna cookie.</b> El programa no lee, no pide y no guarda cookies de Steam.",
+    guarda2: 'El token caduca en 24 h. En Windows se guarda cifrado con DPAPI en <code>%LOCALAPPDATA%\\SteamFamilies\\token.bin</code>; en Linux y macOS, con permisos 600 en <code>~/.local/share/steam-families/</code>.',
+    guarda3: "No se envía nada a ningún servidor propio: las únicas conexiones son a la API de Steam.",
+    guarda4: "Puedes borrarlo cuando quieras con <b>olvidar</b>.",
+    duenosTitulo: "¿Los dueños salen como «Miembro 1»?",
+    duenosTexto: 'Steam limita las consultas de nombres cuando se piden muchas seguidas. Con una <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">API key gratuita</a> salen siempre. Solo se usa durante esta consulta y no se guarda.',
+    apiKeyPlaceholder: "API key de Steam (opcional)",
+    recordar: "Recordar el token en este equipo, cifrado",
+    olvidar: "olvidar",
+    resultado: "Resultado",
+    abrirPanel: "Abrir panel",
+    abrirCsv: "Abrir CSV de prestados",
+    abrirNovedades: "Abrir novedades",
+    historial: "Historial",
+    pie: 'Todo se ejecuta en tu ordenador y no se guarda ninguna cookie de Steam. Si marcas «recordar», el token queda guardado solo para tu usuario: cifrado con DPAPI en Windows, permisos 600 en Linux y macOS.',
+    detener: "Detener la interfaz",
+    juegos: "juegos",
+    prestados: "prestados",
+    jugablesAhora: "jugables ahora",
+    horasPrestados: "horas en prestados",
+    nuevo: "nuevo",
+    fuera: "fuera",
+    otroDueno: "otro dueño",
+    tu: "tú",
+    que: "Qué",
+    quien: "Quién",
+    juego: "Juego",
+    novedadesDel: "Novedades del",
+    primera: "Primera ejecución: guardado el retrato inicial. A partir de la próxima sabrás qué entra y qué sale.",
+    sinCambios: "Sin cambios desde la última vez.",
+    leyendo: "Leyendo el portapapeles…",
+    portapapelesNo: "El navegador no deja leer el portapapeles. Pega con Ctrl+V.",
+    portapapelesVacio: "El portapapeles está vacío.",
+    pegado: "Token pegado. Pulsa Actualizar.",
+    faltaToken: "Pega antes el token.",
+    guardadoActualizando: "Token guardado en este equipo. Actualizando…",
+    consultando: "Consultando Steam. La primera vez tarda unos segundos más porque busca los nombres de los miembros…",
+    listoGuardado: "Listo. Token guardado, caduca el",
+    listoValido: "Listo. Token válido hasta el",
+    listo: "Listo.",
+    actualizarFallo: "No se pudo actualizar.",
+    sinConexion: "No hay conexión con la ventana de Steam Families. Suele pasar si esa ventana se ha cerrado: cierra esta pestaña, haz doble clic en iniciar.cmd (o ejecuta iniciar.sh) y vuelve a pegar el token.",
+    olvidado: "Token olvidado. En la próxima ejecución tendrás que pegarlo.",
+    detenida: "Interfaz detenida",
+    detenidaTexto: "Puedes cerrar esta pestaña. Para volver a abrirla, doble clic en iniciar.cmd.",
+    sinSesion: "Primero inicia sesión en Steam.",
+    copiado: "Token copiado. Vuelve a Steam Families y pulsa Pegar.",
+    copiaManual: "Copia el token:",
+    marcadorAviso: "No lo pulses aquí: arrástralo a la barra de marcadores y úsalo en la página del token de Steam.",
+    idioma: "Idioma"
+  },
+  en: {
+    sub: "Export your family library, split what is shared with you and spot what is new.",
+    paso1: "Step 1 · The token",
+    paso1Texto: 'Open <a href="https://store.steampowered.com/pointssummary/ajaxgetasyncconfig" target="_blank" rel="noopener">this page</a> with your Steam session signed in and copy the <code>webapi_token</code> value. The bare token or the whole JSON both work: the program finds the token either way.',
+    porQue: "Why is it needed, and what is it?",
+    porQue1: "It is a Steam JWT that expires after about 24 hours.",
+    porQue2: "It is only used to read your family library.",
+    porQue3: "The page you open is Steam's own: it returns a JSON document with the token inside.",
+    paso2: "Step 2 · Paste it here",
+    tokenPlaceholder: "Token, or the whole JSON from that page",
+    pegar: "Paste",
+    mostrar: "Show",
+    ocultar: "Hide",
+    lanzar: "Update",
+    copiarTitulo: "Copy the token in one click",
+    copiarTexto: "Drag this button to the bookmarks bar:",
+    copiarEnlace: "Copy token",
+    copiarPasos: 'Then, on Steam\'s token page, click that bookmark: it copies the token to the clipboard and tells you. Come back here and press <b>Paste</b>.',
+    guardaTitulo: "What is stored and what is not",
+    guarda1: "<b>No cookies.</b> The program does not read, ask for or store Steam cookies.",
+    guarda2: 'The token expires in 24 h. On Windows it is stored encrypted with DPAPI in <code>%LOCALAPPDATA%\\SteamFamilies\\token.bin</code>; on Linux and macOS, with 600 permissions in <code>~/.local/share/steam-families/</code>.',
+    guarda3: "Nothing is sent to any server of ours: the only connections are to Steam's API.",
+    guarda4: "You can delete it whenever you want with <b>forget</b>.",
+    duenosTitulo: "Owners show up as “Member 1”?",
+    duenosTexto: 'Steam rate-limits name lookups when too many are requested in a row. With a <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">free API key</a> they always resolve. It is only used for this request and is not stored.',
+    apiKeyPlaceholder: "Steam API key (optional)",
+    recordar: "Remember the token on this computer, encrypted",
+    olvidar: "forget",
+    resultado: "Result",
+    abrirPanel: "Open panel",
+    abrirCsv: "Open shared CSV",
+    abrirNovedades: "Open changes",
+    historial: "History",
+    pie: 'Everything runs on your computer and no Steam cookie is stored. If you tick “remember”, the token is stored for your user only: encrypted with DPAPI on Windows, 600 permissions on Linux and macOS.',
+    detener: "Stop the interface",
+    juegos: "games",
+    prestados: "shared with you",
+    jugablesAhora: "playable now",
+    horasPrestados: "hours in shared games",
+    nuevo: "new",
+    fuera: "gone",
+    otroDueno: "new owner",
+    tu: "you",
+    que: "What",
+    quien: "Who",
+    juego: "Game",
+    novedadesDel: "Changes from",
+    primera: "First run: initial snapshot saved. From the next run you will see what comes in and what goes out.",
+    sinCambios: "No changes since the last run.",
+    leyendo: "Reading the clipboard…",
+    portapapelesNo: "The browser will not let us read the clipboard. Paste with Ctrl+V.",
+    portapapelesVacio: "The clipboard is empty.",
+    pegado: "Token pasted. Press Update.",
+    faltaToken: "Paste the token first.",
+    guardadoActualizando: "Token loaded from this computer. Updating…",
+    consultando: "Asking Steam. The first time takes a few seconds longer while it looks up member names…",
+    listoGuardado: "Done. Token stored, expires on",
+    listoValido: "Done. Token valid until",
+    listo: "Done.",
+    actualizarFallo: "Could not update.",
+    sinConexion: "No connection to the Steam Families window. This usually means that window was closed: close this tab, double-click iniciar.cmd (or run iniciar.sh) and paste the token again.",
+    olvidado: "Token forgotten. You will have to paste it again next time.",
+    detenida: "Interface stopped",
+    detenidaTexto: "You can close this tab. To open it again, double-click iniciar.cmd.",
+    sinSesion: "Sign in to Steam first.",
+    copiado: "Token copied. Go back to Steam Families and press Paste.",
+    copiaManual: "Copy the token:",
+    marcadorAviso: "Don't click it here: drag it to the bookmarks bar and use it on Steam's token page.",
+    idioma: "Language"
+  }
+};
+
+function idiomaInicial() {
+  try {
+    const guardado = localStorage.getItem("sf-idioma");
+    if (guardado === "es" || guardado === "en") return guardado;
+  } catch (e) {}
+  const navegador = (navigator.language || "es").toLowerCase();
+  return navegador.startsWith("es") ? "es" : "en";
+}
+let IDIOMA = idiomaInicial();
+const T = clave => (TEXTOS[IDIOMA] && TEXTOS[IDIOMA][clave]) || TEXTOS.es[clave] || clave;
+const LOCALE = () => IDIOMA === "es" ? "es-ES" : "en-GB";
+const num = opciones => new Intl.NumberFormat(LOCALE(), opciones || {});
+const fmt = n => num().format(n);
+const fmtHoras = n => num({minimumFractionDigits: 1, maximumFractionDigits: 1}).format(n);
+
 const $ = id => document.getElementById(id);
-const fmt = n => new Intl.NumberFormat("es-ES").format(n);
+let ULTIMO = null;
+let VISIBLE = false;
+let ESTADO = {clave: "", extra: "", texto: "", error: false};
+
+function pintaEstado() {
+  const el = $("estado");
+  el.className = ESTADO.error ? "error" : "";
+  el.textContent = ESTADO.clave ? T(ESTADO.clave) + (ESTADO.extra ? " " + ESTADO.extra : "") : ESTADO.texto;
+}
+function ponEstado(clave, extra) {
+  ESTADO = {clave, extra: extra || "", texto: "", error: false};
+  pintaEstado();
+}
+function ponError(texto) {
+  ESTADO = {clave: "", extra: "", texto, error: true};
+  pintaEstado();
+}
+
+function escapa(texto) {
+  return texto.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, " ");
+}
+
+function construyeMarcador() {
+  const codigo = 'javascript:(async()=>{' +
+    'const r=await fetch("https://store.steampowered.com/pointssummary/ajaxgetasyncconfig",{credentials:"include"});' +
+    'const j=await r.json();' +
+    'let t=(j.data&&j.data.webapi_token)||j.webapi_token||"";' +
+    't=t.replace(/^"|"$/g,"");' +
+    'if(!t){alert("' + escapa(T("sinSesion")) + '");return;}' +
+    'try{await navigator.clipboard.writeText(t);alert("' + escapa(T("copiado")) + '");}' +
+    'catch(e){prompt("' + escapa(T("copiaManual")) + '",t);}' +
+    '})();';
+  $("marcador").setAttribute("href", codigo);
+}
+
+function aplicaIdioma() {
+  document.documentElement.lang = IDIOMA;
+  document.querySelectorAll("[data-t]").forEach(el => { el.textContent = T(el.dataset.t); });
+  document.querySelectorAll("[data-th]").forEach(el => { el.innerHTML = T(el.dataset.th); });
+  document.querySelectorAll("[data-tp]").forEach(el => { el.placeholder = T(el.dataset.tp); });
+  document.querySelectorAll("[data-ta]").forEach(el => { el.setAttribute("aria-label", T(el.dataset.ta)); });
+  document.querySelectorAll("[data-idioma]").forEach(b => {
+    b.setAttribute("aria-pressed", String(b.dataset.idioma === IDIOMA));
+  });
+  $("ver").textContent = VISIBLE ? T("ocultar") : T("mostrar");
+  construyeMarcador();
+  pintaEstado();
+  if (ULTIMO) pintar(ULTIMO);
+}
+
+document.querySelectorAll("[data-idioma]").forEach(b => b.addEventListener("click", () => {
+  IDIOMA = b.dataset.idioma;
+  try { localStorage.setItem("sf-idioma", IDIOMA); } catch (e) {}
+  aplicaIdioma();
+}));
 
 $("ver").addEventListener("click", () => {
   const t = $("token");
-  t.type = t.type === "password" ? "text" : "password";
-  $("ver").textContent = t.type === "password" ? "Mostrar" : "Ocultar";
+  VISIBLE = !VISIBLE;
+  t.type = VISIBLE ? "text" : "password";
+  $("ver").textContent = VISIBLE ? T("ocultar") : T("mostrar");
 });
 
-const CODIGO = 'javascript:(async()=>{const r=await fetch("https://store.steampowered.com/pointssummary/ajaxgetasyncconfig",{credentials:"include"});const j=await r.json();let t=(j.data&&j.data.webapi_token)||j.webapi_token||"";t=t.replace(/^"|"$/g,"");if(!t){alert("Primero inicia sesion en Steam.");return;}try{await navigator.clipboard.writeText(t);alert("Token copiado. Vuelve a Steam Families y pulsa Pegar.");}catch(e){prompt("Copia el token:",t);}})();';
-$("marcador").setAttribute("href", CODIGO);
 $("marcador").addEventListener("click", e => {
   e.preventDefault();
-  alert("No lo pulses aqui: arrastralo a la barra de marcadores y usalo en la pagina del token de Steam.");
+  alert(T("marcadorAviso"));
 });
 
 $("pegar").addEventListener("click", async () => {
-  $("estado").className = "";
-  $("estado").textContent = "Leyendo el portapapeles...";
+  ponEstado("leyendo");
   let t = "";
   try {
     t = await Promise.race([
       navigator.clipboard.readText(),
-      new Promise((_, rej) => setTimeout(() => rej(new Error("tarda demasiado")), 3000))
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 3000))
     ]);
   } catch (e) {
-    $("estado").className = "error";
-    $("estado").textContent = "El navegador no deja leer el portapapeles. Pega con Ctrl+V.";
+    ponError(T("portapapelesNo"));
     return;
   }
-  if (!t || !t.trim()) { $("estado").textContent = "El portapapeles esta vacio."; return; }
+  if (!t || !t.trim()) { ponEstado("portapapelesVacio"); return; }
   $("token").value = t.trim();
   $("token").type = "password";
-  $("ver").textContent = "Mostrar";
-  $("estado").className = "";
-  $("estado").textContent = "Token pegado. Pulsa Actualizar.";
+  VISIBLE = false;
+  $("ver").textContent = T("mostrar");
+  ponEstado("pegado");
 });
 
 function pintar(d) {
+  ULTIMO = d;
   $("resultado").hidden = false;
-  $("tarjetas").innerHTML = `
-    <div class="tarjeta"><b>${fmt(d.juegos)}</b><span>juegos</span></div>
-    <div class="tarjeta"><b>${fmt(d.prestados)}</b><span>prestados</span></div>
-    <div class="tarjeta"><b>${fmt(d.jugables)}</b><span>jugables ahora</span></div>
-    <div class="tarjeta"><b>${String(d.horas).replace(".", ",")}</b><span>horas en prestados</span></div>`;
+  $("tarjetas").innerHTML =
+    '<div class="tarjeta"><b>' + fmt(d.juegos) + '</b><span>' + T("juegos") + '</span></div>' +
+    '<div class="tarjeta"><b>' + fmt(d.prestados) + '</b><span>' + T("prestados") + '</span></div>' +
+    '<div class="tarjeta"><b>' + fmt(d.jugables) + '</b><span>' + T("jugablesAhora") + '</span></div>' +
+    '<div class="tarjeta"><b>' + fmtHoras(d.horas) + '</b><span>' + T("horasPrestados") + '</span></div>';
 
   const ev = d.novedades || [];
   if (!d.primera && ev.length) {
     const filas = ev.slice(0, 40).map(e => {
-      const etiqueta = e.evento === "nuevo" ? "nuevo" : (e.evento === "fuera" ? "fuera" : "otro dueño");
+      const etiqueta = e.evento === "nuevo" ? T("nuevo") : (e.evento === "fuera" ? T("fuera") : T("otroDueno"));
       const clase = e.evento === "nuevo" ? "si" : "no";
-      return `<tr><td>${e.nombre}</td><td class="${clase}">${etiqueta}</td><td class="quien">${e.quien || "tú"}</td></tr>`;
+      let quien = e.quien || T("tu");
+      const miembro = /^Miembro (\d+)$/.exec(quien);
+      if (miembro && IDIOMA === "en") quien = "Member " + miembro[1];
+      return '<tr><td>' + e.nombre + '</td><td class="' + clase + '">' + etiqueta +
+        '</td><td class="quien">' + quien + '</td></tr>';
     }).join("");
-    $("novedades").innerHTML = `
-      <p style="margin:14px 0 0;color:var(--suave);font-size:13px">Novedades del ${d.fecha_novedades}</p>
-      <table><thead><tr><th>Juego</th><th>Qué</th><th>Quién</th></tr></thead><tbody>${filas}</tbody></table>`;
+    $("novedades").innerHTML =
+      '<p style="margin:14px 0 0;color:var(--suave);font-size:13px">' + T("novedadesDel") + " " + d.fecha_novedades + '</p>' +
+      '<table><thead><tr><th>' + T("juego") + '</th><th>' + T("que") + '</th><th>' + T("quien") + '</th></tr></thead><tbody>' + filas + '</tbody></table>';
   } else if (d.primera) {
-    $("novedades").innerHTML = `<p style="margin:14px 0 0;color:var(--suave)">Primera ejecución: guardado el retrato inicial. A partir de la próxima sabrás qué entra y qué sale.</p>`;
+    $("novedades").innerHTML = '<p style="margin:14px 0 0;color:var(--suave)">' + T("primera") + '</p>';
   } else {
-    $("novedades").innerHTML = `<p style="margin:14px 0 0;color:var(--suave)">Sin cambios desde la última vez.</p>`;
+    $("novedades").innerHTML = '<p style="margin:14px 0 0;color:var(--suave)">' + T("sinCambios") + '</p>';
   }
 }
 
@@ -1396,33 +1853,29 @@ async function cargar() {
 
 async function lanzar(auto) {
   const token = $("token").value.trim();
-  if (!token) { $("estado").textContent = "Pega antes el token."; return; }
+  if (!token) { ponEstado("faltaToken"); return; }
   $("lanzar").disabled = true;
-  $("estado").className = "";
-  $("estado").textContent = auto
-    ? "Token guardado en este equipo. Actualizando..."
-    : "Consultando Steam. La primera vez tarda unos segundos mas porque busca los nombres de los miembros...";
+  ponEstado(auto ? "guardadoActualizando" : "consultando");
   try {
     const r = await fetch("/api/actualizar", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({token, api_key: $("apikey").value.trim(), guardar: $("recordar").checked})
+      body: JSON.stringify({token, api_key: $("apikey").value.trim(), guardar: $("recordar").checked, idioma: IDIOMA})
     });
     const d = await r.json();
     if (!d.ok) {
-      $("estado").className = "error";
-      $("estado").textContent = d.error || "No se pudo actualizar.";
+      ponError(d.error || T("actualizarFallo"));
       return;
     }
     if (!$("recordar").checked) $("token").value = "";
-    $("estado").textContent = d.caduca
-      ? "Listo. Token " + ($("recordar").checked ? "guardado, caduca el " : "válido hasta el ") + d.caduca + "."
-      : "Listo.";
+    if (d.caduca) {
+      ponEstado($("recordar").checked ? "listoGuardado" : "listoValido", d.caduca + ".");
+    } else {
+      ponEstado("listo");
+    }
     pintar(d);
   } catch (e) {
-    $("estado").className = "error";
-    $("estado").textContent = "No hay conexion con la ventana de Steam Families. Suele pasar si esa ventana se ha cerrado: " +
-      "cierra esta pestana, haz doble clic en actualizar.cmd y vuelve a pegar el token. (" + e.message + ")";
+    ponError(T("sinConexion") + " (" + e.message + ")");
   } finally {
     $("lanzar").disabled = false;
   }
@@ -1433,8 +1886,7 @@ $("olvidar").addEventListener("click", async e => {
   e.preventDefault();
   try { await fetch("/api/olvidar", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"}); } catch (x) {}
   $("token").value = "";
-  $("estado").className = "";
-  $("estado").textContent = "Token olvidado. En la proxima ejecucion tendras que pegarlo.";
+  ponEstado("olvidado");
 });
 
 async function arranque() {
@@ -1449,13 +1901,15 @@ async function arranque() {
   } catch (e) {}
   await cargar();
 }
-arranque();
 
 $("detener").addEventListener("click", async e => {
   e.preventDefault();
-  try { await fetch("/api/detener", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"}); } catch (x) {}
-  document.body.innerHTML = '<main><h1>Interfaz detenida</h1><p class="sub">Puedes cerrar esta pestaña. Para volver a abrirla, doble clic en iniciar.cmd.</p></main>';
+  try { await fetch("/api/detener", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({idioma: IDIOMA})}); } catch (x) {}
+  document.body.innerHTML = '<main><h1>' + T("detenida") + '</h1><p class="sub">' + T("detenidaTexto") + '</p></main>';
 });
+
+aplicaIdioma();
+arranque();
 </script>
 </body>
 </html>
@@ -1519,7 +1973,7 @@ def main(argv=None):
         print(f"{resumen['juegos']} juegos | {resumen['juegos'] - resumen['prestados']} tuyos | "
               f"{resumen['prestados']} prestados")
         if resumen["primera"]:
-            print("primera ejecucion: guardado el retrato inicial, sin novedades")
+            print("primera ejecución: guardado el retrato inicial, sin novedades")
         else:
             nuevos = sum(1 for e in resumen["eventos"] if e["evento"] == "nuevo")
             fuera = sum(1 for e in resumen["eventos"] if e["evento"] == "fuera")
@@ -1550,7 +2004,7 @@ def interfaz(args):
     url = f"http://127.0.0.1:{servidor.server_address[1]}/"
     print(f"Datos: {datos}")
     print(f"Interfaz: {url}")
-    print("Cierra esta ventana (o pulsa Detener en la pagina) para terminar.")
+    print("Cierra esta ventana (o pulsa Detener en la página) para terminar.")
     if not args.sin_navegador:
         def abrir():
             try:

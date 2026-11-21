@@ -99,7 +99,7 @@ class PruebaChivato(unittest.TestCase):
         ]
         texto = sfl.chivato(eventos, "2026-01-01 10:00")
         self.assertIn("+ Juego  (de V)  [gratis]", texto)
-        self.assertIn("- Otro  (ya no esta; era de M)", texto)
+        self.assertIn("- Otro  (ya no está; era de M)", texto)
         self.assertIn("+ Mio  (de ti)", texto)
 
     def test_sin_eventos(self):
@@ -162,7 +162,7 @@ class PruebaPanel(unittest.TestCase):
             self.assertIn("V", html)
             self.assertIn('"v":"2026-02-01"', html)
             self.assertIn('"q":"2026-03-04"', html)
-            self.assertIn("Anadido", html)
+            self.assertIn("Añadido", html)
 
             prestados = list(csv.DictReader((d / "prestados.csv").open(encoding="utf-8-sig")))
             self.assertEqual(len(prestados), 2)

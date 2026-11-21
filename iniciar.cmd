@@ -4,7 +4,7 @@ title Steam Families
 where python >nul 2>nul
 if errorlevel 1 (
   echo.
-  echo No encuentro Python. Instalalo desde https://www.python.org/downloads/
+  echo No encuentro Python. Instala Python desde https://www.python.org/downloads/
   echo y vuelve a hacer doble clic en este fichero.
   echo.
   pause

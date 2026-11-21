@@ -9,7 +9,7 @@ if ! command -v python3 >/dev/null 2>&1; then
     if command -v python >/dev/null 2>&1; then
         PY=python
     else
-        echo "No encuentro python3. Instalalo con el gestor de paquetes de tu distribucion." >&2
+        echo "No encuentro python3. Instálalo con el gestor de paquetes de tu distribución." >&2
         exit 1
     fi
 fi
