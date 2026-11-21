@@ -80,8 +80,94 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 python -m unittest discover -s pruebas -v
 ```
 
-23 pruebas sin red. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`.
+39 pruebas sin red (3 son solo de Windows y se saltan en otros sistemas). GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`.
 
 ## Créditos
 
 Basado en [salah153/steam-family-library](https://github.com/salah153/steam-family-library). MIT, ver `LICENSE`.
+
+---
+
+# Steam Families (English)
+
+See which games your family lends you on Steam, which ones are yours, and what is new since last time. A single Python file, no dependencies, with a browser interface.
+
+Steam merges all the libraries of the group and has no filter to tell them apart. This does.
+
+## Getting started
+
+1. Install [Python 3.8 or higher](https://www.python.org/downloads/). On Windows, tick "Add python.exe to PATH".
+2. Windows: double-click `iniciar.cmd`. Linux or macOS: `chmod +x iniciar.sh && ./iniciar.sh`.
+3. A page opens on `127.0.0.1`. Paste the token the first time; from then on it is stored encrypted and the app updates itself until it expires.
+
+### The token
+
+1. Open `https://store.steampowered.com/pointssummary/ajaxgetasyncconfig` while signed in to Steam.
+2. Copy the value of `webapi_token`. Either the bare token or the whole JSON works.
+3. Paste it in the interface.
+
+The page itself has a **Copiar token** bookmarklet that puts the token on the clipboard in one click, and a **Pegar** (paste) button.
+
+## What it generates
+
+| File | Content |
+|---|---|
+| `panel.html` | The full dashboard in a single offline file |
+| `library.csv` | The whole library with a `source` column (`own` / `family`) |
+| `prestados.csv`, `prestados.txt` | Only what is lent to you |
+| `novedades.txt`, `novedades.json` | What changed in the last run |
+| `historial.csv` | One row per change, with a date |
+| `snapshot.json` | A snapshot of the library to compare against |
+
+The dashboard has accent-insensitive search, filters by origin, status and age, an **Añadido** (added) column with the acquisition date, a **nuevo** (new) tag, a **gratis** (free) tag and the **Compras de la familia (90 días)** shortcut (family purchases, last 90 days). The interface and the dashboard come in Spanish and English: the **ES / EN** button in the corner switches the language and the choice is remembered. The data files (`novedades.txt`, `prestados.txt`) stay in Spanish.
+
+CSVs are UTF-8 with BOM so Excel respects accents.
+
+## Security
+
+- **No cookies.** It does not read, ask for or store Steam cookies.
+- The token is stored encrypted with DPAPI in `%LOCALAPPDATA%\SteamFamilies\token.bin`. Only your Windows user can decrypt it, and it expires on its own after 24 h. There is a **olvidar** (forget) link.
+- The API key, if you paste one, is stored the same way in `apikey.bin`, in the same folder. **olvidar** deletes both.
+- Nothing leaves your machine: the only connections are to `api.steampowered.com` and `steamcommunity.com`.
+- The local server listens only on `127.0.0.1` and rejects requests from other websites by `Origin`.
+- SteamIDs are stored as a 10-character hash, never in the clear. The data files are in `.gitignore`.
+
+## Terminal
+
+```
+python steam_families.py                      # browser interface
+python steam_families.py --exportar --token X # export without the interface
+python steam_families.py --panel              # only regenerate the dashboard
+```
+
+Options: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin-nombres`, `--sin-historial`, `--sin-precios`, `--puerto`, `--sin-navegador`.
+
+## How it works
+
+1. The token is a JWT signed by Steam; its `sub` field is your SteamID64 and `exp` the expiry.
+2. `IFamilyGroupsService/GetFamilyGroupForUser` returns the group and its members.
+3. `IFamilyGroupsService/GetSharedLibraryApps` with `include_own=true` returns all apps with `owner_steamids`, `exclude_reason` and `rt_playtime`.
+4. If your SteamID is among the owners, the game is `own`; otherwise `family`.
+5. What is new is the difference between the previous `snapshot.json` and the current one.
+
+The three family endpoints are undocumented: they work today and may change tomorrow.
+
+## Limits
+
+- The token expires every 24 hours. Without storing a session cookie there is no way to renew it automatically, and storing cookies is ruled out.
+- Free-to-play games count as library: a free game that was claimed also shows up as new.
+- "Bought", "key" and "gift" cannot be told apart: the endpoint only says that someone has it.
+- `rt_time_acquired` is used as the acquisition date because it matches real purchases, but Valve does not document what it exactly means.
+- Without an API key, names are requested one by one from Steam's public endpoint. If it answers 429, it waits 20 s and retries, with at most three waits per run; if it keeps throttling, those members stay as "Miembro 1", "Miembro 2"... until the next run.
+
+## Development
+
+```
+python -m unittest discover -s pruebas -v
+```
+
+39 tests with no network (3 are Windows-only and are skipped elsewhere). GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher.
+
+## Credits
+
+Based on [salah153/steam-family-library](https://github.com/salah153/steam-family-library). MIT, see `LICENSE`.
