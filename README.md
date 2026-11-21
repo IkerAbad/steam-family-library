@@ -72,7 +72,7 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 - Los free-to-play cuentan como biblioteca: un juego gratis reclamado también sale como novedad.
 - «Comprado», «key» y «regalo» no se distinguen: el endpoint solo dice que alguien lo tiene.
 - `rt_time_acquired` se usa como fecha de adquisición porque cuadra con compras reales, pero Valve no documenta su significado exacto.
-- Sin API key, los nombres se piden de uno en uno al endpoint público de Steam. Si aun así devuelve 429, esos miembros quedan como «Miembro 1», «Miembro 2»… hasta la siguiente ejecución.
+- Sin API key, los nombres se piden de uno en uno al endpoint público de Steam. Si responde 429, espera 20 s y reintenta, con tres esperas como máximo por ejecución; si sigue frenando, esos miembros quedan como «Miembro 1», «Miembro 2»… hasta la siguiente.
 
 ## Desarrollo
 

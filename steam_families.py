@@ -146,8 +146,9 @@ def nombres(steamids, previos=None, api_key=""):
     """Alias público de cada miembro. Sin API key: endpoint de la comunidad.
 
     `previos` va por etiqueta (hash), no por SteamID, para no guardar los IDs.
-    429 significa que Steam ha frenado las peticiones: se devuelve lo que haya y
-    se reintenta en la siguiente ejecución.
+    429 significa que Steam ha frenado las peticiones: se espera 20 s y se
+    reintenta el mismo miembro, con tres esperas como máximo por ejecución.
+    Si sigue frenando, lo que falte se deja para la siguiente.
     """
     previos = dict(previos or {})
     out = {}
@@ -176,23 +177,33 @@ def nombres(steamids, previos=None, api_key=""):
 
     pendientes = [s for s in faltan if s not in out]
     # Uno por uno: Steam devuelve 429 si se piden varios SteamID en la misma llamada.
+    # Si aun así frena, se espera 20 s y se reintenta, con tres esperas como máximo
+    # por ejecución: un minuto de margen y nunca deja la interfaz colgada.
+    esperas = 0
     for i, sid in enumerate(pendientes):
         if not sid:
             continue
         if i:
             time.sleep(1.1)
-        try:
-            url = "https://steamcommunity.com/actions/ajaxresolveusers?steamids=" + sid
-            req = urllib.request.Request(url, headers={"User-Agent": UA})
-            with urllib.request.urlopen(req, timeout=20) as r:
-                for u in json.load(r):
-                    if str(u.get("steamid", "")) == sid and u.get("persona_name"):
-                        out[sid] = u["persona_name"].strip()
-        except urllib.error.HTTPError as e:
-            if e.code == 429:
+        while True:
+            try:
+                url = "https://steamcommunity.com/actions/ajaxresolveusers?steamids=" + sid
+                req = urllib.request.Request(url, headers={"User-Agent": UA})
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    for u in json.load(r):
+                        if str(u.get("steamid", "")) == sid and u.get("persona_name"):
+                            out[sid] = u["persona_name"].strip()
                 break
-        except Exception:
-            continue
+            except urllib.error.HTTPError as e:
+                if e.code != 429:
+                    break
+                if esperas >= 3:
+                    # Steam sigue frenando: lo que quede, para la próxima ejecución.
+                    return out
+                esperas += 1
+                time.sleep(20)
+            except Exception:
+                break
 
     return out
 

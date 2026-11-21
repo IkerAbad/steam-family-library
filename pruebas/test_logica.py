@@ -140,7 +140,36 @@ class PruebaNombresRed(unittest.TestCase):
         sfl.urllib.request.urlopen = falso
         alias = sfl.nombres(["111", "222"], {}, "")
         self.assertEqual(alias, {})
-        self.assertEqual(llamadas, ["111"])
+        self.assertEqual(llamadas, ["111", "111", "111", "111"])
+
+    def test_reintenta_tras_el_429(self):
+        llamadas = []
+
+        class Respuesta:
+            def __init__(self, sid):
+                self.sid = sid
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return json.dumps([{"steamid": self.sid,
+                                    "persona_name": "Nombre"}]).encode()
+
+        def falso(req, timeout=0):
+            sid = req.full_url.rsplit("=", 1)[1]
+            llamadas.append(sid)
+            if len(llamadas) == 1:
+                raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
+            return Respuesta(sid)
+
+        sfl.urllib.request.urlopen = falso
+        alias = sfl.nombres(["111"], {}, "")
+        self.assertEqual(alias, {"111": "Nombre"})
+        self.assertEqual(llamadas, ["111", "111"])
 
 
 class PruebaChivato(unittest.TestCase):
