@@ -1805,7 +1805,9 @@ class Handler(BaseHTTPRequestHandler):
                 # La página ya no recibe el token: si está guardado, se usa aquí.
                 token = leer_token() or ""
             if not token:
-                self._enviar(400, {"ok": False, "error": tr("falta el token", "the token is missing")})
+                self._enviar(400, {"ok": False, "error": tr(
+                    "no hay token: pega uno nuevo (el guardado ha caducado o no existe)",
+                    "there is no token: paste a new one (the stored one expired or does not exist)")})
                 return
             if len(token) > 4000:
                 self._enviar(400, {"ok": False, "error": tr("eso no es un token", "that is not a token")})
