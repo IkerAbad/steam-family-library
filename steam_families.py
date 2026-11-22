@@ -37,7 +37,7 @@ from pathlib import Path
 API = "https://api.steampowered.com"
 COMUNIDAD = "https://steamcommunity.com"
 TIENDA = "https://store.steampowered.com"
-VERSION = "2.2.5"
+VERSION = "2.3.0"
 UA = f"steam-family-library/{VERSION}"
 EXCLUDE_REASONS = {
     0: "",
@@ -670,6 +670,7 @@ tr.oculto { opacity:.55; }
 #miembrosCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
 #miembrosCaja table { min-width:0; }
 #miembrosCaja th, #miembrosCaja td { font-size:12px; padding:6px 8px; }
+.mini { height:6px; background:var(--acento); opacity:.6; border-radius:3px; margin-top:4px; }
 #historialCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
 #historialCaja table { min-width:0; }
 #historialCaja th, #historialCaja td { font-size:12px; padding:6px 8px; }
@@ -819,7 +820,7 @@ const NOMBRES = __NOMBRES__;
 const TEXTOS = {
   es: {
     titulo: "Biblioteca familiar de Steam",
-    buscar: "Buscar por nombre o dueño… (los acentos dan igual)",
+    buscar: "Buscar por nombre o dueño… (horas:>10, anio:2026)",
     todo: "Todo",
     soloPrestados: "Solo prestados",
     soloMios: "Solo míos",
@@ -858,6 +859,7 @@ const TEXTOS = {
     historialSinFiltros: "Ninguna novedad cumple esos filtros.",
     historialBuscar: "Buscar por juego o miembro…",
     historialCuenta: "%n% de %m% novedades",
+    mostrarMas: "Mostrar más",
     miembrosTitulo: "Por miembro",
     miembro: "Miembro",
     jugablesHeader: "Jugables",
@@ -909,7 +911,7 @@ const TEXTOS = {
   },
   en: {
     titulo: "Steam family library",
-    buscar: "Search by name or owner… (accents don't matter)",
+    buscar: "Search by name or owner… (horas:>10, anio:2026)",
     todo: "All",
     soloPrestados: "Shared with me",
     soloMios: "Only mine",
@@ -948,6 +950,7 @@ const TEXTOS = {
     historialSinFiltros: "No change matches those filters.",
     historialBuscar: "Search by game or member…",
     historialCuenta: "%n% of %m% changes",
+    mostrarMas: "Show more",
     miembrosTitulo: "By member",
     miembro: "Member",
     jugablesHeader: "Playable",
@@ -1020,8 +1023,27 @@ const fechaHora = s => {
 };
 
 const plano = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-function preparaBusqueda() {
-  DATOS.forEach(d => {
+function analizaConsulta(texto) {
+  const resto = [];
+  let horas = null;
+  let anio = null;
+  (texto || "").split(/\s+/).forEach(t => {
+    const h = /^horas:([<>])(\d+(?:[.,]\d+)?)$/i.exec(t);
+    if (h) {
+      horas = {signo: h[1], valor: parseFloat(h[2].replace(",", "."))};
+      return;
+    }
+    const a = /^anio:(\d{4})$/i.exec(t);
+    if (a) {
+      anio = a[1];
+      return;
+    }
+    if (t) resto.push(t);
+  });
+  return {texto: resto.join(" "), horas, anio};
+}
+
+function preparaBusqueda() {  DATOS.forEach(d => {
     const miembro = /^Miembro (\d+)$/.exec(d.d || "");
     const alterno = miembro && IDIOMA === "en" ? "Member " + miembro[1] : "";
     const propio = d.d === "tú" ? T("tu") : "";
@@ -1071,6 +1093,8 @@ const $ = id => document.getElementById(id);
 const cuerpo = $("cuerpo");
 const CLAVE_TEMA = "sf-tema";
 let TEMA = document.documentElement.dataset.tema === "claro" ? "claro" : "oscuro";
+let TEMA_MANUAL = false;
+try { TEMA_MANUAL = !!localStorage.getItem(CLAVE_TEMA); } catch (e) {}
 
 function aplicaTema() {
   document.documentElement.dataset.tema = TEMA;
@@ -1102,6 +1126,7 @@ let FAVORITOS = new Set(cargaLista(CLAVE_FAV));
 let OCULTOS = new Set(cargaLista(CLAVE_OCULTOS));
 let LISTA_ACTUAL = [];
 let HISTORIAL_ACTUAL = [];
+let HISTORIAL_VISIBLE = 100;
 
 const compara = (a, b) => a.localeCompare(b, IDIOMA);
 
@@ -1202,7 +1227,8 @@ function pintaAviso() {
 }
 
 function pinta() {
-  const q = plano($("q").value.trim());
+  const consulta = analizaConsulta($("q").value.trim());
+  const q = plano(consulta.texto);
   const origen = $("origen").value;
   const dueno = $("duenoFiltro").value;
   const estado = $("estado").value;
@@ -1211,7 +1237,7 @@ function pinta() {
   const soloNuevos = $("soloNuevos").checked;
   const soloFav = $("soloFav").checked;
   const verOcultos = $("verOcultos").checked;
-  const filtrando = !!q || origen !== "todo" || dueno !== "todo" || estado !== "todo" ||
+  const filtrando = !!q || !!consulta.horas || !!consulta.anio || origen !== "todo" || dueno !== "todo" || estado !== "todo" ||
     antiguedad !== "todo" || soloNuevos || soloFav || verOcultos || !!ORDEN_CABECERA;
   $("limpiar").hidden = !filtrando;
 
@@ -1222,6 +1248,13 @@ function pinta() {
 
   let lista = DATOS.filter(d => {
     if (q && !d.b.includes(q)) return false;
+    if (consulta.horas) {
+      const jugadas = d.m / 60;
+      const signo = consulta.horas.signo === ">" ? jugadas > consulta.horas.valor
+        : jugadas < consulta.horas.valor;
+      if (!signo) return false;
+    }
+    if (consulta.anio && (!d.q || d.q.slice(0, 4) !== consulta.anio)) return false;
     if (origen !== "todo" && d.s !== origen) return false;
     if (dueno !== "todo" && !(d.o || []).includes(dueno)) return false;
     if (soloNuevos && d.w !== "nuevo") return false;
@@ -1541,6 +1574,7 @@ function pintaMiembros() {
     return {nombre, j: m.j, p: m.p, m: m.m};
   });
   filas.sort((a, b) => b.j - a.j || compara(a.nombre, b.nombre));
+  const maxHoras = Math.max(1, ...filas.map(f => f.m));
 
   const tabla = document.createElement("table");
   const thead = document.createElement("thead");
@@ -1566,6 +1600,11 @@ function pintaMiembros() {
     const tiempo = document.createElement("td");
     tiempo.className = "der";
     tiempo.textContent = f.m > 0 ? horas(f.m) + " h" : "";
+    const barra = document.createElement("div");
+    barra.className = "mini";
+    barra.style.width = Math.round((f.m / maxHoras) * 100) + "%";
+    barra.title = f.m > 0 ? horas(f.m) + " h" : "";
+    tiempo.appendChild(barra);
     tr.append(nombre, juegos, jugables, tiempo);
     tbody.appendChild(tr);
   });
@@ -1607,7 +1646,7 @@ function pintaHistorial() {
   thead.appendChild(fila);
 
   const tbody = document.createElement("tbody");
-  lista.slice().reverse().slice(0, 300).forEach(h => {
+  lista.slice().reverse().slice(0, HISTORIAL_VISIBLE).forEach(h => {
     const tr = document.createElement("tr");
     const f = document.createElement("td");
     f.className = "dim";
@@ -1633,7 +1672,21 @@ function pintaHistorial() {
     tbody.appendChild(tr);
   }
   tabla.append(thead, tbody);
-  $("historialTabla").replaceChildren(cuenta, tabla);
+  const piezas = [cuenta, tabla];
+  if (lista.length > HISTORIAL_VISIBLE) {
+    const mas = document.createElement("button");
+    mas.type = "button";
+    mas.id = "historialMas";
+    mas.className = "sec";
+    mas.style.marginTop = "10px";
+    mas.textContent = T("mostrarMas") + " (" + (lista.length - HISTORIAL_VISIBLE) + ")";
+    mas.addEventListener("click", () => {
+      HISTORIAL_VISIBLE += 100;
+      pintaHistorial();
+    });
+    piezas.push(mas);
+  }
+  $("historialTabla").replaceChildren(...piezas);
 }
 
 function aplicaIdioma() {
@@ -1665,9 +1718,20 @@ document.querySelectorAll("[data-idioma]").forEach(b => b.addEventListener("clic
 }));
 $("tema").addEventListener("click", () => {
   TEMA = TEMA === "claro" ? "oscuro" : "claro";
+  TEMA_MANUAL = true;
   try { localStorage.setItem(CLAVE_TEMA, TEMA); } catch (e) {}
   aplicaTema();
 });
+if (window.matchMedia) {
+  const consultaTema = matchMedia("(prefers-color-scheme: light)");
+  const cambiaTema = e => {
+    if (TEMA_MANUAL) return;
+    TEMA = e.matches ? "claro" : "oscuro";
+    aplicaTema();
+  };
+  if (consultaTema.addEventListener) consultaTema.addEventListener("change", cambiaTema);
+  else if (consultaTema.addListener) consultaTema.addListener(cambiaTema);
+}
 
 ["origen", "duenoFiltro", "estado", "antiguedad", "soloNuevos", "soloFav", "verOcultos"].forEach(id => $(id).addEventListener("input", pinta));
 $("orden").addEventListener("input", () => {
@@ -1696,6 +1760,18 @@ let esperaPinta = null;
 $("q").addEventListener("input", () => {
   clearTimeout(esperaPinta);
   esperaPinta = setTimeout(pinta, 120);
+});
+document.addEventListener("keydown", e => {
+  const etiqueta = (e.target.tagName || "").toLowerCase();
+  if (e.key === "/" && !["input", "select", "textarea"].includes(etiqueta)) {
+    e.preventDefault();
+    $("q").focus();
+    $("q").select();
+  } else if (e.key === "Escape" && e.target.id === "q") {
+    $("q").value = "";
+    clearTimeout(esperaPinta);
+    pinta();
+  }
 });
 $("verNuevos").addEventListener("click", () => {
   $("soloNuevos").checked = !$("soloNuevos").checked;
@@ -1736,7 +1812,10 @@ $("ficheroAjustes").addEventListener("change", async e => {
   if (fichero) await cargaAjustesFichero(fichero);
   e.target.value = "";
 });
-["hq", "hecho", "hdesde", "hhasta"].forEach(id => $(id).addEventListener("input", pintaHistorial));
+["hq", "hecho", "hdesde", "hhasta"].forEach(id => $(id).addEventListener("input", () => {
+  HISTORIAL_VISIBLE = 100;
+  pintaHistorial();
+}));
 pintaDuenos();
 cargaFiltros();
 aplicaIdioma();
@@ -1817,7 +1896,7 @@ def exportar(datos, token, api_key="", include_free=False, include_non_games=Fal
     }
 
 
-def leer_historial(datos, limite=500):
+def leer_historial(datos, limite=2000):
     """Últimas novedades guardadas en historial.csv, para el panel."""
     ruta = Path(datos) / "historial.csv"
     if not ruta.exists():

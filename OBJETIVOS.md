@@ -1,6 +1,16 @@
 # Objetivos
 
-> Estado: los ocho están implementados en `main`, pendientes de etiquetar.
+> Estado: los ocho primeros y la segunda tanda están implementados.
+
+## Segunda tanda (2.3.0)
+
+- Historial paginado con «Mostrar más».
+- Barra de horas por miembro.
+- Tema que sigue al sistema si no hay elección manual.
+- Atajos `/` y `Escape`.
+- Búsqueda avanzada `horas:>10`, `horas:<2`, `anio:2026`.
+
+## Primera tanda (2.2.0)
 
 Ordenados por valor para quien usa el programa. Cada uno con su criterio de
 aceptación para saber cuándo está terminado.

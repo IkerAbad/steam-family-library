@@ -1,5 +1,13 @@
 # Cambios
 
+## 2.3.0 — 2026-11-22
+
+- Historial paginado: 100 novedades y botón «Mostrar más».
+- Barra de horas por miembro en las estadísticas.
+- El tema sigue al sistema si no has elegido uno a mano.
+- Atajos: `/` enfoca el buscador y `Escape` lo limpia.
+- Búsqueda avanzada: `horas:>10`, `horas:<2` y `anio:2026`.
+
 ## 2.2.5 — 2026-11-22
 
 - Guardar y cargar los ajustes del panel: favoritos, ocultos, tema, idioma y filtros.

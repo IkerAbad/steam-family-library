@@ -59,7 +59,8 @@ def escribe_datos(d):
                        "30": {"o": [sfl.etiqueta("222")], "p": False}}}
     (d / "snapshot.json").write_text(json.dumps(snap), encoding="utf-8")
     (d / "historial.csv").write_text(
-        "fecha,evento,appid,nombre,quien,propio\n"
+        "fecha,evento,appid,nombre,quien,propio\n" +
+        "".join(f"2026-01-01 00:00,nuevo,{1000 + i},Relleno {i},Ana,no\n" for i in range(120)) +
         "2026-11-20 10:00,nuevo,20,Paseo,Ana,no\n"
         "2026-11-21 09:00,fuera,99,Viejo,Luis,no\n",
         encoding="utf-8-sig")
@@ -171,7 +172,7 @@ class PruebaInterfaz(unittest.TestCase):
         pagina = self.pagina("/panel.html")
         pagina.click("#verHistorial")
         filas = "#historialTabla tbody tr"
-        self.assertEqual(pagina.locator(filas).count(), 2)
+        self.assertEqual(pagina.locator(filas).count(), 100)
 
         pagina.fill("#hq", "Paseo")
         self.assertEqual(pagina.locator(filas).count(), 1)
@@ -187,6 +188,15 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertEqual(pagina.locator(filas).count(), 1)
         self.assertIn("Viejo", pagina.inner_text("#historialTabla"))
 
+    def test_historial_mas(self):
+        pagina = self.pagina("/panel.html")
+        pagina.click("#verHistorial")
+        filas = pagina.locator("#historialTabla tbody tr")
+        self.assertEqual(filas.count(), 100)
+        self.assertTrue(pagina.is_visible("#historialMas"))
+        pagina.click("#historialMas")
+        self.assertEqual(filas.count(), 122)
+
     def test_miembros(self):
         pagina = self.pagina("/panel.html")
         filas = pagina.locator("#miembrosTabla tbody tr").all_inner_texts()
@@ -196,6 +206,11 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertIn("2", ana)
         self.assertIn("2,0 h", ana)
         self.assertIn("1,0 h", yo)
+
+        anchos = pagina.eval_on_selector_all(
+            "#miembrosTabla .mini", "barras => barras.map(b => b.style.width)")
+        self.assertIn("100%", anchos)
+        self.assertIn("50%", anchos)
 
     def test_favoritos_y_ocultos(self):
         pagina = self.pagina("/panel.html")
@@ -255,6 +270,16 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertEqual(pagina.get_attribute("html", "data-tema"), "oscuro")
         pagina.reload()
         self.assertEqual(pagina.get_attribute("html", "data-tema"), "oscuro")
+
+    def test_tema_sigue_al_sistema(self):
+        pagina = self.pagina("/panel.html")
+        self.assertEqual(pagina.get_attribute("html", "data-tema"), "claro")
+        pagina.emulate_media(color_scheme="dark")
+        pagina.wait_for_timeout(200)
+        self.assertEqual(pagina.get_attribute("html", "data-tema"), "oscuro")
+        pagina.emulate_media(color_scheme="light")
+        pagina.wait_for_timeout(200)
+        self.assertEqual(pagina.get_attribute("html", "data-tema"), "claro")
 
     def test_busqueda_por_dueno(self):
         pagina = self.pagina("/panel.html")
@@ -317,6 +342,32 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertIn("Steam family library", pagina.inner_text("h1"))
         self.assertEqual(pagina.get_attribute('[data-fav="20"]', "aria-pressed"), "true")
         self.assertEqual(pagina.locator("#cuerpo tr").count(), 2)
+
+    def test_atajos(self):
+        pagina = self.pagina("/panel.html")
+        pagina.keyboard.press("/")
+        self.assertEqual(pagina.evaluate("document.activeElement.id"), "q")
+        pagina.keyboard.type("Ana")
+        pagina.keyboard.press("Escape")
+        self.assertEqual(pagina.input_value("#q"), "")
+
+    def test_busqueda_avanzada(self):
+        pagina = self.pagina("/panel.html")
+        filas = pagina.locator("#cuerpo tr")
+
+        pagina.fill("#q", "horas:>1")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Beta", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "horas:<1")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Gamma", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "anio:2025")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 0)
 
 
 if __name__ == "__main__":
