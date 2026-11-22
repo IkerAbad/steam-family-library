@@ -8,6 +8,7 @@ En Windows deja dist/steam-families.exe. Hay que ejecutarlo en el sistema
 destino: PyInstaller no compila para otra plataforma.
 """
 
+import argparse
 import pathlib
 import shutil
 import subprocess
@@ -17,6 +18,11 @@ RAIZ = pathlib.Path(__file__).resolve().parent
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Empaqueta Steam Families con PyInstaller.")
+    parser.add_argument("--nombre", default="steam-families",
+                        help="nombre del ejecutable (por defecto steam-families)")
+    args = parser.parse_args()
+
     try:
         import PyInstaller  # noqa: F401
     except ImportError:
@@ -26,7 +32,7 @@ def main():
     orden = [
         sys.executable, "-m", "PyInstaller",
         "--onefile", "--noconfirm",
-        "--name", "steam-families",
+        "--name", args.nombre,
         "--distpath", str(RAIZ / "dist"),
         "--workpath", str(RAIZ / "build"),
         "--specpath", str(RAIZ / "build"),
@@ -35,8 +41,8 @@ def main():
     codigo = subprocess.call(orden)
     if codigo == 0:
         shutil.rmtree(RAIZ / "build", ignore_errors=True)
-        nombre = "steam-families.exe" if sys.platform.startswith("win") else "steam-families"
-        print(f"hecho: {RAIZ / 'dist' / nombre}")
+        sufijo = ".exe" if sys.platform.startswith("win") else ""
+        print(f"hecho: {RAIZ / 'dist' / (args.nombre + sufijo)}")
     return codigo
 
 

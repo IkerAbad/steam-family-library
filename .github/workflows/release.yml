@@ -17,14 +17,14 @@ jobs:
       matrix:
         include:
           - os: windows-latest
+            nombre: steam-families
             binario: dist/steam-families.exe
-            nombre: steam-families.exe
           - os: ubuntu-latest
-            binario: dist/steam-families
             nombre: steam-families-linux
+            binario: dist/steam-families-linux
           - os: macos-latest
-            binario: dist/steam-families
             nombre: steam-families-macos
+            binario: dist/steam-families-macos
 
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +41,7 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Empaqueta
-        run: python empaquetar.py
+        run: python empaquetar.py --nombre ${{ matrix.nombre }}
 
       - name: Comprueba el ejecutable
         run: ${{ matrix.binario }} --version

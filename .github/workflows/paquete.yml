@@ -12,13 +12,16 @@ jobs:
       matrix:
         include:
           - os: windows-latest
+            nombre: steam-families
             binario: dist/steam-families.exe
             artefacto: steam-families-windows
           - os: ubuntu-latest
-            binario: dist/steam-families
+            nombre: steam-families-linux
+            binario: dist/steam-families-linux
             artefacto: steam-families-linux
           - os: macos-latest
-            binario: dist/steam-families
+            nombre: steam-families-macos
+            binario: dist/steam-families-macos
             artefacto: steam-families-macos
 
     steps:
@@ -36,7 +39,7 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Empaqueta
-        run: python empaquetar.py
+        run: python empaquetar.py --nombre ${{ matrix.nombre }}
 
       - name: Comprueba el ejecutable
         run: ${{ matrix.binario }} --version
