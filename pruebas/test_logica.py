@@ -451,6 +451,74 @@ class PruebaActualizacion(unittest.TestCase):
             finally:
                 sfl.ruta_token = ruta
 
+    def test_cada_cero_no_actualiza(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = sfl.ruta_token
+            sfl.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
+            try:
+                sfl.guardar_token(self.jwt())
+                esperas = []
+                llamadas = []
+
+                def dormir(segundos):
+                    esperas.append(segundos)
+                    if len(esperas) >= 2:
+                        raise RuntimeError("fin")
+
+                def falso(*args, **kwargs):
+                    llamadas.append(1)
+
+                with self.assertRaises(RuntimeError):
+                    sfl.actualizacion_periodica(
+                        tmp, lambda: 0, dormir=dormir, ejecutar_fn=falso)
+                self.assertEqual(esperas, [3600, 3600])
+                self.assertEqual(llamadas, [])
+            finally:
+                sfl.ruta_token = ruta
+
+    def test_cada_se_consulta_cada_vuelta(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = sfl.ruta_token
+            sfl.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
+            try:
+                sfl.guardar_token(self.jwt())
+                valores = iter([1 * 3600, 3 * 3600])
+                esperas = []
+
+                def dormir(segundos):
+                    esperas.append(segundos)
+                    if len(esperas) >= 2:
+                        raise RuntimeError("fin")
+
+                def falso(datos, token, api_key="", aviso=None):
+                    return True, "ok"
+
+                with self.assertRaises(RuntimeError):
+                    sfl.actualizacion_periodica(
+                        tmp, lambda: next(valores), dormir=dormir, ejecutar_fn=falso)
+                self.assertEqual(esperas, [1 * 3600, 3 * 3600])
+            finally:
+                sfl.ruta_token = ruta
+
+    def test_ajustes_ida_y_vuelta(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(sfl.leer_ajustes(tmp))
+            self.assertTrue(sfl.guardar_ajustes(tmp, 3))
+            self.assertEqual(sfl.leer_ajustes(tmp), 3)
+            self.assertTrue(sfl.guardar_ajustes(tmp, 0))
+            self.assertEqual(sfl.leer_ajustes(tmp), 0)
+
+    def test_ajustes_fuera_de_rango(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (pathlib.Path(tmp) / "ajustes.json").write_text(
+                json.dumps({"cada": 999}), encoding="utf-8")
+            self.assertEqual(sfl.leer_ajustes(tmp), 168)
+            (pathlib.Path(tmp) / "ajustes.json").write_text(
+                json.dumps({"cada": -4}), encoding="utf-8")
+            self.assertEqual(sfl.leer_ajustes(tmp), 0)
+            (pathlib.Path(tmp) / "ajustes.json").write_text("{roto", encoding="utf-8")
+            self.assertIsNone(sfl.leer_ajustes(tmp))
+
 
 class PruebaApiBasura(unittest.TestCase):
     def test_respuesta_no_json(self):

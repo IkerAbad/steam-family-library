@@ -1,6 +1,15 @@
 # Objetivos
 
-> Estado: los ocho primeros y la segunda tanda están implementados.
+> Estado: los ocho primeros y las tandas segunda, tercera y cuarta están implementados.
+
+## Cuarta tanda (2.5.0)
+
+- Intervalo de actualización desde el panel, con `ajustes.json`.
+- Exportar la vista filtrada en JSON.
+- Vista compacta recordada y copia del resumen.
+- Top 10 de los más jugados y filtro al pulsar un miembro.
+- Contador de novedades en el título.
+- Botón «Sorpréndeme» y limpieza completa de filtros.
 
 ## Tercera tanda (2.4.0)
 

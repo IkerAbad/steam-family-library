@@ -37,7 +37,7 @@ from pathlib import Path
 API = "https://api.steampowered.com"
 COMUNIDAD = "https://steamcommunity.com"
 TIENDA = "https://store.steampowered.com"
-VERSION = "2.4.0"
+VERSION = "2.5.0"
 UA = f"steam-family-library/{VERSION}"
 EXCLUDE_REASONS = {
     0: "",
@@ -617,6 +617,9 @@ input[type=search]:focus, select:focus { outline:none; border-color:var(--acento
 label.check { display:flex; align-items:center; gap:6px; color:var(--suave); font-size:13px; padding:0 4px; cursor:pointer; }
 label.check input { accent-color:var(--acento); }
 #resumen { padding:2px 24px 10px; color:var(--suave); font-size:13px; }
+#elegido { padding:0 24px 10px; color:var(--acento); font-size:13px; min-height:18px; }
+#elegido:empty { display:none; }
+tbody tr.elegido td { background:#1b2a36; }
 table { width:100%; min-width:900px; border-collapse:collapse; table-layout:fixed; }
 thead th { position:sticky; top:0; background:var(--panel); text-align:left; padding:9px 12px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--suave); border-bottom:1px solid var(--borde); user-select:none; cursor:pointer; }
 thead th[data-campo]:hover { color:var(--texto); }
@@ -630,6 +633,10 @@ thead th:nth-child(6) { width:120px; }
 thead th:nth-child(7) { width:100px; }
 thead th.der { text-align:right; }
 tbody td { padding:8px 12px; border-bottom:1px solid #1e242c; vertical-align:middle; }
+body.compacto tbody td { padding:3px 10px; font-size:12px; }
+body.compacto thead th { padding:5px 10px; }
+body.compacto #miembrosCaja td, body.compacto #miembrosCaja th,
+body.compacto #topCaja td, body.compacto #topCaja th { padding:3px 8px; }
 tbody td:first-child { overflow:hidden; }
 tbody tr:hover { background:#171c23; }
 td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
@@ -655,7 +662,10 @@ tr.oculto { opacity:.55; }
 .sec:hover { background:#1f252d; color:var(--texto); }
 #vacio { padding:30px 24px; color:var(--suave); }
 #version { padding:8px 24px 20px; color:#5d6773; font-size:11px; text-align:right; }
-#ajustes { padding:8px 24px 0; text-align:right; }
+#ajustes { padding:8px 24px 0; display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:8px; }
+#cadaCaja { font-size:13px; color:var(--suave); margin-right:10px; }
+#cadaCaja select { margin-left:6px; }
+#cadaEstado { font-size:12px; color:var(--suave); margin-right:8px; }
 #historialCaja { padding:16px 24px 30px; border-top:1px solid var(--borde); }
 #miembrosCaja { padding:16px 24px 0; border-top:1px solid var(--borde); }
 #mesesCaja { padding:16px 24px 0; border-top:1px solid var(--borde); }
@@ -668,8 +678,15 @@ tr.oculto { opacity:.55; }
 .mes .et { font-size:10px; color:var(--suave); text-transform:capitalize; }
 .mes:focus { outline:1px solid var(--acento); outline-offset:2px; }
 #miembrosCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
-#miembrosCaja table { min-width:0; }
-#miembrosCaja th, #miembrosCaja td { font-size:12px; padding:6px 8px; }
+#miembrosCaja table, #topCaja table { min-width:0; }
+#miembrosCaja th, #miembrosCaja td, #topCaja th, #topCaja td { font-size:12px; padding:6px 8px; }
+#topCaja { padding:16px 24px 0; border-top:1px solid var(--borde); margin-top:16px; }
+#topCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
+#topCaja a { color:var(--acento); text-decoration:none; }
+#topCaja a:hover { text-decoration:underline; }
+.enlace { background:none; border:none; padding:0; color:var(--acento); font:inherit; cursor:pointer; text-align:left; }
+.enlace:hover { text-decoration:underline; }
+.enlace:focus { outline:1px solid var(--acento); outline-offset:2px; }
 .mini { height:6px; background:var(--acento); opacity:.6; border-radius:3px; margin-top:4px; }
 #historialCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
 #historialCaja table { min-width:0; }
@@ -680,6 +697,7 @@ html[data-tema="claro"] {
   --acento:#1a6fa8; --verde:#1d7a3e; --ambar:#8a5a00; --rojo:#b03030;
 }
 html[data-tema="claro"] tbody td { border-bottom-color:#e6eaf0; }
+html[data-tema="claro"] tbody tr.elegido td { background:#eaf3fa; }
 html[data-tema="claro"] tbody tr:hover { background:#eef2f7; }
 html[data-tema="claro"] .prestado { color:#1d7a3e; border-color:#9fd3b0; background:#eaf7ee; }
 html[data-tema="claro"] .propio { color:#5c6878; border-color:#d5dbe3; background:#f1f3f6; }
@@ -760,7 +778,11 @@ html[data-tema="claro"] #version { color:#8b98a8; }
   <button type="button" id="limpiar" class="sec" data-t="limpiar" hidden>Limpiar filtros</button>
   <button type="button" id="verHistorial" class="sec" data-t="historial">Historial</button>
   <button type="button" id="exportar" class="sec" data-t="exportar">Exportar CSV</button>
+  <button type="button" id="sorprende" class="sec" data-t="sorprende">Sorpréndeme</button>
+  <button type="button" id="exportarJson" class="sec" data-t="exportarJson">Exportar JSON</button>
+  <button type="button" id="copiarResumen" class="sec" data-t="copiarResumen">Copiar resumen</button>
 </div>
+<div id="elegido" role="status" aria-live="polite"></div>
 <div id="resumen" aria-live="polite"></div>
 <table>
   <thead>
@@ -785,6 +807,10 @@ html[data-tema="claro"] #version { color:#8b98a8; }
   <h2 data-t="miembrosTitulo">Por miembro</h2>
   <div id="miembrosTabla"></div>
 </section>
+<section id="topCaja">
+  <h2 data-t="topTitulo">Más jugados</h2>
+  <div id="topTabla"></div>
+</section>
 <section id="historialCaja" hidden>
   <h2 data-t="historialTitulo">Historial de novedades</h2>
   <div class="controles" style="padding:0 0 10px">
@@ -802,6 +828,22 @@ html[data-tema="claro"] #version { color:#8b98a8; }
   <button type="button" id="exportarHistorial" class="sec" data-t="exportarHistorial" style="margin-top:10px">Exportar historial</button>
 </section>
 <div id="ajustes">
+  <label id="compactoCaja" class="check">
+    <input type="checkbox" id="compacto" data-ta="compacto">
+    <span data-t="compacto">Vista compacta</span>
+  </label>
+  <label id="cadaCaja" hidden>
+    <span data-t="cadaEtiqueta">Actualizar sola cada</span>
+    <select id="cada">
+      <option value="0" data-t="cadaNo">nunca</option>
+      <option value="1">1 h</option>
+      <option value="3">3 h</option>
+      <option value="6">6 h</option>
+      <option value="12">12 h</option>
+      <option value="24">24 h</option>
+    </select>
+  </label>
+  <span id="cadaEstado" role="status" aria-live="polite"></span>
   <button type="button" id="guardarAjustes" class="sec" data-t="guardarAjustes">Guardar ajustes</button>
   <button type="button" id="cargarAjustes" class="sec" data-t="cargarAjustes">Cargar ajustes</button>
   <input id="ficheroAjustes" type="file" accept="application/json,.json" hidden>
@@ -852,16 +894,28 @@ const TEXTOS = {
     historial: "Historial",
     historialTitulo: "Historial de novedades",
     exportar: "Exportar CSV",
+    exportarJson: "Exportar JSON",
+    copiarResumen: "Copiar resumen",
+    copiado: "Copiado",
+    compacto: "Vista compacta",
+    sorprende: "Sorpréndeme",
+    teToca: "Te toca",
     exportarHistorial: "Exportar historial",
     guardarAjustes: "Guardar ajustes",
     cargarAjustes: "Cargar ajustes",
     ajustesMal: "Ese fichero no es una copia de ajustes válida.",
+    cadaEtiqueta: "Actualizar sola cada",
+    cadaNo: "nunca",
+    cadaGuardado: "Guardado",
+    cadaError: "No se pudo guardar",
     historialVacio: "Todavía no hay novedades.",
     historialSinFiltros: "Ninguna novedad cumple esos filtros.",
     historialBuscar: "Buscar por juego o miembro…",
     historialCuenta: "%n% de %m% novedades",
     mostrarMas: "Mostrar más",
     miembrosTitulo: "Por miembro",
+    topTitulo: "Más jugados",
+    filtrarPor: "Filtrar por",
     miembro: "Miembro",
     jugablesHeader: "Jugables",
     horasHeader: "Horas",
@@ -945,16 +999,28 @@ const TEXTOS = {
     historial: "History",
     historialTitulo: "Changes history",
     exportar: "Export CSV",
+    exportarJson: "Export JSON",
+    copiarResumen: "Copy summary",
+    copiado: "Copied",
+    compacto: "Compact view",
+    sorprende: "Surprise me",
+    teToca: "You play",
     exportarHistorial: "Export history",
     guardarAjustes: "Save settings",
     cargarAjustes: "Load settings",
     ajustesMal: "That file is not a valid settings backup.",
+    cadaEtiqueta: "Auto-update every",
+    cadaNo: "never",
+    cadaGuardado: "Saved",
+    cadaError: "Could not save",
     historialVacio: "No changes yet.",
     historialSinFiltros: "No change matches those filters.",
     historialBuscar: "Search by game or member…",
     historialCuenta: "%n% of %m% changes",
     mostrarMas: "Show more",
     miembrosTitulo: "By member",
+    topTitulo: "Most played",
+    filtrarPor: "Filter by",
     miembro: "Member",
     jugablesHeader: "Playable",
     horasHeader: "Hours",
@@ -1124,6 +1190,14 @@ function aplicaTema() {
   boton.textContent = TEMA === "claro" ? T("temaOscuro") : T("temaClaro");
   boton.setAttribute("aria-label", boton.textContent);
 }
+const CLAVE_COMPACTO = "sf-compacto";
+let COMPACTO = false;
+try { COMPACTO = localStorage.getItem(CLAVE_COMPACTO) === "1"; } catch (e) {}
+
+function aplicaCompacto() {
+  document.body.classList.toggle("compacto", COMPACTO);
+  $("compacto").checked = COMPACTO;
+}
 const CLAVE_FILTROS = "sf-filtros";
 const CLAVE_FAV = "sf-favoritos";
 const CLAVE_OCULTOS = "sf-ocultos";
@@ -1254,7 +1328,26 @@ function pintaAviso() {
     nuevos + " " + T("juegosNuevos") + ", " + fuera + " " + T("yaNoEstan") + ".";
 }
 
+function pintaTitulo() {
+  const nuevos = HAY_NOV ? DATOS.filter(d => d.w === "nuevo").length : 0;
+  document.title = (nuevos ? "(" + nuevos + ") " : "") + T("titulo");
+}
+
+function sorprende() {
+  if (!LISTA_ACTUAL.length) return;
+  const d = LISTA_ACTUAL[Math.floor(Math.random() * LISTA_ACTUAL.length)];
+  document.querySelectorAll("#cuerpo tr.elegido").forEach(tr => tr.classList.remove("elegido"));
+  const fila = document.querySelector('#cuerpo tr[data-appid="' + d.a + '"]');
+  if (fila) {
+    fila.classList.add("elegido");
+    fila.scrollIntoView({block: "center", behavior: "smooth"});
+  }
+  const dueno = d.d ? " (" + (d.d === "tú" ? T("tu") : d.d) + ")" : "";
+  $("elegido").textContent = T("teToca") + " " + d.n + dueno;
+}
+
 function pinta() {
+  $("elegido").textContent = "";
   const consulta = analizaConsulta($("q").value.trim());
   const q = plano(consulta.texto);
   const origen = $("origen").value;
@@ -1327,6 +1420,7 @@ function pinta() {
   const frag = document.createDocumentFragment();
   for (const d of lista) {
     const tr = document.createElement("tr");
+    tr.dataset.appid = d.a;
 
     const td1 = document.createElement("td");
     const cont = document.createElement("div");
@@ -1487,8 +1581,10 @@ function guardaAjustesFichero() {
     idioma: IDIOMA,
     favoritos: [...FAVORITOS],
     ocultos: [...OCULTOS],
-    filtros: JSON.parse(localStorage.getItem(CLAVE_FILTROS) || "{}")
+    filtros: JSON.parse(localStorage.getItem(CLAVE_FILTROS) || "{}"),
+    compacto: COMPACTO
   };
+  if (!$("cadaCaja").hidden) datos.cada = Number($("cada").value) || 0;
   const blob = new Blob([JSON.stringify(datos, null, 2)], {type: "application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1498,6 +1594,38 @@ function guardaAjustesFichero() {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function cargaCada() {
+  if (location.protocol !== "http:" && location.protocol !== "https:") return;
+  try {
+    const r = await fetch("/api/ajustes");
+    if (!r.ok) return;
+    const d = await r.json();
+    const valor = Number(d.cada) || 0;
+    const opciones = [...$("cada").options].map(o => Number(o.value));
+    let elegida = opciones[0];
+    opciones.forEach(o => {
+      if (Math.abs(o - valor) < Math.abs(elegida - valor)) elegida = o;
+    });
+    $("cada").value = String(elegida);
+    $("cadaCaja").hidden = false;
+  } catch (e) {}
+}
+
+async function guardaCada() {
+  const estado = $("cadaEstado");
+  try {
+    const r = await fetch("/api/ajustes", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({cada: Number($("cada").value)})
+    });
+    estado.textContent = r.ok ? T("cadaGuardado") : T("cadaError");
+  } catch (e) {
+    estado.textContent = T("cadaError");
+  }
+  setTimeout(() => { estado.textContent = ""; }, 2500);
 }
 
 async function cargaAjustesFichero(fichero) {
@@ -1519,9 +1647,19 @@ async function cargaAjustesFichero(fichero) {
     if (d.filtros && typeof d.filtros === "object") {
       try { localStorage.setItem(CLAVE_FILTROS, JSON.stringify(d.filtros)); } catch (e) {}
     }
+    if (typeof d.compacto === "boolean") {
+      COMPACTO = d.compacto;
+      try { localStorage.setItem(CLAVE_COMPACTO, COMPACTO ? "1" : "0"); } catch (e) {}
+    }
+    if (typeof d.cada === "number" && !$("cadaCaja").hidden &&
+        [...$("cada").options].some(o => Number(o.value) === d.cada)) {
+      $("cada").value = String(d.cada);
+      await guardaCada();
+    }
     pintaDuenos();
     cargaFiltros();
     aplicaIdioma();
+    aplicaCompacto();
   } catch (e) {
     alert(T("ajustesMal"));
   }
@@ -1548,6 +1686,30 @@ function exportaCsv() {
   const a = document.createElement("a");
   a.href = url;
   a.download = "steam-families-" + new Date().toISOString().slice(0, 10) + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportaJson() {
+  const datos = LISTA_ACTUAL.map(d => ({
+    appid: Number(d.a),
+    name: d.n,
+    owner: d.d || "",
+    source: d.s,
+    playable: !!d.p,
+    exclude_reason: d.e || "",
+    playtime_minutes: d.m,
+    acquired: d.q || "",
+    last_played: d.u || "",
+    store_url: "https://store.steampowered.com/app/" + d.a
+  }));
+  const blob = new Blob([JSON.stringify(datos, null, 2)], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "steam-families-" + new Date().toISOString().slice(0, 10) + ".json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -1611,7 +1773,7 @@ function pintaMiembros() {
     let nombre = NOMBRES[h] || h;
     nombre = nombre === "tú" ? T("tu")
       : nombre.replace(/^Miembro (\d+)$/, (todo, n) => IDIOMA === "en" ? "Member " + n : todo);
-    return {nombre, j: m.j, p: m.p, m: m.m};
+    return {h, nombre, j: m.j, p: m.p, m: m.m};
   });
   filas.sort((a, b) => b.j - a.j || compara(a.nombre, b.nombre));
   const maxHoras = Math.max(1, ...filas.map(f => f.m));
@@ -1630,7 +1792,13 @@ function pintaMiembros() {
   filas.forEach(f => {
     const tr = document.createElement("tr");
     const nombre = document.createElement("td");
-    nombre.textContent = f.nombre;
+    const boton = document.createElement("button");
+    boton.type = "button";
+    boton.className = "enlace";
+    boton.textContent = f.nombre;
+    boton.title = T("filtrarPor") + " " + f.nombre;
+    boton.addEventListener("click", () => filtraPorDueno(f.h));
+    nombre.appendChild(boton);
     const juegos = document.createElement("td");
     juegos.className = "der";
     juegos.textContent = numero(f.j);
@@ -1667,6 +1835,83 @@ function pintaMiembros() {
   tfoot.appendChild(trTotal);
   tabla.append(thead, tbody, tfoot);
   $("miembrosTabla").replaceChildren(tabla);
+}
+
+function filtraPorDueno(h) {
+  const sel = $("duenoFiltro");
+  if (![...sel.options].some(o => o.value === h)) return;
+  sel.value = h;
+  pinta();
+  window.scrollTo({top: 0, behavior: "smooth"});
+}
+
+function pintaTop() {
+  const filas = DATOS.filter(d => d.m > 0)
+    .sort((a, b) => b.m - a.m || compara(a.n, b.n))
+    .slice(0, 10);
+  $("topCaja").hidden = filas.length === 0;
+  if (!filas.length) {
+    $("topTabla").replaceChildren();
+    return;
+  }
+  const max = Math.max(1, ...filas.map(d => d.m));
+  const tabla = document.createElement("table");
+  const thead = document.createElement("thead");
+  const fila = document.createElement("tr");
+  [T("juego"), T("dueno"), T("horasHeader")].forEach(texto => {
+    const th = document.createElement("th");
+    th.textContent = texto;
+    fila.appendChild(th);
+  });
+  thead.appendChild(fila);
+  const tbody = document.createElement("tbody");
+  filas.forEach(d => {
+    const tr = document.createElement("tr");
+    const nombre = document.createElement("td");
+    const a = document.createElement("a");
+    a.href = "https://store.steampowered.com/app/" + d.a;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = d.n;
+    a.title = d.n;
+    nombre.appendChild(a);
+    const dueno = document.createElement("td");
+    dueno.textContent = d.d || "";
+    if (d.d === "tú") dueno.textContent = T("tu");
+    const tiempo = document.createElement("td");
+    tiempo.className = "der";
+    tiempo.textContent = horas(d.m) + " h";
+    const barra = document.createElement("div");
+    barra.className = "mini";
+    barra.style.width = Math.round((d.m / max) * 100) + "%";
+    tiempo.appendChild(barra);
+    tr.append(nombre, dueno, tiempo);
+    tbody.appendChild(tr);
+  });
+  tabla.append(thead, tbody);
+  $("topTabla").replaceChildren(tabla);
+}
+
+async function copiaResumen() {
+  const texto = $("resumen").textContent + ". " + $("stats").textContent.trim();
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(texto);
+    ok = true;
+  } catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = texto;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    ok = document.execCommand("copy");
+    ta.remove();
+  }
+  if (!ok) return;
+  const boton = $("copiarResumen");
+  boton.textContent = T("copiado");
+  setTimeout(() => { boton.textContent = T("copiarResumen"); }, 1500);
 }
 
 function pintaHistorial() {
@@ -1757,10 +2002,12 @@ function aplicaIdioma() {
   });
   pintaStats();
   pintaAviso();
+  pintaTitulo();
   pintaActualizado();
   pintaNombres();
   pintaMeses();
   pintaMiembros();
+  pintaTop();
   pintaHistorial();
   aplicaTema();
   pintaDuenos();
@@ -1847,10 +2094,13 @@ $("presetCompras").addEventListener("click", () => {
 $("limpiar").addEventListener("click", () => {
   $("q").value = "";
   $("origen").value = "todo";
+  $("duenoFiltro").value = "todo";
   $("estado").value = "todo";
   $("antiguedad").value = "todo";
   $("orden").value = "anadido";
   $("soloNuevos").checked = false;
+  $("soloFav").checked = false;
+  $("verOcultos").checked = false;
   ORDEN_CABECERA = null;
   try { localStorage.removeItem(CLAVE_FILTROS); } catch (e) {}
   pinta();
@@ -1861,7 +2111,16 @@ $("verHistorial").addEventListener("click", () => {
   pintaHistorial();
 });
 $("exportar").addEventListener("click", exportaCsv);
+$("exportarJson").addEventListener("click", exportaJson);
+$("sorprende").addEventListener("click", sorprende);
+$("copiarResumen").addEventListener("click", copiaResumen);
+$("compacto").addEventListener("change", () => {
+  COMPACTO = $("compacto").checked;
+  try { localStorage.setItem(CLAVE_COMPACTO, COMPACTO ? "1" : "0"); } catch (e) {}
+  aplicaCompacto();
+});
 $("exportarHistorial").addEventListener("click", exportaHistorial);
+$("cada").addEventListener("change", guardaCada);
 $("guardarAjustes").addEventListener("click", guardaAjustesFichero);
 $("cargarAjustes").addEventListener("click", () => $("ficheroAjustes").click());
 $("ficheroAjustes").addEventListener("change", async e => {
@@ -1876,6 +2135,8 @@ $("ficheroAjustes").addEventListener("change", async e => {
 pintaDuenos();
 cargaFiltros();
 aplicaIdioma();
+aplicaCompacto();
+cargaCada();
 </script>
 </body>
 </html>
@@ -2095,12 +2356,39 @@ def ejecutar(datos, token, api_key="", aviso=None):
     return True, texto
 
 
+def leer_ajustes(datos):
+    """Horas entre actualizaciones guardadas, o None si no hay nada válido."""
+    try:
+        guardado = json.loads((Path(datos) / "ajustes.json").read_text(encoding="utf-8"))
+        cada = float(guardado.get("cada", 6))
+    except (OSError, ValueError, TypeError):
+        return None
+    return max(0.0, min(168.0, cada))
+
+
+def guardar_ajustes(datos, cada):
+    try:
+        escribir_atomico(Path(datos) / "ajustes.json",
+                         json.dumps({"cada": cada}, ensure_ascii=False, indent=1))
+        return True
+    except OSError:
+        return False
+
+
 def actualizacion_periodica(datos, cada_segundos, dormir=None, ejecutar_fn=None):
-    """Actualiza sola cada cierto tiempo mientras la interfaz está abierta."""
+    """Actualiza sola cada cierto tiempo mientras la interfaz está abierta.
+
+    `cada_segundos` puede ser un número o una función sin argumentos, para que
+    el intervalo se pueda cambiar desde el panel sin reiniciar.
+    """
     dormir = dormir or time.sleep
     ejecutar_fn = ejecutar_fn or ejecutar
     while True:
-        dormir(cada_segundos)
+        espera = cada_segundos() if callable(cada_segundos) else cada_segundos
+        if not espera or espera <= 0:
+            dormir(3600)
+            continue
+        dormir(espera)
         token = leer_token()
         if not token:
             continue
@@ -2401,6 +2689,7 @@ class Servidor(ThreadingHTTPServer):
 class Handler(BaseHTTPRequestHandler):
     datos = Path(".")
     servidor = None
+    cada = 6.0
 
 
     def log_message(self, *args):
@@ -2488,6 +2777,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if pedida == "/api/progreso":
             self._enviar(200, leer_progreso())
+            return
+        if pedida == "/api/ajustes":
+            self._enviar(200, {"ok": True, "cada": self.cada})
             return
         if pedida in FICHEROS:
             nombre, tipo = FICHEROS[pedida]
@@ -2586,6 +2878,23 @@ class Handler(BaseHTTPRequestHandler):
             datos["log"] = mensaje
             datos["caduca"] = caduca_token(token)
             self._enviar(200, datos)
+            return
+
+        if self.path == "/api/ajustes":
+            try:
+                cada = float(cuerpo.get("cada"))
+            except (TypeError, ValueError):
+                self._enviar(400, {"ok": False, "error": tr(
+                    "cada debe ser un número de horas",
+                    "cada must be a number of hours")})
+                return
+            if cada < 0 or cada > 168:
+                self._enviar(400, {"ok": False, "error": tr(
+                    "como mucho 168 horas", "at most 168 hours")})
+                return
+            type(self).cada = cada
+            guardar_ajustes(self.datos, cada)
+            self._enviar(200, {"ok": True, "cada": cada})
             return
 
         if self.path == "/api/detener":
@@ -3317,8 +3626,9 @@ def main(argv=None):
     p.add_argument("--sin-historial", action="store_true", help="no toca snapshot ni novedades")
     p.add_argument("--sin-precios", action="store_true", help="no consulta la tienda")
     p.add_argument("--puerto", type=int, default=8087, help="puerto de la interfaz")
-    p.add_argument("--cada", type=float, default=6,
-                   help="horas entre actualizaciones automáticas (0 lo desactiva)")
+    p.add_argument("--cada", type=float, default=None,
+                   help="horas entre actualizaciones automáticas (0 lo desactiva; "
+                        "por defecto, lo guardado o 6)")
     p.add_argument("--sin-navegador", action="store_true", help="no abre el navegador")
     p.add_argument("--version", action="version", version=f"Steam Families {VERSION}")
     args = p.parse_args(argv)
@@ -3402,9 +3712,14 @@ def interfaz(args):
         return 1
 
     Handler.servidor = servidor
-    if args.cada and args.cada > 0:
-        threading.Thread(target=actualizacion_periodica,
-                         args=(datos, args.cada * 3600), daemon=True).start()
+    cada = args.cada
+    if cada is None:
+        guardado = leer_ajustes(datos)
+        cada = 6.0 if guardado is None else guardado
+    Handler.cada = cada
+    threading.Thread(target=actualizacion_periodica,
+                     args=(datos, lambda: type(Handler).cada * 3600),
+                     daemon=True).start()
     url = f"http://127.0.0.1:{servidor.server_address[1]}/"
     print(f"Datos: {datos}")
     print(f"Interfaz: {url}")

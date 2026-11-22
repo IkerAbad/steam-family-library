@@ -1,5 +1,18 @@
 # Cambios
 
+## 2.5.0 — 2026-11-22
+
+- Intervalo de actualización automática configurable desde el panel, guardado en `ajustes.json`.
+- La copia de ajustes incluye la vista compacta y el intervalo.
+- Exportar la vista filtrada en JSON.
+- Vista compacta, recordada entre visitas.
+- Top 10 de los juegos más jugados.
+- Pulsar un miembro en las estadísticas filtra la tabla por él.
+- Copiar el resumen al portapapeles.
+- Contador de novedades en el título de la pestaña, con título traducido.
+- Botón «Sorpréndeme»: elige un juego al azar de la vista filtrada.
+- «Limpiar filtros» ahora también resetea dueño, favoritos y ocultos.
+
 ## 2.4.0 — 2026-11-22
 
 - Búsqueda por operadores: `origen:`, `estado:` y `dueno:`.

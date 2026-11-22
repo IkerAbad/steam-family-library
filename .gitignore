@@ -20,5 +20,6 @@ build/
 dist/
 snapshot.corrupto.json
 historial.corrupto.csv
+ajustes.json
 .lock
 *.lock

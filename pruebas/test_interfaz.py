@@ -90,6 +90,8 @@ class PruebaInterfaz(unittest.TestCase):
         sfl.ruta_token = lambda: cls.datos / "token.bin"
 
         sfl.Handler.datos = cls.datos
+        cls.cada_original = sfl.Handler.cada
+        sfl.Handler.cada = 6.0
         cls.servidor = sfl.Servidor(("127.0.0.1", 0), sfl.Handler)
         sfl.Handler.servidor = cls.servidor
         cls.hilo = threading.Thread(target=cls.servidor.serve_forever, daemon=True)
@@ -104,6 +106,7 @@ class PruebaInterfaz(unittest.TestCase):
         cls.servidor.server_close()
         cls.hilo.join(timeout=5)
         sfl.Handler.datos = pathlib.Path(".")
+        sfl.Handler.cada = cls.cada_original
         sfl.ruta_token = cls.ruta_original
         cls.tmp.cleanup()
 
@@ -368,6 +371,23 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertEqual(pagina.get_attribute('[data-fav="20"]', "aria-pressed"), "true")
         self.assertEqual(pagina.locator("#cuerpo tr").count(), 2)
 
+    def test_cada_desde_el_panel(self):
+        pagina = self.pagina("/panel.html")
+        pagina.wait_for_selector("#cadaCaja", state="visible")
+        self.assertEqual(pagina.input_value("#cada"), "6")
+        pagina.select_option("#cada", "12")
+        for _ in range(60):
+            if pagina.inner_text("#cadaEstado") == "Guardado":
+                break
+            pagina.wait_for_timeout(50)
+        self.assertEqual(pagina.inner_text("#cadaEstado"), "Guardado")
+        self.assertEqual(sfl.Handler.cada, 12)
+        pagina.reload()
+        pagina.wait_for_selector("#cadaCaja", state="visible")
+        self.assertEqual(pagina.input_value("#cada"), "12")
+        pagina.select_option("#cada", "6")
+        pagina.wait_for_timeout(300)
+
     def test_atajos(self):
         pagina = self.pagina("/panel.html")
         pagina.keyboard.press("/")
@@ -412,6 +432,99 @@ class PruebaInterfaz(unittest.TestCase):
         pagina.wait_for_timeout(250)
         self.assertEqual(filas.count(), 1)
         self.assertIn("Beta", pagina.inner_text("#cuerpo"))
+
+    def test_exportar_json(self):
+        pagina = self.pagina("/panel.html")
+        pagina.fill("#q", "Beta")
+        pagina.wait_for_timeout(250)
+        with pagina.expect_download() as descarga:
+            pagina.click("#exportarJson")
+        fichero = pathlib.Path(descarga.value.path())
+        self.assertTrue(descarga.value.suggested_filename.endswith(".json"))
+        datos = json.loads(fichero.read_text(encoding="utf-8"))
+        self.assertEqual(len(datos), 1)
+        self.assertEqual(datos[0]["name"], "Beta")
+        self.assertEqual(datos[0]["appid"], 20)
+        self.assertTrue(datos[0]["playable"])
+        self.assertEqual(datos[0]["playtime_minutes"], 120)
+        self.assertEqual(datos[0]["store_url"],
+                         "https://store.steampowered.com/app/20")
+
+    def test_vista_compacta(self):
+        pagina = self.pagina("/panel.html")
+        self.assertFalse(pagina.evaluate("document.body.classList.contains('compacto')"))
+        pagina.check("#compacto")
+        self.assertTrue(pagina.evaluate("document.body.classList.contains('compacto')"))
+        pagina.reload()
+        self.assertTrue(pagina.evaluate("document.body.classList.contains('compacto')"))
+        with pagina.expect_download() as descarga:
+            pagina.click("#guardarAjustes")
+        datos = json.loads(pathlib.Path(descarga.value.path()).read_text(encoding="utf-8"))
+        self.assertTrue(datos["compacto"])
+        pagina.uncheck("#compacto")
+
+    def test_top_jugados(self):
+        pagina = self.pagina("/panel.html")
+        filas = pagina.locator("#topTabla tbody tr").all_inner_texts()
+        self.assertEqual(len(filas), 2)
+        self.assertIn("Beta", filas[0])
+        self.assertIn("2,0 h", filas[0])
+        self.assertIn("Alfa", filas[1])
+        anchos = pagina.eval_on_selector_all(
+            "#topTabla .mini", "barras => barras.map(b => b.style.width)")
+        self.assertEqual(anchos, ["100%", "50%"])
+
+    def test_miembro_filtra(self):
+        pagina = self.pagina("/panel.html")
+        pagina.click("#miembrosTabla button.enlace:has-text('Ana')")
+        self.assertNotEqual(pagina.input_value("#duenoFiltro"), "todo")
+        self.assertEqual(pagina.locator("#cuerpo tr").count(), 2)
+        self.assertNotIn("Alfa", pagina.inner_text("#cuerpo"))
+        pagina.click("#limpiar")
+        self.assertEqual(pagina.locator("#cuerpo tr").count(), 3)
+
+    def test_copiar_resumen(self):
+        pagina = self.pagina("/panel.html")
+        pagina.context.grant_permissions(["clipboard-read", "clipboard-write"])
+        pagina.click("#copiarResumen")
+        for _ in range(60):
+            if pagina.inner_text("#copiarResumen") == "Copiado":
+                break
+            pagina.wait_for_timeout(50)
+        self.assertEqual(pagina.inner_text("#copiarResumen"), "Copiado")
+        texto = pagina.evaluate("navigator.clipboard.readText()")
+        self.assertIn("3 de 3 juegos", texto)
+
+    def test_sorprende(self):
+        pagina = self.pagina("/panel.html")
+        pagina.fill("#q", "Beta")
+        pagina.wait_for_timeout(250)
+        pagina.click("#sorprende")
+        self.assertIn("Beta", pagina.inner_text("#elegido"))
+        self.assertTrue(pagina.evaluate(
+            "document.querySelector('#cuerpo tr.elegido').dataset.appid === '20'"))
+
+    def test_titulo_cuenta_novedades(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            for nombre in ("library.csv", "snapshot.json"):
+                (d / nombre).write_bytes((self.datos / nombre).read_bytes())
+            (d / "novedades.json").write_text(json.dumps({
+                "fecha": "2026-11-21T10:00:00+00:00",
+                "eventos": [{"appid": "20", "evento": "nuevo"}]}), encoding="utf-8")
+            sfl.generar_panel(d)
+            contexto = self.navegador.new_context(locale="es-ES")
+            self.addCleanup(contexto.close)
+            pagina = contexto.new_page()
+            pagina.goto((d / "panel.html").as_uri())
+            self.assertTrue(pagina.title().startswith("(1) "))
+            self.assertIn("Biblioteca familiar", pagina.title())
+
+    def test_titulo_cambia_de_idioma(self):
+        pagina = self.pagina("/panel.html")
+        self.assertEqual(pagina.title(), "Biblioteca familiar de Steam")
+        pagina.click('[data-idioma="en"]')
+        self.assertEqual(pagina.title(), "Steam family library")
 
     def test_accesibilidad_basica(self):
         script = """() => {

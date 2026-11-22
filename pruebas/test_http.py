@@ -245,6 +245,28 @@ class PruebaHttp(unittest.TestCase):
     def test_olvidar(self):
         self.assertEqual(self.post("/api/olvidar", {})[0], 200)
 
+    def test_ajustes_get(self):
+        codigo, cuerpo = self.get("/api/ajustes")
+        self.assertEqual(codigo, 200)
+        self.assertIn("cada", json.loads(cuerpo))
+
+    def test_ajustes_post(self):
+        original = sfl.Handler.cada
+        try:
+            codigo, cuerpo = self.post("/api/ajustes", {"cada": 3})
+            self.assertEqual(codigo, 200)
+            self.assertEqual(json.loads(cuerpo)["cada"], 3)
+            self.assertEqual(sfl.Handler.cada, 3)
+            self.assertEqual(json.loads(self.get("/api/ajustes")[1])["cada"], 3)
+            self.assertEqual(sfl.leer_ajustes(self.datos), 3)
+        finally:
+            sfl.Handler.cada = original
+
+    def test_ajustes_mal(self):
+        self.assertEqual(self.post("/api/ajustes", {"cada": "mucho"})[0], 400)
+        self.assertEqual(self.post("/api/ajustes", {"cada": 200})[0], 400)
+        self.assertEqual(self.post("/api/ajustes", {"cada": -1})[0], 400)
+
     def test_progreso(self):
         sfl.progreso("probando")
         try:
