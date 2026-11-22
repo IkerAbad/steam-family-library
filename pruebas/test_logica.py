@@ -288,6 +288,34 @@ class PruebaApiReintentos(unittest.TestCase):
         self.assertEqual(len(llamadas), 1)
 
 
+class PruebaTokenRechazado(unittest.TestCase):
+    def test_borra_el_guardado_si_steam_lo_rechaza(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = sfl.ruta_token
+            urlopen = sfl.urllib.request.urlopen
+            dormir = sfl.time.sleep
+            sfl.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
+            sfl.time.sleep = lambda segundos: None
+
+            carga = base64.urlsafe_b64encode(
+                json.dumps({"exp": 2000000000}).encode()).decode().rstrip("=")
+            tok = "x." + carga + "." + "a" * 43
+            sfl.guardar_token(tok)
+
+            def falso(req, timeout=0):
+                raise urllib.error.HTTPError(req.full_url, 401, "no", {}, io.BytesIO(b"no"))
+
+            sfl.urllib.request.urlopen = falso
+            try:
+                with self.assertRaises(SystemExit):
+                    sfl.api_get("X", {"access_token": tok})
+                self.assertFalse((pathlib.Path(tmp) / "token.bin").exists())
+            finally:
+                sfl.urllib.request.urlopen = urlopen
+                sfl.time.sleep = dormir
+                sfl.ruta_token = ruta
+
+
 class PruebaHistorial(unittest.TestCase):
     def test_cabecera_en_fichero_vacio(self):
         with tempfile.TemporaryDirectory() as tmp:

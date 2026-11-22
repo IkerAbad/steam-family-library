@@ -118,6 +118,24 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertEqual(pagina.input_value("#origen"), "own")
         self.assertEqual(pagina.locator("#cuerpo tr").count(), 1)
 
+    def test_limpiar_filtros(self):
+        pagina = self.pagina("/panel.html")
+        pagina.fill("#q", "Alfa")
+        pagina.wait_for_selector("#limpiar:not([hidden])")
+        pagina.click("#limpiar")
+        self.assertEqual(pagina.input_value("#q"), "")
+        self.assertEqual(pagina.input_value("#origen"), "todo")
+        self.assertEqual(pagina.locator("#cuerpo tr").count(), 3)
+
+    def test_orden_con_teclado(self):
+        pagina = self.pagina("/panel.html")
+        cabecera = pagina.locator('th[data-campo="m"]')
+        cabecera.focus()
+        pagina.keyboard.press("Enter")
+        self.assertEqual(cabecera.get_attribute("aria-sort"), "descending")
+        pagina.keyboard.press("Enter")
+        self.assertEqual(cabecera.get_attribute("aria-sort"), "ascending")
+
 
 if __name__ == "__main__":
     unittest.main()

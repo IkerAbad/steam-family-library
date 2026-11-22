@@ -124,6 +124,10 @@ def api_get(metodo, params, intentos=3):
                 continue
             cuerpo = e.read().decode("utf-8", "replace")[:400]
             if e.code in (401, 403):
+                # Si el token rechazado es el guardado, no tiene sentido reintentarlo
+                # en cada apertura: se borra y la próxima vez se pide uno nuevo.
+                if params.get("access_token") and params["access_token"] == leer_token():
+                    olvidar_token()
                 pista = tr("\nSteam ha rechazado el token. Saca uno nuevo y cópialo entero con el marcador «Copiar token».",
                            "\nSteam rejected the token. Get a new one and copy it whole with the “Copy token” bookmark.")
             else:
@@ -547,6 +551,7 @@ label.check input { accent-color:var(--acento); }
 table { width:100%; border-collapse:collapse; table-layout:fixed; }
 thead th { position:sticky; top:0; background:var(--panel); text-align:left; padding:9px 12px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--suave); border-bottom:1px solid var(--borde); user-select:none; cursor:pointer; }
 thead th[data-campo]:hover { color:var(--texto); }
+thead th:focus { outline:1px solid var(--acento); outline-offset:-1px; }
 .flecha { color:var(--acento); margin-left:5px; font-size:10px; }
 thead th:nth-child(2) { width:150px; }
 thead th:nth-child(3) { width:100px; }
@@ -571,6 +576,8 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
 .dim { color:var(--suave); }
 .atajo { background:#22303c; color:var(--acento); border:1px solid #2b5878; border-radius:6px; padding:7px 12px; font:inherit; cursor:pointer; }
 .atajo:hover { background:#2a3d4d; }
+.sec { background:var(--panel); color:var(--suave); border:1px solid var(--borde); border-radius:6px; padding:7px 12px; font:inherit; cursor:pointer; }
+.sec:hover { background:#1f252d; color:var(--texto); }
 #vacio { padding:30px 24px; color:var(--suave); }
 #actualizado { margin:4px 0 0; color:var(--suave); font-size:12px; }
 #actualizado.viejo { color:var(--ambar); }
@@ -628,18 +635,19 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
   </select>
   <label class="check"><input type="checkbox" id="soloNuevos"> <span data-t="soloNuevos">Solo novedades</span></label>
   <button type="button" id="presetCompras" class="atajo" data-t="preset">Añadidos (90 días)</button>
+  <button type="button" id="limpiar" class="sec" data-t="limpiar" hidden>Limpiar filtros</button>
 </div>
 <div id="resumen"></div>
 <table>
   <thead>
     <tr>
-      <th data-t="juego" data-campo="n">Juego</th>
-      <th data-t="dueno" data-campo="d">Dueño</th>
-      <th data-t="origen" data-campo="s">Origen</th>
-      <th data-t="estado" data-campo="p">Estado</th>
-      <th class="der" data-t="tusHoras" data-campo="m">Tus horas</th>
-      <th class="der" data-t="ultimaSesion" data-campo="u">Última sesión</th>
-      <th class="der" data-t="anadido" data-campo="q">Añadido</th>
+      <th data-t="juego" data-campo="n" tabindex="0">Juego</th>
+      <th data-t="dueno" data-campo="d" tabindex="0">Dueño</th>
+      <th data-t="origen" data-campo="s" tabindex="0">Origen</th>
+      <th data-t="estado" data-campo="p" tabindex="0">Estado</th>
+      <th class="der" data-t="tusHoras" data-campo="m" tabindex="0">Tus horas</th>
+      <th class="der" data-t="ultimaSesion" data-campo="u" tabindex="0">Última sesión</th>
+      <th class="der" data-t="anadido" data-campo="q" tabindex="0">Añadido</th>
     </tr>
   </thead>
   <tbody id="cuerpo"></tbody>
@@ -677,6 +685,7 @@ const TEXTOS = {
     soloNuevos: "Solo novedades",
     verNuevos: "Ver solo novedades",
     preset: "Añadidos (90 días)",
+    limpiar: "Limpiar filtros",
     juego: "Juego",
     dueno: "Dueño",
     origen: "Origen",
@@ -739,6 +748,7 @@ const TEXTOS = {
     soloNuevos: "Only new",
     verNuevos: "Show only new",
     preset: "Added (90 days)",
+    limpiar: "Clear filters",
     juego: "Game",
     dueno: "Owner",
     origen: "Source",
@@ -848,7 +858,10 @@ function pintaFlechas() {
   document.querySelectorAll("thead th[data-campo]").forEach(th => {
     const flecha = th.querySelector(".flecha");
     if (flecha) flecha.remove();
-    if (ORDEN_CABECERA && ORDEN_CABECERA.campo === th.dataset.campo) {
+    const activo = ORDEN_CABECERA && ORDEN_CABECERA.campo === th.dataset.campo;
+    th.setAttribute("aria-sort", activo
+      ? (ORDEN_CABECERA.dir === "asc" ? "ascending" : "descending") : "none");
+    if (activo) {
       const s = document.createElement("span");
       s.className = "flecha";
       s.textContent = ORDEN_CABECERA.dir === "asc" ? "▲" : "▼";
@@ -910,6 +923,9 @@ function pinta() {
   const orden = $("orden").value;
   const antiguedad = $("antiguedad").value;
   const soloNuevos = $("soloNuevos").checked;
+  const filtrando = !!q || origen !== "todo" || estado !== "todo" ||
+    antiguedad !== "todo" || soloNuevos || !!ORDEN_CABECERA;
+  $("limpiar").hidden = !filtrando;
 
   let corte = "";
   if (antiguedad === "30") corte = isoDias(30);
@@ -1076,15 +1092,24 @@ $("orden").addEventListener("input", () => {
   ORDEN_CABECERA = null;
   pinta();
 });
-document.querySelectorAll("thead th[data-campo]").forEach(th => th.addEventListener("click", () => {
-  const campo = th.dataset.campo;
-  if (ORDEN_CABECERA && ORDEN_CABECERA.campo === campo) {
-    ORDEN_CABECERA.dir = ORDEN_CABECERA.dir === "asc" ? "desc" : "asc";
-  } else {
-    ORDEN_CABECERA = {campo, dir: ["m", "q", "u"].includes(campo) ? "desc" : "asc"};
-  }
-  pinta();
-}));
+document.querySelectorAll("thead th[data-campo]").forEach(th => {
+  const ordenar = () => {
+    const campo = th.dataset.campo;
+    if (ORDEN_CABECERA && ORDEN_CABECERA.campo === campo) {
+      ORDEN_CABECERA.dir = ORDEN_CABECERA.dir === "asc" ? "desc" : "asc";
+    } else {
+      ORDEN_CABECERA = {campo, dir: ["m", "q", "u"].includes(campo) ? "desc" : "asc"};
+    }
+    pinta();
+  };
+  th.addEventListener("click", ordenar);
+  th.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      ordenar();
+    }
+  });
+});
 let esperaPinta = null;
 $("q").addEventListener("input", () => {
   clearTimeout(esperaPinta);
@@ -1102,6 +1127,17 @@ $("presetCompras").addEventListener("click", () => {
   $("orden").value = "anadido";
   $("soloNuevos").checked = false;
   ORDEN_CABECERA = null;
+  pinta();
+});
+$("limpiar").addEventListener("click", () => {
+  $("q").value = "";
+  $("origen").value = "todo";
+  $("estado").value = "todo";
+  $("antiguedad").value = "todo";
+  $("orden").value = "anadido";
+  $("soloNuevos").checked = false;
+  ORDEN_CABECERA = null;
+  try { localStorage.removeItem(CLAVE_FILTROS); } catch (e) {}
   pinta();
 });
 cargaFiltros();
