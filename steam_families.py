@@ -644,17 +644,17 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
   <button type="button" id="presetCompras" class="atajo" data-t="preset">Añadidos (90 días)</button>
   <button type="button" id="limpiar" class="sec" data-t="limpiar" hidden>Limpiar filtros</button>
 </div>
-<div id="resumen"></div>
+<div id="resumen" aria-live="polite"></div>
 <table>
   <thead>
     <tr>
-      <th data-t="juego" data-campo="n" tabindex="0">Juego</th>
-      <th data-t="dueno" data-campo="d" tabindex="0">Dueño</th>
-      <th data-t="origen" data-campo="s" tabindex="0">Origen</th>
-      <th data-t="estado" data-campo="p" tabindex="0">Estado</th>
-      <th class="der" data-t="tusHoras" data-campo="m" tabindex="0">Tus horas</th>
-      <th class="der" data-t="ultimaSesion" data-campo="u" tabindex="0">Última sesión</th>
-      <th class="der" data-t="anadido" data-campo="q" tabindex="0">Añadido</th>
+      <th scope="col" data-t="juego" data-campo="n" tabindex="0">Juego</th>
+      <th scope="col" data-t="dueno" data-campo="d" tabindex="0">Dueño</th>
+      <th scope="col" data-t="origen" data-campo="s" tabindex="0">Origen</th>
+      <th scope="col" data-t="estado" data-campo="p" tabindex="0">Estado</th>
+      <th scope="col" class="der" data-t="tusHoras" data-campo="m" tabindex="0">Tus horas</th>
+      <th scope="col" class="der" data-t="ultimaSesion" data-campo="u" tabindex="0">Última sesión</th>
+      <th scope="col" class="der" data-t="anadido" data-campo="q" tabindex="0">Añadido</th>
     </tr>
   </thead>
   <tbody id="cuerpo"></tbody>
@@ -1871,7 +1871,7 @@ label.check input { accent-color:var(--acento); }
       </p>
       <input id="apikey" type="text" data-tp="apiKeyPlaceholder" placeholder="API key de Steam (opcional)" autocomplete="off" spellcheck="false" style="width:100%">
     </details>
-    <div id="estado"></div>
+    <div id="estado" role="status" aria-live="polite"></div>
     <label class="check" style="margin-top:10px">
       <input type="checkbox" id="recordar" checked>
       <span data-t="recordar">Recordar el token y la API key en este equipo, cifrados</span>
