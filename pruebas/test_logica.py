@@ -375,6 +375,28 @@ class PruebaErroresPanel(unittest.TestCase):
             self.assertIn("source", str(error.exception))
 
 
+class PruebaApiBasura(unittest.TestCase):
+    def test_respuesta_no_json(self):
+        class Respuesta:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return b"<html>portal cautivo</html>"
+
+        original = sfl.urllib.request.urlopen
+        sfl.urllib.request.urlopen = lambda req, timeout=0: Respuesta()
+        try:
+            with self.assertRaises(SystemExit) as error:
+                sfl.api_get("X", {})
+            self.assertIn("ilegible", str(error.exception))
+        finally:
+            sfl.urllib.request.urlopen = original
+
+
 class PruebaHistorial(unittest.TestCase):
     def test_cabecera_en_fichero_vacio(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -395,6 +417,15 @@ class PruebaHistorial(unittest.TestCase):
             self.assertEqual(sfl.anotar_historial(ruta, eventos, "2026-01-01 18:00"), 0)
             lineas = ruta.read_text(encoding="utf-8-sig").splitlines()
             self.assertEqual(len(lineas), 2)
+
+    def test_historial_corrupto_se_aparta(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = pathlib.Path(tmp) / "historial.csv"
+            ruta.write_bytes(b"\xff\xfe\x00basura")
+            eventos = [{"evento": "nuevo", "appid": 1, "nombre": "X", "quien": "V", "propio": False}]
+            self.assertEqual(sfl.anotar_historial(ruta, eventos, "2026-01-01 10:00"), 1)
+            self.assertTrue((pathlib.Path(tmp) / "historial.corrupto.csv").exists())
+            self.assertEqual(len(ruta.read_text(encoding="utf-8-sig").splitlines()), 2)
 
 
 class PruebaCandado(unittest.TestCase):

@@ -116,7 +116,11 @@ def api_get(metodo, params, intentos=3):
     for intento in range(intentos):
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.load(resp).get("response", {})
+                try:
+                    return json.load(resp).get("response", {})
+                except ValueError:
+                    die(tr("Steam devolvió una respuesta ilegible (no es JSON).",
+                           "Steam returned an unreadable response (not JSON)."))
         except urllib.error.HTTPError as e:
             if (e.code >= 500 or e.code == 429) and intento < intentos - 1:
                 time.sleep(2 + 3 * intento)

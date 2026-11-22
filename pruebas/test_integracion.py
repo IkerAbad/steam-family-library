@@ -238,6 +238,14 @@ class PruebaIntegracion(unittest.TestCase):
     def test_es_gratis(self):
         self.assertFalse(sfl.es_gratis(10))
 
+    def test_snapshot_corrupto_se_aparta(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            (d / "snapshot.json").write_text("{roto", encoding="utf-8")
+            sfl.exportar(d, self.token(), con_precios=False)
+            self.assertTrue((d / "snapshot.corrupto.json").exists())
+            self.assertTrue((d / "snapshot.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

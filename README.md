@@ -14,7 +14,7 @@ Steam fusiona todas las bibliotecas del grupo y no tiene ningún filtro para sep
 ## Empezar
 
 1. Instala [Python 3.8 o superior](https://www.python.org/downloads/). En Windows, marca «Add python.exe to PATH».
-2. Windows: doble clic en `iniciar.cmd`. Linux o macOS: `chmod +x iniciar.sh && ./iniciar.sh`. Los datos se guardan en la subcarpeta `datos/`.
+2. Windows: doble clic en `iniciar.cmd`. Linux o macOS: `./iniciar.sh`. Los datos se guardan en la subcarpeta `datos/`.
 3. Se abre una página en `127.0.0.1`. Pega el token la primera vez; a partir de ahí se guarda cifrado y la app se actualiza sola hasta que caduque.
 
 Solo puede haber una ventana usando la misma carpeta de datos. Si abres otra, avisa y se cierra.
@@ -87,13 +87,21 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 - Sin API key, los nombres se piden de uno en uno al endpoint público de Steam. Si responde 429, espera 20 s y reintenta, con tres esperas como máximo por ejecución; si sigue frenando, esos miembros quedan como «Miembro 1», «Miembro 2»… hasta la siguiente.
 - Los nombres guardados se refrescan a los 7 días para que un cambio de alias no se quede pegado. Con API key se refrescan en cada ejecución.
 
+## Problemas
+
+- **401 al actualizar**: el token ha caducado o se copió cortado. Abre la página del token con la sesión iniciada, usa el marcador **Copiar token** y pulsa **Pegar**. Si sigue, cierra sesión en Steam, entra de nuevo y saca otro.
+- **«Miembro 1», «Miembro 2»**: Steam ha frenado las consultas de nombres. Vuelve a actualizar o pega una API key gratuita; los nombres se guardan.
+- **«Ya hay otra ventana…»**: otra instancia está usando `datos/`. Ciérrala o pulsa **Detener la interfaz**.
+- **No encuentro Python**: instala Python 3.8 o superior con «Add python.exe to PATH»; en Windows también vale `py -3`.
+- **No se actualiza sola**: el token caduca a las 24 h; pega uno nuevo.
+
 ## Desarrollo
 
 ```
 python -m unittest discover -s pruebas -v
 ```
 
-89 pruebas sin red, más 5 de interfaz con Playwright (se saltan si no está instalado; hacen falta `pip install -r requirements-dev.txt` y `playwright install chromium`). Tres de las unitarias son solo de Windows y se saltan en otros sistemas. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`, y las pruebas de navegador en Chromium.
+92 pruebas sin red, más 5 de interfaz con Playwright (se saltan si no está instalado; hacen falta `pip install -r requirements-dev.txt` y `playwright install chromium`). Tres de las unitarias son solo de Windows y se saltan en otros sistemas. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`, y las pruebas de navegador en Chromium.
 
 ## Créditos
 
@@ -110,7 +118,7 @@ Steam merges all the libraries of the group and has no filter to tell them apart
 ## Getting started
 
 1. Install [Python 3.8 or higher](https://www.python.org/downloads/). On Windows, tick "Add python.exe to PATH".
-2. Windows: double-click `iniciar.cmd`. Linux or macOS: `chmod +x iniciar.sh && ./iniciar.sh`. Data is stored in the `datos/` subfolder.
+2. Windows: double-click `iniciar.cmd`. Linux or macOS: `./iniciar.sh`. Data is stored in the `datos/` subfolder.
 3. A page opens on `127.0.0.1`. Paste the token the first time; from then on it is stored encrypted and the app updates itself until it expires.
 
 Only one window can use the same data folder. If you open another one, it warns and closes.
@@ -183,13 +191,21 @@ The three family endpoints are undocumented: they work today and may change tomo
 - Without an API key, names are requested one by one from Steam's public endpoint. If it answers 429, it waits 20 s and retries, with at most three waits per run; if it keeps throttling, those members stay as "Miembro 1", "Miembro 2"... until the next run.
 - Stored names are refreshed after 7 days so an alias change does not stay stuck. With an API key they are refreshed on every run.
 
+## Troubleshooting
+
+- **401 when updating**: the token expired or was copied truncated. Open the token page while signed in, use the **Copiar token** bookmark and press **Pegar** (paste). If it persists, sign out of Steam, sign in again and get a new one.
+- **"Miembro 1", "Miembro 2"**: Steam is throttling name lookups. Update again or paste a free API key; names are stored.
+- **"Another window..."**: another instance is using `datos/`. Close it or press **Detener la interfaz** (stop).
+- **Python not found**: install Python 3.8+ with "Add python.exe to PATH"; on Windows the `py -3` launcher also works.
+- **It does not update by itself**: the token expires after 24 h; paste a new one.
+
 ## Development
 
 ```
 python -m unittest discover -s pruebas -v
 ```
 
-89 tests with no network, plus 5 browser tests with Playwright (skipped if it is not installed; they need `pip install -r requirements-dev.txt` and `playwright install chromium`). Three of the unit tests are Windows-only and are skipped elsewhere. GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher, and the browser tests on Chromium.
+92 tests with no network, plus 5 browser tests with Playwright (skipped if it is not installed; they need `pip install -r requirements-dev.txt` and `playwright install chromium`). Three of the unit tests are Windows-only and are skipped elsewhere. GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher, and the browser tests on Chromium.
 
 ## Credits
 
