@@ -35,6 +35,8 @@ class PruebaIntegracion(unittest.TestCase):
     def setUp(self):
         SteamFalso.fallos = {}
         SteamFalso.caida = 0
+        SteamFalso.sin_grupo = False
+        SteamFalso.sin_apps = False
         SteamFalso.llamadas = []
         self.dormir = sfl.time.sleep
         sfl.time.sleep = lambda segundos: None
@@ -131,6 +133,20 @@ class PruebaIntegracion(unittest.TestCase):
             with self.assertRaises(SystemExit) as error:
                 sfl.exportar(pathlib.Path(tmp), self.token(), con_precios=False)
             self.assertIn("rechazado", str(error.exception))
+
+    def test_cuenta_sin_grupo(self):
+        SteamFalso.sin_grupo = True
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit) as error:
+                sfl.exportar(pathlib.Path(tmp), self.token(), con_precios=False)
+            self.assertIn("grupo familiar", str(error.exception))
+
+    def test_sin_apps(self):
+        SteamFalso.sin_apps = True
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit) as error:
+                sfl.exportar(pathlib.Path(tmp), self.token(), con_precios=False)
+            self.assertIn("ninguna app", str(error.exception))
 
     def test_sin_nombres_conserva_los_guardados(self):
         with tempfile.TemporaryDirectory() as tmp:

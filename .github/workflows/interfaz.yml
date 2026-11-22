@@ -36,3 +36,8 @@ jobs:
 
       - name: Pruebas de interfaz
         run: python -m unittest discover -s pruebas -p "test_interfaz.py" -v
+
+      - name: Cobertura
+        run: |
+          python -m coverage run --source=. -m unittest discover -s pruebas
+          python -m coverage report --include="steam_families.py" --fail-under=85

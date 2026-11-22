@@ -21,6 +21,8 @@ APPS = [
 class SteamFalso(BaseHTTPRequestHandler):
     fallos = {}
     caida = 0
+    sin_grupo = False
+    sin_apps = False
     llamadas = []
 
     def log_message(self, *args):
@@ -48,6 +50,9 @@ class SteamFalso(BaseHTTPRequestHandler):
             if tipo.caida:
                 self._enviar("<html><body>Unauthorized</body></html>", tipo.caida, "text/html")
                 return
+            if tipo.sin_grupo:
+                self._json({"response": {"is_not_member_of_any_group": True}})
+                return
             self._json({"response": {
                 "family_groupid": "grupo1",
                 "family_group": {"name": "Basados",
@@ -56,7 +61,7 @@ class SteamFalso(BaseHTTPRequestHandler):
             return
 
         if "GetSharedLibraryApps" in ruta:
-            self._json({"response": {"apps": APPS}})
+            self._json({"response": {"apps": [] if tipo.sin_apps else APPS}})
             return
 
         if "GetPlayerSummaries" in ruta:

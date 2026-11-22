@@ -128,6 +128,16 @@ class PruebaHttp(unittest.TestCase):
         finally:
             sfl.olvidar_clave()
 
+    def test_clave_vacia(self):
+        codigo, cuerpo = self.get("/api/clave")
+        self.assertEqual(codigo, 200)
+        self.assertFalse(json.loads(cuerpo)["guardada"])
+
+    def test_library_csv(self):
+        codigo, cuerpo = self.get("/library.csv")
+        self.assertEqual(codigo, 200)
+        self.assertIn("appid", cuerpo)
+
     def test_usa_el_token_guardado_si_no_se_pega(self):
         carga = base64.urlsafe_b64encode(
             json.dumps({"exp": 2000000000, "sub": "1"}).encode()).decode().rstrip("=")

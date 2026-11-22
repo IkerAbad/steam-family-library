@@ -7,7 +7,10 @@ import json
 import pathlib
 import sys
 import tempfile
+import threading
+import time
 import unittest
+import urllib.request
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
@@ -107,6 +110,37 @@ class PruebaCli(unittest.TestCase):
                                           "--datos", tmp, "--sin-precios"])
             self.assertEqual(codigo, 1)
             self.assertIn("rechazado", texto)
+
+    def test_interfaz_arranca_y_se_para(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            escribe_datos(d)
+            sfl.Handler.servidor = None
+            hilo = threading.Thread(
+                target=self.ejecuta,
+                args=(["--datos", str(d), "--puerto", "0", "--sin-navegador", "--cada", "0"],),
+                daemon=True)
+            hilo.start()
+
+            puerto = None
+            for _ in range(60):
+                servidor = getattr(sfl.Handler, "servidor", None)
+                if servidor is not None:
+                    puerto = servidor.server_address[1]
+                    break
+                time.sleep(0.1)
+            self.assertIsNotNone(puerto, "la interfaz no arrancó")
+
+            with urllib.request.urlopen(f"http://127.0.0.1:{puerto}/api/estado", timeout=5) as r:
+                self.assertEqual(r.status, 200)
+            peticion = urllib.request.Request(
+                f"http://127.0.0.1:{puerto}/api/detener", data=b"{}",
+                headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(peticion, timeout=5) as r:
+                self.assertEqual(r.status, 200)
+
+            hilo.join(timeout=10)
+            self.assertFalse(hilo.is_alive(), "la interfaz no se paró")
 
 
 if __name__ == "__main__":

@@ -155,6 +155,28 @@ class PruebaNombresRed(unittest.TestCase):
         self.assertEqual(alias, {})
         self.assertEqual(llamadas, ["111", "111", "111", "111"])
 
+    def test_error_que_no_es_429_no_reintenta(self):
+        llamadas = []
+
+        def falso(req, timeout=0):
+            llamadas.append(1)
+            raise urllib.error.HTTPError(req.full_url, 403, "no", {}, io.BytesIO(b"no"))
+
+        sfl.urllib.request.urlopen = falso
+        self.assertEqual(sfl.nombres(["111"], {}, ""), {})
+        self.assertEqual(len(llamadas), 1)
+
+    def test_error_generico_sigue_con_el_siguiente(self):
+        llamadas = []
+
+        def falso(req, timeout=0):
+            llamadas.append(req.full_url.rsplit("=", 1)[1])
+            raise RuntimeError("raro")
+
+        sfl.urllib.request.urlopen = falso
+        self.assertEqual(sfl.nombres(["111", "222"], {}, ""), {})
+        self.assertEqual(llamadas, ["111", "222"])
+
     def test_reintenta_tras_el_429(self):
         llamadas = []
 
@@ -450,6 +472,67 @@ class PruebaApiBasura(unittest.TestCase):
             self.assertIn("ilegible", str(error.exception))
         finally:
             sfl.urllib.request.urlopen = original
+
+    def test_error_404(self):
+        def falso(req, timeout=0):
+            raise urllib.error.HTTPError(req.full_url, 404, "no", {},
+                                         io.BytesIO(b"no existe"))
+
+        original = sfl.urllib.request.urlopen
+        sfl.urllib.request.urlopen = falso
+        dormir = sfl.time.sleep
+        sfl.time.sleep = lambda segundos: None
+        try:
+            with self.assertRaises(SystemExit) as error:
+                sfl.api_get("X", {})
+            self.assertIn("404", str(error.exception))
+        finally:
+            sfl.urllib.request.urlopen = original
+            sfl.time.sleep = dormir
+
+
+class PruebaLeerJson(unittest.TestCase):
+    def test_corrupto(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = pathlib.Path(tmp) / "x.json"
+            ruta.write_text("{roto", encoding="utf-8")
+            self.assertEqual(sfl.leer_json(ruta, {"x": 1}), {"x": 1})
+            self.assertEqual(sfl.leer_json(ruta), {})
+
+
+class PruebaRedSinConexion(unittest.TestCase):
+    def test_api_get_sin_red(self):
+        original = sfl.urllib.request.urlopen
+        dormir = sfl.time.sleep
+        sfl.urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(
+            urllib.error.URLError("sin red"))
+        sfl.time.sleep = lambda segundos: None
+        try:
+            with self.assertRaises(SystemExit) as error:
+                sfl.api_get("X", {})
+            self.assertIn("conectar", str(error.exception))
+        finally:
+            sfl.urllib.request.urlopen = original
+            sfl.time.sleep = dormir
+
+    def test_es_gratis_sin_red(self):
+        original = sfl.urllib.request.urlopen
+        sfl.urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(
+            urllib.error.URLError("sin red"))
+        try:
+            self.assertIsNone(sfl.es_gratis(1))
+        finally:
+            sfl.urllib.request.urlopen = original
+
+    def test_token_corrupto(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = sfl.ruta_token
+            sfl.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
+            try:
+                (pathlib.Path(tmp) / "token.bin").write_bytes(b"basura")
+                self.assertIsNone(sfl.leer_token())
+            finally:
+                sfl.ruta_token = ruta
 
 
 class PruebaHistorial(unittest.TestCase):
