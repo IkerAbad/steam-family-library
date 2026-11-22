@@ -60,6 +60,17 @@ class PruebaInterfaz(unittest.TestCase):
         escribe_datos(cls.datos)
         sfl.generar_panel(cls.datos)
 
+        try:
+            cls.pw = sync_playwright().start()
+            cls.navegador = cls.pw.chromium.launch()
+        except Exception:
+            try:
+                cls.pw.stop()
+            except Exception:
+                pass
+            cls.tmp.cleanup()
+            raise unittest.SkipTest("Chromium no está instalado: playwright install chromium")
+
         cls.ruta_original = sfl.ruta_token
         sfl.ruta_token = lambda: cls.datos / "token.bin"
 
@@ -69,9 +80,6 @@ class PruebaInterfaz(unittest.TestCase):
         cls.hilo = threading.Thread(target=cls.servidor.serve_forever, daemon=True)
         cls.hilo.start()
         cls.base = f"http://127.0.0.1:{cls.servidor.server_address[1]}"
-
-        cls.pw = sync_playwright().start()
-        cls.navegador = cls.pw.chromium.launch()
 
     @classmethod
     def tearDownClass(cls):
