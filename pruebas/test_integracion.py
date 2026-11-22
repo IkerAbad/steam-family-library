@@ -225,6 +225,21 @@ class PruebaIntegracion(unittest.TestCase):
             self.assertEqual(snap["nombres"].get(sfl.etiqueta("222")), "Ana")
             self.assertEqual(snap["nombres_fecha"], "2026-01-01")
 
+    def test_sin_nombres_no_deja_hashes_en_las_novedades(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            (d / "snapshot.json").write_text(json.dumps({
+                "nombres": {sfl.etiqueta("111"): "tú", sfl.etiqueta("222"): "Ana"},
+                "nombres_fecha": datetime.now().strftime("%Y-%m-%d"),
+                "juegos": {},
+            }), encoding="utf-8")
+            sfl.exportar(d, self.token(), con_nombres=False, con_precios=False)
+            self.assertEqual(self.nombres_pedidos(), [])
+            nov = json.loads((d / "novedades.json").read_text(encoding="utf-8"))
+            quienes = [e["quien"] for e in nov["eventos"]]
+            self.assertIn("Ana", quienes)
+            self.assertFalse(any(len(q) == 10 for q in quienes))
+
 
 if __name__ == "__main__":
     unittest.main()

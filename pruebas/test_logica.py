@@ -226,6 +226,19 @@ class PruebaCarpeta(unittest.TestCase):
             sfl.carpeta('C:\\una\\ruta"')
 
 
+class PruebaHistorial(unittest.TestCase):
+    def test_cabecera_en_fichero_vacio(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = pathlib.Path(tmp) / "historial.csv"
+            ruta.write_text("", encoding="utf-8")
+            sfl.anotar_historial(ruta, [{
+                "evento": "nuevo", "appid": 1, "nombre": "X", "quien": "V", "propio": False,
+            }], "2026-01-01 10:00")
+            lineas = ruta.read_text(encoding="utf-8-sig").splitlines()
+            self.assertEqual(lineas[0], "fecha,evento,appid,nombre,quien,propio")
+            self.assertEqual(len(lineas), 2)
+
+
 class PruebaPanel(unittest.TestCase):
     def test_genera_todo(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -241,6 +254,9 @@ class PruebaPanel(unittest.TestCase):
                  "last_played": "", "store_url": "u"},
                 {"appid": "30", "name": "Bloqueado", "source": "family", "playable": "False",
                  "exclude_reason": "excluido", "playtime_minutes": "0", "acquired": "",
+                 "last_played": "", "store_url": "u"},
+                {"appid": "40", "name": "__FECHA_NOV__", "source": "own", "playable": "True",
+                 "exclude_reason": "", "playtime_minutes": "0", "acquired": "",
                  "last_played": "", "store_url": "u"},
             ]
             with (d / "library.csv").open("w", newline="", encoding="utf-8-sig") as f:
@@ -263,8 +279,9 @@ class PruebaPanel(unittest.TestCase):
             self.assertIn('"v":"2026-02-01"', html)
             self.assertIn('"q":"2026-03-04"', html)
             self.assertIn("Añadido", html)
-            self.assertIn('const ACTUALIZADO = "2026-11-21T10:00:00+00:00"', html)
+            self.assertIn("const ACTUALIZADO = \"2026-11-21T10:00:00+00:00\"", html)
             self.assertIn("const SIN_NOMBRE = 0", html)
+            self.assertIn('"n":"__FECHA_NOV__"', html)
 
             prestados = list(csv.DictReader((d / "prestados.csv").open(encoding="utf-8-sig")))
             self.assertEqual(len(prestados), 2)

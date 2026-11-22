@@ -275,17 +275,23 @@ def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api
         die(tr("la API no devolvió ninguna app. Puede que el token sea de otra cuenta",
                "the API returned no apps. The token may belong to another account"))
 
+    todos = set(miembros)
+    for a in apps:
+        todos.update(str(o) for o in a.get("owner_steamids", []))
+    previos_nombres = (previo or {}).get("nombres") or {}
     alias = {}
     if con_nombres:
-        todos = set(miembros)
-        for a in apps:
-            todos.update(str(o) for o in a.get("owner_steamids", []))
-        previos_nombres = (previo or {}).get("nombres") or {}
         # Con API key se refrescan siempre (una sola llamada); sin ella, cada semana.
         if api_key or nombres_caducados((previo or {}).get("nombres_fecha")):
             previos_nombres = {}
         alias = nombres([s for s in sorted(todos) if s != yo], previos_nombres, api_key)
         alias = rellenar_huecos(alias, miembros, yo)
+    else:
+        # Sin consultar: los nombres guardados se reutilizan para «quién».
+        for sid in todos:
+            nombre = previos_nombres.get(etiqueta(sid), "")
+            if nombre and nombre != "tú":
+                alias[sid] = nombre
     alias[yo] = "tú"
 
     juegos, csv_filas, snapshot = [], [], {}
@@ -366,7 +372,8 @@ def comparar(antes, despues, yo, alias):
 
     def quien(ids):
         otros = [i for i in ids if i != yo]
-        nombres = [alias.get(i, i) for i in otros]
+        nombres = [alias.get(i, "") for i in otros]
+        nombres = [n for n in nombres if n]
         return ", ".join(sorted(nombres)) if nombres else ""
 
     for appid, j in actuales.items():
@@ -411,7 +418,8 @@ def escribir_csv(ruta, filas):
 
 
 def anotar_historial(ruta, eventos, ahora):
-    nuevo = not Path(ruta).exists()
+    ruta = Path(ruta)
+    nuevo = not ruta.exists() or ruta.stat().st_size == 0
     with open(ruta, "a", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
         if nuevo:
@@ -945,7 +953,12 @@ document.querySelectorAll("[data-idioma]").forEach(b => b.addEventListener("clic
   aplicaIdioma();
 }));
 
-["q", "origen", "estado", "orden", "antiguedad", "soloNuevos"].forEach(id => $(id).addEventListener("input", pinta));
+["origen", "estado", "orden", "antiguedad", "soloNuevos"].forEach(id => $(id).addEventListener("input", pinta));
+let esperaPinta = null;
+$("q").addEventListener("input", () => {
+  clearTimeout(esperaPinta);
+  esperaPinta = setTimeout(pinta, 120);
+});
 $("verNuevos").addEventListener("click", () => {
   $("soloNuevos").checked = !$("soloNuevos").checked;
   pinta();
@@ -1111,12 +1124,13 @@ def generar_panel(datos):
                f"cannot write the shared files in {datos}: {e}"))
 
     blob = json.dumps(juegos, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
-    html = PLANTILLA.replace("__DATOS__", blob)
-    html = html.replace("__FECHA_NOV__", json.dumps(nov.get("fecha", ""), ensure_ascii=False))
+    html = PLANTILLA.replace("__FECHA_NOV__", json.dumps(nov.get("fecha", ""), ensure_ascii=False))
     html = html.replace("__HAY_NOV__", "true" if marca else "false")
     html = html.replace("__ACTUALIZADO__", json.dumps(snap.get("fecha", ""), ensure_ascii=False))
     sin_nombre = sum(1 for v in alias.values() if str(v).startswith("Miembro "))
     html = html.replace("__SIN_NOMBRE__", str(sin_nombre))
+    # Los datos van al final: si un nombre de juego coincide con un marcador, no se toca.
+    html = html.replace("__DATOS__", blob)
 
     salida = datos / "panel.html"
     try:
@@ -1746,6 +1760,7 @@ const TEXTOS = {
     nuevo: "nuevo",
     fuera: "fuera",
     otroDueno: "otro dueño",
+    otroMiembro: "otro miembro",
     tu: "tú",
     que: "Qué",
     quien: "Quién",
@@ -1821,6 +1836,7 @@ const TEXTOS = {
     nuevo: "new",
     fuera: "gone",
     otroDueno: "new owner",
+    otroMiembro: "another member",
     tu: "you",
     que: "What",
     quien: "Who",
@@ -1992,23 +2008,56 @@ function pintar(d) {
   }
 
   const ev = d.novedades || [];
+  const caja = $("novedades");
+  caja.replaceChildren();
   if (!d.primera && ev.length) {
-    const filas = ev.slice(0, 40).map(e => {
+    const titulo = document.createElement("p");
+    titulo.style.cssText = "margin:14px 0 0;color:var(--suave);font-size:13px";
+    titulo.textContent = T("novedadesDel") + " " + d.fecha_novedades;
+
+    const tabla = document.createElement("table");
+    const thead = document.createElement("thead");
+    const fila = document.createElement("tr");
+    [T("juego"), T("que"), T("quien")].forEach(texto => {
+      const th = document.createElement("th");
+      th.textContent = texto;
+      fila.appendChild(th);
+    });
+    thead.appendChild(fila);
+
+    const tbody = document.createElement("tbody");
+    ev.slice(0, 40).forEach(e => {
       const etiqueta = e.evento === "nuevo" ? T("nuevo") : (e.evento === "fuera" ? T("fuera") : T("otroDueno"));
       const clase = e.evento === "nuevo" ? "si" : "no";
-      let quien = e.quien || T("tu");
+      let quien = e.quien || (e.propio ? T("tu") : T("otroMiembro"));
       const miembro = /^Miembro (\d+)$/.exec(quien);
       if (miembro && IDIOMA === "en") quien = "Member " + miembro[1];
-      return '<tr><td>' + e.nombre + '</td><td class="' + clase + '">' + etiqueta +
-        '</td><td class="quien">' + quien + '</td></tr>';
-    }).join("");
-    $("novedades").innerHTML =
-      '<p style="margin:14px 0 0;color:var(--suave);font-size:13px">' + T("novedadesDel") + " " + d.fecha_novedades + '</p>' +
-      '<table><thead><tr><th>' + T("juego") + '</th><th>' + T("que") + '</th><th>' + T("quien") + '</th></tr></thead><tbody>' + filas + '</tbody></table>';
+
+      const tr = document.createElement("tr");
+      const td1 = document.createElement("td");
+      td1.textContent = e.nombre;
+      const td2 = document.createElement("td");
+      td2.className = clase;
+      td2.textContent = etiqueta;
+      const td3 = document.createElement("td");
+      td3.className = "quien";
+      td3.textContent = quien;
+      tr.append(td1, td2, td3);
+      tbody.appendChild(tr);
+    });
+
+    tabla.append(thead, tbody);
+    caja.append(titulo, tabla);
   } else if (d.primera) {
-    $("novedades").innerHTML = '<p style="margin:14px 0 0;color:var(--suave)">' + T("primera") + '</p>';
+    const p = document.createElement("p");
+    p.style.cssText = "margin:14px 0 0;color:var(--suave)";
+    p.textContent = T("primera");
+    caja.appendChild(p);
   } else {
-    $("novedades").innerHTML = '<p style="margin:14px 0 0;color:var(--suave)">' + T("sinCambios") + '</p>';
+    const p = document.createElement("p");
+    p.style.cssText = "margin:14px 0 0;color:var(--suave)";
+    p.textContent = T("sinCambios");
+    caja.appendChild(p);
   }
 }
 
