@@ -301,7 +301,7 @@ def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api
         "include_excluded": "true",
         "include_free": str(bool(con_free)).lower(),
         "include_non_games": str(bool(con_no_juegos)).lower(),
-        "language": "spanish",
+        "language": "english" if idioma() == "en" else "spanish",
     })
     apps = lib.get("apps", [])
     if not apps:
@@ -627,7 +627,7 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
     <option value="anio" data-t="esteAnio">Añadidos este año</option>
   </select>
   <label class="check"><input type="checkbox" id="soloNuevos"> <span data-t="soloNuevos">Solo novedades</span></label>
-  <button type="button" id="presetCompras" class="atajo" data-t="preset">Compras de la familia (90 días)</button>
+  <button type="button" id="presetCompras" class="atajo" data-t="preset">Añadidos (90 días)</button>
 </div>
 <div id="resumen"></div>
 <table>
@@ -676,7 +676,7 @@ const TEXTOS = {
     esteAnio: "Añadidos este año",
     soloNuevos: "Solo novedades",
     verNuevos: "Ver solo novedades",
-    preset: "Compras de la familia (90 días)",
+    preset: "Añadidos (90 días)",
     juego: "Juego",
     dueno: "Dueño",
     origen: "Origen",
@@ -738,7 +738,7 @@ const TEXTOS = {
     esteAnio: "Added this year",
     soloNuevos: "Only new",
     verNuevos: "Show only new",
-    preset: "Family purchases (90 days)",
+    preset: "Added (90 days)",
     juego: "Game",
     dueno: "Owner",
     origen: "Source",
@@ -827,6 +827,7 @@ function cargaFiltros() {
     if (["anadido", "nombre", "horas", "reciente", "dueno"].includes(g.orden)) $("orden").value = g.orden;
     if (["todo", "30", "90", "anio"].includes(g.antiguedad)) $("antiguedad").value = g.antiguedad;
     if (typeof g.soloNuevos === "boolean") $("soloNuevos").checked = g.soloNuevos;
+    if (typeof g.q === "string") $("q").value = g.q.slice(0, 200);
   } catch (e) {}
 }
 
@@ -837,7 +838,8 @@ function guardaFiltros() {
       estado: $("estado").value,
       orden: $("orden").value,
       antiguedad: $("antiguedad").value,
-      soloNuevos: $("soloNuevos").checked
+      soloNuevos: $("soloNuevos").checked,
+      q: $("q").value
     }));
   } catch (e) {}
 }
@@ -1595,12 +1597,11 @@ class Handler(BaseHTTPRequestHandler):
             return
         if pedida == "/api/token":
             guardado = leer_token()
-            self._enviar(200, {"ok": True, "token": guardado, "guardado": bool(guardado),
+            self._enviar(200, {"ok": True, "guardado": bool(guardado),
                                "caduca": caduca_token(guardado) if guardado else ""})
             return
         if pedida == "/api/clave":
-            clave = leer_clave()
-            self._enviar(200, {"ok": True, "clave": clave or "", "guardada": bool(clave)})
+            self._enviar(200, {"ok": True, "guardada": bool(leer_clave())})
             return
         if pedida == "/api/progreso":
             self._enviar(200, leer_progreso())
@@ -1647,6 +1648,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == "/api/actualizar":
             token = normaliza_token(str(cuerpo.get("token") or ""))
+            if not token:
+                # La página ya no recibe el token: si está guardado, se usa aquí.
+                token = leer_token() or ""
             if not token:
                 self._enviar(400, {"ok": False, "error": tr("falta el token", "the token is missing")})
                 return
@@ -1881,6 +1885,7 @@ const TEXTOS = {
     duenosTitulo: "¿Los dueños salen como «Miembro 1»?",
     duenosTexto: 'Steam limita las consultas de nombres cuando se piden muchas seguidas. Con una <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">API key gratuita</a> salen siempre. Solo se usa durante esta consulta y no se guarda.',
     apiKeyPlaceholder: "API key de Steam (opcional)",
+    claveGuardada: "API key guardada (escribe otra para cambiarla)",
     recordar: "Recordar el token y la API key en este equipo, cifrados",
     olvidar: "olvidar",
     sinNombreAviso: "Hay %n% miembros sin nombre. Pega una API key gratuita y vuelve a actualizar:",
@@ -1957,6 +1962,7 @@ const TEXTOS = {
     duenosTitulo: "Owners show up as “Member 1”?",
     duenosTexto: 'Steam rate-limits name lookups when too many are requested in a row. With a <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">free API key</a> they always resolve. It is only used for this request and is not stored.',
     apiKeyPlaceholder: "Steam API key (optional)",
+    claveGuardada: "API key stored (type another to replace it)",
     recordar: "Remember the token and the API key on this computer, encrypted",
     olvidar: "forget",
     sinNombreAviso: "%n% members have no name yet. Paste a free API key and update again:",
@@ -2027,6 +2033,7 @@ const fmtHoras = n => num({minimumFractionDigits: 1, maximumFractionDigits: 1}).
 const $ = id => document.getElementById(id);
 let ULTIMO = null;
 let VISIBLE = false;
+let HAY_TOKEN = false;
 let ESTADO = {clave: "", extra: "", texto: "", error: false};
 
 function pintaEstado() {
@@ -2234,7 +2241,7 @@ async function cargar() {
 
 async function lanzar(auto) {
   const token = $("token").value.trim();
-  if (!token) { ponEstado("faltaToken"); return; }
+  if (!token && !HAY_TOKEN) { ponEstado("faltaToken"); return; }
   $("lanzar").disabled = true;
   ponEstado(auto ? "guardadoActualizando" : "consultando");
   empiezaSondeo();
@@ -2249,7 +2256,12 @@ async function lanzar(auto) {
       ponError(d.error || T("actualizarFallo"));
       return;
     }
-    if (!$("recordar").checked) $("token").value = "";
+    if (!$("recordar").checked) {
+      $("token").value = "";
+      HAY_TOKEN = false;
+    } else {
+      HAY_TOKEN = true;
+    }
     if (d.caduca) {
       ponEstado($("recordar").checked ? "listoGuardado" : "listoValido", d.caduca + ".");
     } else {
@@ -2269,6 +2281,7 @@ $("olvidar").addEventListener("click", async e => {
   e.preventDefault();
   try { await fetch("/api/olvidar", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"}); } catch (x) {}
   $("token").value = "";
+  HAY_TOKEN = false;
   ponEstado("olvidado");
 });
 
@@ -2276,7 +2289,7 @@ async function cargaClave() {
   try {
     const r = await fetch("/api/clave");
     const d = await r.json();
-    if (d && d.clave) $("apikey").value = d.clave;
+    if (d && d.guardada) $("apikey").placeholder = T("claveGuardada");
   } catch (e) {}
 }
 
@@ -2285,8 +2298,8 @@ async function arranque() {
   try {
     const r = await fetch("/api/token");
     const d = await r.json();
-    if (d && d.token) {
-      $("token").value = d.token;
+    if (d && d.guardado) {
+      HAY_TOKEN = true;
       $("recordar").checked = true;
       await lanzar(true);
     }

@@ -240,6 +240,16 @@ class PruebaIntegracion(unittest.TestCase):
             self.assertIn("Ana", quienes)
             self.assertFalse(any(len(q) == 10 for q in quienes))
 
+    def test_nombres_de_juegos_en_el_idioma_de_la_interfaz(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sfl.idioma("en")
+            try:
+                sfl.exportar(pathlib.Path(tmp), self.token(), con_precios=False)
+            finally:
+                sfl.idioma("es")
+            consultas = [c for r, c in SteamFalso.llamadas if "GetSharedLibraryApps" in r]
+            self.assertEqual(consultas[0]["language"], ["english"])
+
 
 if __name__ == "__main__":
     unittest.main()

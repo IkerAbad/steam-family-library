@@ -1,5 +1,6 @@
 """Pruebas de los endpoints de la interfaz, en local y sin red externa."""
 
+import base64
 import csv
 import json
 import pathlib
@@ -100,7 +101,30 @@ class PruebaHttp(unittest.TestCase):
     def test_token_sin_guardar(self):
         codigo, cuerpo = self.get("/api/token")
         self.assertEqual(codigo, 200)
-        self.assertIsNone(json.loads(cuerpo)["token"])
+        datos = json.loads(cuerpo)
+        self.assertFalse(datos["guardado"])
+        self.assertNotIn("token", datos)
+
+    def test_token_guardado_no_se_devuelve(self):
+        carga = base64.urlsafe_b64encode(
+            json.dumps({"exp": 2000000000, "sub": "1"}).encode()).decode().rstrip("=")
+        tok = "x." + carga + "." + "a" * 43
+        sfl.guardar_token(tok)
+        try:
+            datos = json.loads(self.get("/api/token")[1])
+            self.assertTrue(datos["guardado"])
+            self.assertNotIn("token", datos)
+        finally:
+            sfl.olvidar_token()
+
+    def test_clave_guardada_no_se_devuelve(self):
+        sfl.guardar_clave("0123456789abcdef")
+        try:
+            datos = json.loads(self.get("/api/clave")[1])
+            self.assertTrue(datos["guardada"])
+            self.assertNotIn("clave", datos)
+        finally:
+            sfl.olvidar_clave()
 
     def test_panel_inexistente(self):
         self.assertEqual(self.get("/panel.html")[0], 404)

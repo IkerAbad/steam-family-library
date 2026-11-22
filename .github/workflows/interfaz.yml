@@ -1,0 +1,27 @@
+name: Interfaz
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  navegador:
+    name: Interfaz en Chromium
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instala Playwright
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Pruebas de interfaz
+        run: python -m unittest discover -s pruebas -p "test_interfaz.py" -v
