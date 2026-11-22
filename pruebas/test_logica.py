@@ -337,6 +337,44 @@ class PruebaTokenRechazado(unittest.TestCase):
                 sfl.ruta_token = ruta
 
 
+class PruebaCarpetaDatos(unittest.TestCase):
+    def test_vacia(self):
+        with self.assertRaises(SystemExit) as error:
+            sfl.carpeta_de_datos("")
+        self.assertIn("vacía", str(error.exception))
+
+    def test_fichero_en_vez_de_carpeta(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = pathlib.Path(tmp) / "fichero.txt"
+            ruta.write_text("hola", encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                sfl.carpeta_de_datos(str(ruta))
+
+
+class PruebaErroresPanel(unittest.TestCase):
+    def test_sin_csv(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit) as error:
+                sfl.generar_panel(pathlib.Path(tmp))
+            self.assertIn("no encuentro", str(error.exception))
+
+    def test_csv_vacio(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            (d / "library.csv").write_text("appid,name,source\n", encoding="utf-8")
+            with self.assertRaises(SystemExit) as error:
+                sfl.generar_panel(d)
+            self.assertIn("vacío", str(error.exception))
+
+    def test_csv_sin_columna(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            (d / "library.csv").write_text("appid,name\n10,Juego\n", encoding="utf-8")
+            with self.assertRaises(SystemExit) as error:
+                sfl.generar_panel(d)
+            self.assertIn("source", str(error.exception))
+
+
 class PruebaHistorial(unittest.TestCase):
     def test_cabecera_en_fichero_vacio(self):
         with tempfile.TemporaryDirectory() as tmp:

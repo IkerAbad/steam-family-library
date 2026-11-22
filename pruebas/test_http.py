@@ -146,6 +146,20 @@ class PruebaHttp(unittest.TestCase):
     def test_panel_inexistente(self):
         self.assertEqual(self.get("/panel.html")[0], 404)
 
+    def test_fichero_que_no_existe(self):
+        self.assertEqual(self.get("/prestados.csv")[0], 404)
+
+    def test_cuerpo_demasiado_grande(self):
+        req = urllib.request.Request(
+            self.base + "/api/actualizar", data=b"{}" * 60_000,
+            headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                codigo = r.status
+        except urllib.error.HTTPError as e:
+            codigo = e.code
+        self.assertEqual(codigo, 413)
+
     def test_ruta_desconocida(self):
         self.assertEqual(self.get("/loquesea")[0], 404)
 
