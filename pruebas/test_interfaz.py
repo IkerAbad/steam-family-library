@@ -106,6 +106,8 @@ class PruebaInterfaz(unittest.TestCase):
         pagina.click('[data-idioma="en"]')
         self.assertIn("step 1", pagina.locator("h2").first.inner_text().lower())
         self.assertIn("Export your family library", pagina.inner_text(".sub"))
+        pagina.reload()
+        self.assertIn("step 1", pagina.locator("h2").first.inner_text().lower())
 
     def test_panel_ordena_por_horas(self):
         pagina = self.pagina("/panel.html")

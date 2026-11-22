@@ -14,7 +14,7 @@ sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import steam_families as sfl  # noqa: E402
-from falso import arranca, para, token as token_falso  # noqa: E402
+from falso import SteamFalso, arranca, para, token as token_falso  # noqa: E402
 
 
 def escribe_datos(d):
@@ -49,6 +49,10 @@ class PruebaCli(unittest.TestCase):
         with contextlib.redirect_stdout(salida), contextlib.redirect_stderr(salida):
             codigo = sfl.main(args)
         return codigo, salida.getvalue()
+
+    def setUp(self):
+        SteamFalso.caida = 0
+        SteamFalso.fallos = {}
 
     def test_panel(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -95,6 +99,14 @@ class PruebaCli(unittest.TestCase):
                 sfl.main(["--version"])
         self.assertEqual(error.exception.code, 0)
         self.assertIn(sfl.VERSION, salida.getvalue())
+
+    def test_exportar_con_token_rechazado(self):
+        SteamFalso.caida = 401
+        with tempfile.TemporaryDirectory() as tmp:
+            codigo, texto = self.ejecuta(["--exportar", "--token", token_falso(),
+                                          "--datos", tmp, "--sin-precios"])
+            self.assertEqual(codigo, 1)
+            self.assertIn("rechazado", texto)
 
 
 if __name__ == "__main__":
