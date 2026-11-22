@@ -18,7 +18,7 @@ Sin Python: descarga la [última release](https://github.com/IkerAbad/steam-fami
 
 1. Instala [Python 3.8 o superior](https://www.python.org/downloads/). En Windows, marca «Add python.exe to PATH».
 2. Windows: doble clic en `iniciar.cmd`. Linux o macOS: `./iniciar.sh`. Los datos se guardan en la subcarpeta `datos/`.
-3. Se abre una página en `127.0.0.1`. Pega el token la primera vez; a partir de ahí se guarda cifrado y la app se actualiza sola hasta que caduque.
+3. Se abre una página en `127.0.0.1`. Pega el token la primera vez; a partir de ahí se guarda cifrado y la app se actualiza sola hasta que caduque. Con la ventana abierta repite cada 6 horas (`--cada`).
 
 Solo puede haber una ventana usando la misma carpeta de datos. Si abres otra, avisa y se cierra.
 
@@ -67,7 +67,7 @@ python steam_families.py --exportar --token X --datos datos # exporta sin interf
 python steam_families.py --panel --datos datos      # solo regenera el panel
 ```
 
-Opciones: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin-nombres`, `--sin-historial`, `--sin-precios`, `--puerto`, `--sin-navegador`, `--version`.
+Opciones: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin-nombres`, `--sin-historial`, `--sin-precios`, `--puerto`, `--cada`, `--sin-navegador`, `--version`.
 
 ## Ejecutable
 
@@ -130,7 +130,7 @@ Without Python: download the [latest release](https://github.com/IkerAbad/steam-
 
 1. Install [Python 3.8 or higher](https://www.python.org/downloads/). On Windows, tick "Add python.exe to PATH".
 2. Windows: double-click `iniciar.cmd`. Linux or macOS: `./iniciar.sh`. Data is stored in the `datos/` subfolder.
-3. A page opens on `127.0.0.1`. Paste the token the first time; from then on it is stored encrypted and the app updates itself until it expires.
+3. A page opens on `127.0.0.1`. Paste the token the first time; from then on it is stored encrypted and the app updates itself until it expires. While the window is open it repeats every 6 hours (`--cada`).
 
 Only one window can use the same data folder. If you open another one, it warns and closes.
 
@@ -179,7 +179,7 @@ python steam_families.py --exportar --token X --datos datos # export without the
 python steam_families.py --panel --datos datos      # only regenerate the dashboard
 ```
 
-Options: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin-nombres`, `--sin-historial`, `--sin-precios`, `--puerto`, `--sin-navegador`, `--version`.
+Options: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin-nombres`, `--sin-historial`, `--sin-precios`, `--puerto`, `--cada`, `--sin-navegador`, `--version`.
 
 ## Executable
 

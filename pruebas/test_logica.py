@@ -375,6 +375,61 @@ class PruebaErroresPanel(unittest.TestCase):
             self.assertIn("source", str(error.exception))
 
 
+class PruebaActualizacion(unittest.TestCase):
+    def jwt(self):
+        carga = base64.urlsafe_b64encode(
+            json.dumps({"exp": 2000000000}).encode()).decode().rstrip("=")
+        return "x." + carga + "." + "a" * 43
+
+    def test_un_ciclo_usa_token_y_clave(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = sfl.ruta_token
+            sfl.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
+            try:
+                tok = self.jwt()
+                sfl.guardar_token(tok)
+                sfl.guardar_clave("0" * 32)
+                llamadas = []
+
+                def dormir(segundos):
+                    if llamadas:
+                        raise RuntimeError("fin")
+                    llamadas.append("dormido")
+
+                def falso(datos, token, api_key="", aviso=None):
+                    llamadas.append((token, api_key))
+                    return True, "ok"
+
+                with self.assertRaises(RuntimeError):
+                    sfl.actualizacion_periodica(tmp, 10, dormir=dormir, ejecutar_fn=falso)
+                self.assertEqual(llamadas[-1], (tok, "0" * 32))
+            finally:
+                sfl.ruta_token = ruta
+
+    def test_sin_token_no_llama(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = sfl.ruta_token
+            sfl.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
+            try:
+                sfl.olvidar_token()
+                veces = []
+                llamadas = []
+
+                def dormir(segundos):
+                    if len(veces) >= 2:
+                        raise RuntimeError("fin")
+                    veces.append(segundos)
+
+                def falso(*args, **kwargs):
+                    llamadas.append(1)
+
+                with self.assertRaises(RuntimeError):
+                    sfl.actualizacion_periodica(tmp, 10, dormir=dormir, ejecutar_fn=falso)
+                self.assertEqual(llamadas, [])
+            finally:
+                sfl.ruta_token = ruta
+
+
 class PruebaApiBasura(unittest.TestCase):
     def test_respuesta_no_json(self):
         class Respuesta:

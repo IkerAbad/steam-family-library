@@ -1541,6 +1541,25 @@ def ejecutar(datos, token, api_key="", aviso=None):
     return True, texto
 
 
+def actualizacion_periodica(datos, cada_segundos, dormir=None, ejecutar_fn=None):
+    """Actualiza sola cada cierto tiempo mientras la interfaz está abierta."""
+    dormir = dormir or time.sleep
+    ejecutar_fn = ejecutar_fn or ejecutar
+    while True:
+        dormir(cada_segundos)
+        token = leer_token()
+        if not token:
+            continue
+        if not CANDADO.acquire(blocking=False):
+            continue
+        try:
+            progreso(tr("Actualización automática…", "Automatic update…"))
+            ejecutar_fn(datos, token, leer_clave() or "", aviso=progreso)
+        finally:
+            parar_progreso()
+            CANDADO.release()
+
+
 PROHIBIDOS = set('"<>|*?')
 CANDADO = threading.Lock()
 FICHEROS = {
@@ -2251,6 +2270,7 @@ const TEXTOS = {
     listoGuardado: "Listo. Token guardado, caduca el",
     listoValido: "Listo. Token válido hasta el",
     listo: "Listo.",
+    actualizadoSolo: "Actualizado automáticamente.",
     actualizarFallo: "No se pudo actualizar.",
     sinConexion: "No hay conexión con la ventana de Steam Families. Suele pasar si esa ventana se ha cerrado: cierra esta pestaña, haz doble clic en iniciar.cmd (o ejecuta iniciar.sh) y vuelve a pegar el token.",
     olvidado: "Token olvidado. En la próxima ejecución tendrás que pegarlo.",
@@ -2328,6 +2348,7 @@ const TEXTOS = {
     listoGuardado: "Done. Token stored, expires on",
     listoValido: "Done. Token valid until",
     listo: "Done.",
+    actualizadoSolo: "Updated automatically.",
     actualizarFallo: "Could not update.",
     sinConexion: "No connection to the Steam Families window. This usually means that window was closed: close this tab, double-click iniciar.cmd (or run iniciar.sh) and paste the token again.",
     olvidado: "Token forgotten. You will have to paste it again next time.",
@@ -2362,6 +2383,8 @@ const fechaHora = s => {
 
 const $ = id => document.getElementById(id);
 let ULTIMO = null;
+let ULTIMA_FECHA = null;
+let OCUPADO = false;
 let VISIBLE = false;
 let HAY_TOKEN = false;
 let ESTADO = {clave: "", extra: "", texto: "", error: false};
@@ -2473,6 +2496,7 @@ $("pegar").addEventListener("click", async () => {
 
 function pintar(d) {
   ULTIMO = d;
+  ULTIMA_FECHA = d.actualizado || ULTIMA_FECHA;
   $("resultado").hidden = false;
   $("tarjetas").innerHTML =
     '<div class="tarjeta"><b>' + fmt(d.juegos) + '</b><span>' + T("juegos") + '</span></div>' +
@@ -2573,6 +2597,7 @@ async function lanzar(auto) {
   const token = $("token").value.trim();
   if (!token && !HAY_TOKEN) { ponEstado("faltaToken"); return; }
   $("lanzar").disabled = true;
+  OCUPADO = true;
   ponEstado(auto ? "guardadoActualizando" : "consultando");
   empiezaSondeo();
   try {
@@ -2603,6 +2628,7 @@ async function lanzar(auto) {
     ponError(T("sinConexion") + " (" + e.message + ")");
   } finally {
     paraSondeo();
+    OCUPADO = false;
     $("lanzar").disabled = false;
   }
 }
@@ -2650,6 +2676,19 @@ $("detener").addEventListener("click", async e => {
   document.body.innerHTML = '<main><h1>' + T("detenida") + '</h1><p class="sub">' + T("detenidaTexto") + '</p></main>';
 });
 
+async function vigila() {
+  if (OCUPADO) return;
+  try {
+    const r = await fetch("/api/estado");
+    const d = await r.json();
+    if (d && d.ok && d.actualizado && d.actualizado !== ULTIMA_FECHA) {
+      pintar(d);
+      ponEstado("actualizadoSolo");
+    }
+  } catch (e) {}
+}
+setInterval(vigila, 30000);
+
 aplicaIdioma();
 arranque();
 </script>
@@ -2674,6 +2713,8 @@ def main(argv=None):
     p.add_argument("--sin-historial", action="store_true", help="no toca snapshot ni novedades")
     p.add_argument("--sin-precios", action="store_true", help="no consulta la tienda")
     p.add_argument("--puerto", type=int, default=8087, help="puerto de la interfaz")
+    p.add_argument("--cada", type=float, default=6,
+                   help="horas entre actualizaciones automáticas (0 lo desactiva)")
     p.add_argument("--sin-navegador", action="store_true", help="no abre el navegador")
     p.add_argument("--version", action="version", version=f"Steam Families {VERSION}")
     args = p.parse_args(argv)
@@ -2757,6 +2798,9 @@ def interfaz(args):
         return 1
 
     Handler.servidor = servidor
+    if args.cada and args.cada > 0:
+        threading.Thread(target=actualizacion_periodica,
+                         args=(datos, args.cada * 3600), daemon=True).start()
     url = f"http://127.0.0.1:{servidor.server_address[1]}/"
     print(f"Datos: {datos}")
     print(f"Interfaz: {url}")
