@@ -67,6 +67,27 @@ def tr(es, en):
     return en if idioma() == "en" else es
 
 
+_PROGRESO = {"activo": False, "texto": ""}
+_PROGRESO_CANDADO = threading.Lock()
+
+
+def progreso(texto):
+    """Marca lo que está haciendo la exportación para que la página lo enseñe."""
+    with _PROGRESO_CANDADO:
+        _PROGRESO["texto"] = texto
+        _PROGRESO["activo"] = True
+
+
+def parar_progreso():
+    with _PROGRESO_CANDADO:
+        _PROGRESO["activo"] = False
+
+
+def leer_progreso():
+    with _PROGRESO_CANDADO:
+        return dict(_PROGRESO)
+
+
 def die(msg):
     raise SystemExit(msg)
 
@@ -89,24 +110,33 @@ def carpeta(texto):
     return p
 
 
-def api_get(metodo, params):
+def api_get(metodo, params, intentos=3):
+    """GET a la API de Steam. Reintenta solo lo que puede ser pasajero: 5xx y red."""
     url = f"{API}/{metodo}/?" + urllib.parse.urlencode(params, doseq=True)
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.load(resp).get("response", {})
-    except urllib.error.HTTPError as e:
-        cuerpo = e.read().decode("utf-8", "replace")[:400]
-        if e.code in (401, 403):
-            pista = tr("\nSteam ha rechazado el token. Saca uno nuevo y cópialo entero con el marcador «Copiar token».",
-                       "\nSteam rejected the token. Get a new one and copy it whole with the “Copy token” bookmark.")
-        else:
-            pista = ""
-        die(tr(f"{metodo} devolvió HTTP {e.code}\n{cuerpo}{pista}",
-               f"{metodo} returned HTTP {e.code}\n{cuerpo}{pista}"))
-    except urllib.error.URLError as e:
-        die(tr(f"no se pudo conectar con la API de Steam: {e.reason}",
-               f"could not connect to the Steam API: {e.reason}"))
+    for intento in range(intentos):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.load(resp).get("response", {})
+        except urllib.error.HTTPError as e:
+            if e.code >= 500 and intento < intentos - 1:
+                time.sleep(2 + 3 * intento)
+                continue
+            cuerpo = e.read().decode("utf-8", "replace")[:400]
+            if e.code in (401, 403):
+                pista = tr("\nSteam ha rechazado el token. Saca uno nuevo y cópialo entero con el marcador «Copiar token».",
+                           "\nSteam rejected the token. Get a new one and copy it whole with the “Copy token” bookmark.")
+            else:
+                pista = ""
+            die(tr(f"{metodo} devolvió HTTP {e.code}\n{cuerpo}{pista}",
+                   f"{metodo} returned HTTP {e.code}\n{cuerpo}{pista}"))
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            if intento < intentos - 1:
+                time.sleep(2 + 3 * intento)
+                continue
+            motivo = getattr(e, "reason", e)
+            die(tr(f"no se pudo conectar con la API de Steam: {motivo}",
+                   f"could not connect to the Steam API: {motivo}"))
 
 
 def normaliza_token(texto):
@@ -153,7 +183,7 @@ def etiqueta(steamid):
     return hashlib.sha256(steamid.encode()).hexdigest()[:10]
 
 
-def nombres(steamids, previos=None, api_key=""):
+def nombres(steamids, previos=None, api_key="", aviso=None):
     """Alias público de cada miembro. Sin API key: endpoint de la comunidad.
 
     `previos` va por etiqueta (hash), no por SteamID, para no guardar los IDs.
@@ -196,6 +226,9 @@ def nombres(steamids, previos=None, api_key=""):
             continue
         if i:
             time.sleep(1.1)
+        if aviso:
+            aviso(tr(f"Nombres: {i + 1}/{len(pendientes)}…",
+                     f"Names: {i + 1}/{len(pendientes)}…"))
         while True:
             try:
                 url = COMUNIDAD + "/actions/ajaxresolveusers?steamids=" + sid
@@ -245,7 +278,7 @@ def nombres_caducados(fecha, dias=DIAS_NOMBRES):
     return (datetime.now().date() - cuando).days >= dias
 
 
-def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api_key=""):
+def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api_key="", aviso=None):
     yo = steamid_del_token(token)
 
     fam = api_get("IFamilyGroupsService/GetFamilyGroupForUser/v1", {
@@ -284,7 +317,7 @@ def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api
         # Con API key se refrescan siempre (una sola llamada); sin ella, cada semana.
         if api_key or nombres_caducados((previo or {}).get("nombres_fecha")):
             previos_nombres = {}
-        alias = nombres([s for s in sorted(todos) if s != yo], previos_nombres, api_key)
+        alias = nombres([s for s in sorted(todos) if s != yo], previos_nombres, api_key, aviso)
         alias = rellenar_huecos(alias, miembros, yo)
     else:
         # Sin consultar: los nombres guardados se reutilizan para «quién».
@@ -410,11 +443,34 @@ def comparar(antes, despues, yo, alias):
     return eventos
 
 
-def escribir_csv(ruta, filas):
-    with open(ruta, "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.DictWriter(f, fieldnames=COLUMNAS, extrasaction="ignore")
-        w.writeheader()
-        w.writerows(filas)
+def escribir_atomico(ruta, texto, encoding="utf-8"):
+    """Escribe a un temporal y lo cambia de golpe: nunca deja el fichero a medias."""
+    ruta = Path(ruta)
+    temporal = ruta.with_name(ruta.name + ".tmp")
+    try:
+        temporal.write_text(texto, encoding=encoding)
+        os.replace(temporal, ruta)
+    finally:
+        try:
+            temporal.unlink()
+        except OSError:
+            pass
+
+
+def escribir_csv(ruta, filas, campos=None):
+    ruta = Path(ruta)
+    temporal = ruta.with_name(ruta.name + ".tmp")
+    try:
+        with open(temporal, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.DictWriter(f, fieldnames=campos or COLUMNAS, extrasaction="ignore")
+            w.writeheader()
+            w.writerows(filas)
+        os.replace(temporal, ruta)
+    finally:
+        try:
+            temporal.unlink()
+        except OSError:
+            pass
 
 
 def anotar_historial(ruta, eventos, ahora):
@@ -489,7 +545,9 @@ label.check { display:flex; align-items:center; gap:6px; color:var(--suave); fon
 label.check input { accent-color:var(--acento); }
 #resumen { padding:2px 24px 10px; color:var(--suave); font-size:13px; }
 table { width:100%; border-collapse:collapse; table-layout:fixed; }
-thead th { position:sticky; top:0; background:var(--panel); text-align:left; padding:9px 12px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--suave); border-bottom:1px solid var(--borde); user-select:none; }
+thead th { position:sticky; top:0; background:var(--panel); text-align:left; padding:9px 12px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--suave); border-bottom:1px solid var(--borde); user-select:none; cursor:pointer; }
+thead th[data-campo]:hover { color:var(--texto); }
+.flecha { color:var(--acento); margin-left:5px; font-size:10px; }
 thead th:nth-child(2) { width:150px; }
 thead th:nth-child(3) { width:100px; }
 thead th:nth-child(4) { width:180px; }
@@ -575,13 +633,13 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
 <table>
   <thead>
     <tr>
-      <th data-t="juego">Juego</th>
-      <th data-t="dueno">Dueño</th>
-      <th data-t="origen">Origen</th>
-      <th data-t="estado">Estado</th>
-      <th class="der" data-t="tusHoras">Tus horas</th>
-      <th class="der" data-t="ultimaSesion">Última sesión</th>
-      <th class="der" data-t="anadido">Añadido</th>
+      <th data-t="juego" data-campo="n">Juego</th>
+      <th data-t="dueno" data-campo="d">Dueño</th>
+      <th data-t="origen" data-campo="s">Origen</th>
+      <th data-t="estado" data-campo="p">Estado</th>
+      <th class="der" data-t="tusHoras" data-campo="m">Tus horas</th>
+      <th class="der" data-t="ultimaSesion" data-campo="u">Última sesión</th>
+      <th class="der" data-t="anadido" data-campo="q">Añadido</th>
     </tr>
   </thead>
   <tbody id="cuerpo"></tbody>
@@ -756,6 +814,61 @@ function motivo(texto) {
 
 const $ = id => document.getElementById(id);
 const cuerpo = $("cuerpo");
+const CLAVE_FILTROS = "sf-filtros";
+let ORDEN_CABECERA = null;
+
+const compara = (a, b) => a.localeCompare(b, IDIOMA);
+
+function cargaFiltros() {
+  try {
+    const g = JSON.parse(localStorage.getItem(CLAVE_FILTROS) || "{}");
+    if (["todo", "family", "own"].includes(g.origen)) $("origen").value = g.origen;
+    if (["todo", "jugable", "bloqueado", "jugados", "sinestrenar"].includes(g.estado)) $("estado").value = g.estado;
+    if (["anadido", "nombre", "horas", "reciente", "dueno"].includes(g.orden)) $("orden").value = g.orden;
+    if (["todo", "30", "90", "anio"].includes(g.antiguedad)) $("antiguedad").value = g.antiguedad;
+    if (typeof g.soloNuevos === "boolean") $("soloNuevos").checked = g.soloNuevos;
+  } catch (e) {}
+}
+
+function guardaFiltros() {
+  try {
+    localStorage.setItem(CLAVE_FILTROS, JSON.stringify({
+      origen: $("origen").value,
+      estado: $("estado").value,
+      orden: $("orden").value,
+      antiguedad: $("antiguedad").value,
+      soloNuevos: $("soloNuevos").checked
+    }));
+  } catch (e) {}
+}
+
+function pintaFlechas() {
+  document.querySelectorAll("thead th[data-campo]").forEach(th => {
+    const flecha = th.querySelector(".flecha");
+    if (flecha) flecha.remove();
+    if (ORDEN_CABECERA && ORDEN_CABECERA.campo === th.dataset.campo) {
+      const s = document.createElement("span");
+      s.className = "flecha";
+      s.textContent = ORDEN_CABECERA.dir === "asc" ? "▲" : "▼";
+      th.appendChild(s);
+    }
+  });
+}
+
+function ordenaPorCabecera(lista) {
+  const campo = ORDEN_CABECERA.campo;
+  const signo = ORDEN_CABECERA.dir === "asc" ? 1 : -1;
+  lista.sort((a, b) => {
+    let x = a[campo];
+    let y = b[campo];
+    if (campo === "p") { x = x ? 1 : 0; y = y ? 1 : 0; }
+    if ((campo === "u" || campo === "q") && !x !== !y) return x ? -1 : 1;
+    const orden = (typeof x === "number" && typeof y === "number")
+      ? x - y
+      : compara(String(x || ""), String(y || ""));
+    return orden * signo || compara(a.n, b.n);
+  });
+}
 
 const totales = {
   juegos: DATOS.length,
@@ -815,12 +928,15 @@ function pinta() {
     return true;
   });
 
-  const compara = (a, b) => a.localeCompare(b, IDIOMA);
-  if (orden === "anadido") lista.sort((a, b) => (b.q || "").localeCompare(a.q || "") || compara(a.n, b.n));
+  if (ORDEN_CABECERA) ordenaPorCabecera(lista);
+  else if (orden === "anadido") lista.sort((a, b) => (b.q || "").localeCompare(a.q || "") || compara(a.n, b.n));
   else if (orden === "horas") lista.sort((a, b) => b.m - a.m || compara(a.n, b.n));
   else if (orden === "reciente") lista.sort((a, b) => (b.u || "").localeCompare(a.u || "") || compara(a.n, b.n));
   else if (orden === "dueno") lista.sort((a, b) => compara(a.d || "zz", b.d || "zz") || compara(a.n, b.n));
   else lista.sort((a, b) => compara(a.n, b.n));
+
+  pintaFlechas();
+  guardaFiltros();
 
   $("resumen").textContent = numero(lista.length) + " " + T("de") + " " + numero(DATOS.length) + " " + T("juegos");
   $("vacio").hidden = lista.length > 0;
@@ -953,7 +1069,20 @@ document.querySelectorAll("[data-idioma]").forEach(b => b.addEventListener("clic
   aplicaIdioma();
 }));
 
-["origen", "estado", "orden", "antiguedad", "soloNuevos"].forEach(id => $(id).addEventListener("input", pinta));
+["origen", "estado", "antiguedad", "soloNuevos"].forEach(id => $(id).addEventListener("input", pinta));
+$("orden").addEventListener("input", () => {
+  ORDEN_CABECERA = null;
+  pinta();
+});
+document.querySelectorAll("thead th[data-campo]").forEach(th => th.addEventListener("click", () => {
+  const campo = th.dataset.campo;
+  if (ORDEN_CABECERA && ORDEN_CABECERA.campo === campo) {
+    ORDEN_CABECERA.dir = ORDEN_CABECERA.dir === "asc" ? "desc" : "asc";
+  } else {
+    ORDEN_CABECERA = {campo, dir: ["m", "q", "u"].includes(campo) ? "desc" : "asc"};
+  }
+  pinta();
+}));
 let esperaPinta = null;
 $("q").addEventListener("input", () => {
   clearTimeout(esperaPinta);
@@ -970,8 +1099,10 @@ $("presetCompras").addEventListener("click", () => {
   $("antiguedad").value = "90";
   $("orden").value = "anadido";
   $("soloNuevos").checked = false;
+  ORDEN_CABECERA = null;
   pinta();
 });
+cargaFiltros();
 aplicaIdioma();
 </script>
 </body>
@@ -985,8 +1116,10 @@ aplicaIdioma();
 
 
 def exportar(datos, token, api_key="", include_free=False, include_non_games=False,
-             con_nombres=True, con_historial=True, con_precios=True):
+             con_nombres=True, con_historial=True, con_precios=True, aviso=None):
     """Descarga la biblioteca, escribe el CSV y calcula las novedades."""
+    aviso = aviso or (lambda texto: None)
+    aviso(tr("Consultando el grupo familiar…", "Checking the family group…"))
     ruta_snap = Path(datos) / "snapshot.json"
 
     previo = {}
@@ -1002,7 +1135,9 @@ def exportar(datos, token, api_key="", include_free=False, include_non_games=Fal
             except Exception:
                 pass
 
-    datos_nuevos = descargar(token, include_free, include_non_games, con_nombres, previo, api_key)
+    datos_nuevos = descargar(token, include_free, include_non_games, con_nombres, previo, api_key, aviso)
+    aviso(tr(f"Biblioteca: {len(datos_nuevos['juegos'])} juegos",
+             f"Library: {len(datos_nuevos['juegos'])} games"))
     try:
         escribir_csv(Path(datos) / "library.csv", datos_nuevos["csv"])
     except OSError as e:
@@ -1017,17 +1152,21 @@ def exportar(datos, token, api_key="", include_free=False, include_non_games=Fal
         if previo:
             eventos = comparar(previo, datos_nuevos["snapshot"], datos_nuevos["yo"], datos_nuevos["alias"])
             if eventos and con_precios:
-                for e in [x for x in eventos if x["evento"] == "nuevo"][:25]:
+                nuevos = [x for x in eventos if x["evento"] == "nuevo"][:25]
+                for i, e in enumerate(nuevos, 1):
+                    aviso(tr(f"Precios: {i}/{len(nuevos)}…", f"Prices: {i}/{len(nuevos)}…"))
                     gratis = es_gratis(e["appid"])
                     if gratis is not None:
                         e["gratis"] = gratis
-                    time.sleep(1.1)
+                    if i < len(nuevos):
+                        time.sleep(1.1)
+        aviso(tr("Guardando…", "Saving…"))
         try:
-            Path(ruta_snap).write_text(json.dumps(datos_nuevos["snapshot"], ensure_ascii=False, indent=1),
-                                       encoding="utf-8")
-            (Path(datos) / "novedades.json").write_text(json.dumps({
-                "fecha": ahora, "eventos": eventos}, ensure_ascii=False, indent=1), encoding="utf-8")
-            (Path(datos) / "novedades.txt").write_text(chivato(eventos, ahora), encoding="utf-8")
+            escribir_atomico(ruta_snap, json.dumps(datos_nuevos["snapshot"],
+                                                   ensure_ascii=False, indent=1))
+            escribir_atomico(Path(datos) / "novedades.json", json.dumps({
+                "fecha": ahora, "eventos": eventos}, ensure_ascii=False, indent=1))
+            escribir_atomico(Path(datos) / "novedades.txt", chivato(eventos, ahora))
             anotar_historial(Path(datos) / "historial.csv", eventos, ahora)
         except OSError as e:
             die(tr(f"no puedo escribir el historial en {datos}: {e}",
@@ -1111,14 +1250,11 @@ def generar_panel(datos):
     prestados = [j for j in juegos if j["s"] == "family"]
     prestados.sort(key=lambda j: j["n"].lower())
     try:
-        if prestados:
-            with (datos / "prestados.csv").open("w", encoding="utf-8-sig", newline="") as f:
-                w = csv.DictWriter(f, fieldnames=list(filas[0].keys()), extrasaction="ignore")
-                w.writeheader()
-                por_id = {str(r["appid"]): r for r in filas}
-                w.writerows(por_id[j["a"]] for j in prestados)
+        por_id = {str(r["appid"]): r for r in filas}
+        escribir_csv(datos / "prestados.csv", [por_id[j["a"]] for j in prestados],
+                     list(filas[0].keys()))
         jugables = sorted((j["n"] for j in prestados if j["p"]), key=str.lower)
-        (datos / "prestados.txt").write_text("\n".join(jugables) + "\n", encoding="utf-8")
+        escribir_atomico(datos / "prestados.txt", "\n".join(jugables) + "\n")
     except OSError as e:
         die(tr(f"no puedo escribir los ficheros de prestados en {datos}: {e}",
                f"cannot write the shared files in {datos}: {e}"))
@@ -1134,17 +1270,19 @@ def generar_panel(datos):
 
     salida = datos / "panel.html"
     try:
-        salida.write_text(html, encoding="utf-8")
+        escribir_atomico(salida, html)
     except OSError as e:
         die(f"no puedo escribir {salida}: {e}")
 
     return {"juegos": len(juegos), "prestados": len(prestados)}
 
 
-def ejecutar(datos, token, api_key=""):
+def ejecutar(datos, token, api_key="", aviso=None):
     """Lo que hace el botón Actualizar: todo en el mismo proceso."""
+    aviso = aviso or (lambda texto: None)
     try:
-        resumen = exportar(datos, token, api_key)
+        resumen = exportar(datos, token, api_key, aviso=aviso)
+        aviso(tr("Generando el panel…", "Building the dashboard…"))
         panel = generar_panel(datos)
     except SystemExit as e:
         return False, str(e)
@@ -1464,6 +1602,9 @@ class Handler(BaseHTTPRequestHandler):
             clave = leer_clave()
             self._enviar(200, {"ok": True, "clave": clave or "", "guardada": bool(clave)})
             return
+        if pedida == "/api/progreso":
+            self._enviar(200, leer_progreso())
+            return
         if pedida in FICHEROS:
             nombre, tipo = FICHEROS[pedida]
             ruta = self.datos / nombre
@@ -1526,8 +1667,9 @@ class Handler(BaseHTTPRequestHandler):
                     "An update is already running. Wait until it finishes.")})
                 return
             try:
-                ok, mensaje = ejecutar(self.datos, token, api_key)
+                ok, mensaje = ejecutar(self.datos, token, api_key, aviso=progreso)
             finally:
+                parar_progreso()
                 CANDADO.release()
             if not ok:
                 self._enviar(500, {"ok": False, "error": mensaje})
@@ -1901,6 +2043,27 @@ function ponError(texto) {
   pintaEstado();
 }
 
+let sondeo = null;
+function empiezaSondeo() {
+  if (sondeo) return;
+  sondeo = setInterval(async () => {
+    try {
+      const r = await fetch("/api/progreso");
+      const d = await r.json();
+      if (d.activo && d.texto) {
+        $("estado").className = "";
+        $("estado").textContent = d.texto;
+      }
+    } catch (e) {}
+  }, 700);
+}
+function paraSondeo() {
+  if (sondeo) {
+    clearInterval(sondeo);
+    sondeo = null;
+  }
+}
+
 function escapa(texto) {
   return texto.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, " ");
 }
@@ -2074,6 +2237,7 @@ async function lanzar(auto) {
   if (!token) { ponEstado("faltaToken"); return; }
   $("lanzar").disabled = true;
   ponEstado(auto ? "guardadoActualizando" : "consultando");
+  empiezaSondeo();
   try {
     const r = await fetch("/api/actualizar", {
       method: "POST",
@@ -2095,6 +2259,7 @@ async function lanzar(auto) {
   } catch (e) {
     ponError(T("sinConexion") + " (" + e.message + ")");
   } finally {
+    paraSondeo();
     $("lanzar").disabled = false;
   }
 }

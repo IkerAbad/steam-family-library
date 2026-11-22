@@ -35,7 +35,7 @@ En la propia página hay un marcador **Copiar token** que lo deja en el portapap
 
 El panel trae buscador sin acentos, filtros por origen, estado y antigüedad, columna **Añadido** con la fecha de adquisición, marca **nuevo**, marca **gratis** y el atajo **Compras de la familia (90 días)**. La interfaz y el panel están en español y en inglés: el botón **ES / EN** de la esquina cambia el idioma y la elección se recuerda. Los ficheros de datos (`novedades.txt`, `prestados.txt`) siguen en español.
 
-Debajo del título, el panel muestra la fecha de la última actualización y la pone en ámbar si tiene más de un día. También avisa si algún miembro sigue como «Miembro N», con enlace a la API key.
+Debajo del título, el panel muestra la fecha de la última actualización y la pone en ámbar si tiene más de un día. También avisa si algún miembro sigue como «Miembro N», con enlace a la API key. Recuerda los filtros y el orden, y ordena al pulsar una cabecera.
 
 Los CSV van en UTF-8 con BOM para que Excel respete los acentos.
 
@@ -84,7 +84,7 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 python -m unittest discover -s pruebas -v
 ```
 
-53 pruebas sin red (3 son solo de Windows y se saltan en otros sistemas). GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`.
+57 pruebas sin red (3 son solo de Windows y se saltan en otros sistemas). GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`.
 
 ## Créditos
 
@@ -125,7 +125,7 @@ The page itself has a **Copiar token** bookmarklet that puts the token on the cl
 
 The dashboard has accent-insensitive search, filters by origin, status and age, an **Añadido** (added) column with the acquisition date, a **nuevo** (new) tag, a **gratis** (free) tag and the **Compras de la familia (90 días)** shortcut (family purchases, last 90 days). The interface and the dashboard come in Spanish and English: the **ES / EN** button in the corner switches the language and the choice is remembered. The data files (`novedades.txt`, `prestados.txt`) stay in Spanish.
 
-Under the title, the dashboard shows the last update time and turns it amber when the data is over a day old. It also warns when a member is still "Miembro N", with a link to the API key.
+Under the title, the dashboard shows the last update time and turns it amber when the data is over a day old. It also warns when a member is still "Miembro N", with a link to the API key. It remembers your filters and sort order, and sorts when you click a column header.
 
 CSVs are UTF-8 with BOM so Excel respects accents.
 
@@ -174,7 +174,7 @@ The three family endpoints are undocumented: they work today and may change tomo
 python -m unittest discover -s pruebas -v
 ```
 
-53 tests with no network (3 are Windows-only and are skipped elsewhere). GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher.
+57 tests with no network (3 are Windows-only and are skipped elsewhere). GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher.
 
 ## Credits
 

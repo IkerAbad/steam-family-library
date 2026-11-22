@@ -125,7 +125,7 @@ class PruebaHttp(unittest.TestCase):
     def test_acepta_el_json_entero(self):
         vistos = []
         original = sfl.ejecutar
-        sfl.ejecutar = lambda datos, token, api_key="": (vistos.append((token, api_key)) or (True, "ok"))
+        sfl.ejecutar = lambda datos, token, api_key="", **k: (vistos.append((token, api_key)) or (True, "ok"))
         try:
             codigo, _ = self.post("/api/actualizar", {
                 "token": '{"success":1,"data":{"webapi_token":"aaa.bbb.ccc"}}',
@@ -145,6 +145,16 @@ class PruebaHttp(unittest.TestCase):
 
     def test_olvidar(self):
         self.assertEqual(self.post("/api/olvidar", {})[0], 200)
+
+    def test_progreso(self):
+        sfl.progreso("probando")
+        try:
+            codigo, cuerpo = self.get("/api/progreso")
+        finally:
+            sfl.parar_progreso()
+        self.assertEqual(codigo, 200)
+        self.assertTrue(json.loads(cuerpo)["activo"])
+        self.assertFalse(json.loads(self.get("/api/progreso")[1])["activo"])
 
     def test_doble_actualizacion(self):
         original = sfl.ejecutar

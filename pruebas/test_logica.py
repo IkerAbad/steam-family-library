@@ -5,6 +5,7 @@
 
 import csv
 import base64
+import io
 import json
 import os
 import pathlib
@@ -13,6 +14,7 @@ import tempfile
 import unittest
 import urllib.error
 from datetime import datetime, timedelta
+from unittest import mock
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
@@ -224,6 +226,66 @@ class PruebaCarpeta(unittest.TestCase):
     def test_rechaza_comilla_colada(self):
         with self.assertRaises(SystemExit):
             sfl.carpeta('C:\\una\\ruta"')
+
+
+class PruebaEscrituraAtomica(unittest.TestCase):
+    def test_deja_el_viejo_si_falla(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = pathlib.Path(tmp) / "x.json"
+            ruta.write_text("viejo", encoding="utf-8")
+            with mock.patch("steam_families.os.replace", side_effect=OSError("boom")):
+                with self.assertRaises(OSError):
+                    sfl.escribir_atomico(ruta, "nuevo")
+            self.assertEqual(ruta.read_text(encoding="utf-8"), "viejo")
+            self.assertFalse((pathlib.Path(tmp) / "x.json.tmp").exists())
+
+
+class PruebaApiReintentos(unittest.TestCase):
+    def setUp(self):
+        self.urlopen = sfl.urllib.request.urlopen
+        self.dormir = sfl.time.sleep
+        sfl.time.sleep = lambda segundos: None
+
+    def tearDown(self):
+        sfl.urllib.request.urlopen = self.urlopen
+        sfl.time.sleep = self.dormir
+
+    def test_reintenta_un_500(self):
+        llamadas = []
+
+        class Respuesta:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return b'{"response": {"ok": 1}}'
+
+        def falso(req, timeout=0):
+            llamadas.append(1)
+            if len(llamadas) == 1:
+                raise urllib.error.HTTPError(req.full_url, 500, "boom", {},
+                                             io.BytesIO(b"error"))
+            return Respuesta()
+
+        sfl.urllib.request.urlopen = falso
+        self.assertEqual(sfl.api_get("X", {}), {"ok": 1})
+        self.assertEqual(len(llamadas), 2)
+
+    def test_no_reintenta_un_403(self):
+        llamadas = []
+
+        def falso(req, timeout=0):
+            llamadas.append(1)
+            raise urllib.error.HTTPError(req.full_url, 403, "no", {},
+                                         io.BytesIO(b"no"))
+
+        sfl.urllib.request.urlopen = falso
+        with self.assertRaises(SystemExit):
+            sfl.api_get("X", {})
+        self.assertEqual(len(llamadas), 1)
 
 
 class PruebaHistorial(unittest.TestCase):
