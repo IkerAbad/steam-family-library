@@ -51,7 +51,7 @@ Los CSV van en UTF-8 con BOM para que Excel respete los acentos.
 - La API key, si la pegas, se guarda igual en `apikey.bin`, en la misma carpeta. **olvidar** borra los dos.
 - El token y la API key **no se envían a la página**: el servidor los usa y la interfaz solo sabe si están guardados.
 - Nada sale de tu equipo: las únicas conexiones son a `api.steampowered.com` y `steamcommunity.com`.
-- El servidor local escucha solo en `127.0.0.1` y rechaza peticiones de otras webs por `Origin`.
+- El servidor local escucha solo en `127.0.0.1`, comprueba el `Host` y rechaza peticiones de otras webs por `Origin`.
 - Los SteamID se guardan como un hash de 10 caracteres, nunca en claro. Los ficheros de datos están en `.gitignore`.
 
 ## Terminal
@@ -91,7 +91,7 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 python -m unittest discover -s pruebas -v
 ```
 
-73 pruebas sin red, más 5 de interfaz con Playwright (se saltan si no está instalado; hacen falta `pip install -r requirements-dev.txt` y `playwright install chromium`). Tres de las unitarias son solo de Windows y se saltan en otros sistemas. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`, y las pruebas de navegador en Chromium.
+74 pruebas sin red, más 5 de interfaz con Playwright (se saltan si no está instalado; hacen falta `pip install -r requirements-dev.txt` y `playwright install chromium`). Tres de las unitarias son solo de Windows y se saltan en otros sistemas. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`, y las pruebas de navegador en Chromium.
 
 ## Créditos
 
@@ -147,7 +147,7 @@ CSVs are UTF-8 with BOM so Excel respects accents.
 - The API key, if you paste one, is stored the same way in `apikey.bin`, in the same folder. **olvidar** deletes both.
 - The token and the API key are **never sent to the page**: the server uses them and the interface only knows whether they are stored.
 - Nothing leaves your machine: the only connections are to `api.steampowered.com` and `steamcommunity.com`.
-- The local server listens only on `127.0.0.1` and rejects requests from other websites by `Origin`.
+- The local server listens only on `127.0.0.1`, checks the `Host` header and rejects requests from other websites by `Origin`.
 - SteamIDs are stored as a 10-character hash, never in the clear. The data files are in `.gitignore`.
 
 ## Terminal
@@ -187,7 +187,7 @@ The three family endpoints are undocumented: they work today and may change tomo
 python -m unittest discover -s pruebas -v
 ```
 
-73 tests with no network, plus 5 browser tests with Playwright (skipped if it is not installed; they need `pip install -r requirements-dev.txt` and `playwright install chromium`). Three of the unit tests are Windows-only and are skipped elsewhere. GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher, and the browser tests on Chromium.
+74 tests with no network, plus 5 browser tests with Playwright (skipped if it is not installed; they need `pip install -r requirements-dev.txt` and `playwright install chromium`). Three of the unit tests are Windows-only and are skipped elsewhere. GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher, and the browser tests on Chromium.
 
 ## Credits
 

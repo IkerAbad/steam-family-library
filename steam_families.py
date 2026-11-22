@@ -1726,7 +1726,16 @@ class Handler(BaseHTTPRequestHandler):
         puerto = self.servidor.server_address[1]
         return origen in (f"http://127.0.0.1:{puerto}", f"http://localhost:{puerto}")
 
+    def _host_ok(self):
+        """Rechaza peticiones con otro Host: corta el DNS rebinding hacia 127.0.0.1."""
+        host = (self.headers.get("Host") or "").lower()
+        puerto = self.servidor.server_address[1]
+        return host in (f"127.0.0.1:{puerto}", f"localhost:{puerto}")
+
     def _get(self):
+        if not self._host_ok():
+            self._enviar(403, {"ok": False, "error": tr("host no permitido", "host not allowed")})
+            return
         consulta = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
         idioma((consulta.get("lang") or [""])[0])
         pedida = urllib.parse.urlparse(self.path).path
@@ -1766,6 +1775,9 @@ class Handler(BaseHTTPRequestHandler):
         self._enviar(404, {"ok": False, "error": tr("no existe", "not found")})
 
     def _post(self):
+        if not self._host_ok():
+            self._enviar(403, {"ok": False, "error": tr("host no permitido", "host not allowed")})
+            return
         if not self._origen_ok():
             self._enviar(403, {"ok": False, "error": tr("petición de otro sitio: solo vale desde esta página",
                                                         "request from another site: only this page is allowed")})

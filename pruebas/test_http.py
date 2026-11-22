@@ -2,6 +2,7 @@
 
 import base64
 import csv
+import http.client
 import json
 import pathlib
 import sys
@@ -147,6 +148,19 @@ class PruebaHttp(unittest.TestCase):
 
     def test_ruta_desconocida(self):
         self.assertEqual(self.get("/loquesea")[0], 404)
+
+    def test_host_ajeno(self):
+        puerto = self.servidor.server_address[1]
+        conexion = http.client.HTTPConnection("127.0.0.1", puerto, timeout=5)
+        try:
+            conexion.putrequest("GET", "/api/estado", skip_host=True)
+            conexion.putheader("Host", "malo.example")
+            conexion.endheaders()
+            respuesta = conexion.getresponse()
+            respuesta.read()
+            self.assertEqual(respuesta.status, 403)
+        finally:
+            conexion.close()
 
     def test_json_roto(self):
         req = urllib.request.Request(
