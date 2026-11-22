@@ -731,6 +731,7 @@ tr.oculto { opacity:.55; }
   <button type="button" id="presetCompras" class="atajo" data-t="preset">Añadidos (90 días)</button>
   <button type="button" id="limpiar" class="sec" data-t="limpiar" hidden>Limpiar filtros</button>
   <button type="button" id="verHistorial" class="sec" data-t="historial">Historial</button>
+  <button type="button" id="exportar" class="sec" data-t="exportar">Exportar CSV</button>
 </div>
 <div id="resumen" aria-live="polite"></div>
 <table>
@@ -815,6 +816,7 @@ const TEXTOS = {
     limpiar: "Limpiar filtros",
     historial: "Historial",
     historialTitulo: "Historial de novedades",
+    exportar: "Exportar CSV",
     historialVacio: "Todavía no hay novedades.",
     historialSinFiltros: "Ninguna novedad cumple esos filtros.",
     historialBuscar: "Buscar por juego o miembro…",
@@ -898,6 +900,7 @@ const TEXTOS = {
     limpiar: "Clear filters",
     historial: "History",
     historialTitulo: "Changes history",
+    exportar: "Export CSV",
     historialVacio: "No changes yet.",
     historialSinFiltros: "No change matches those filters.",
     historialBuscar: "Search by game or member…",
@@ -1011,6 +1014,7 @@ function guardaLista(clave, conjunto) {
 
 let FAVORITOS = new Set(cargaLista(CLAVE_FAV));
 let OCULTOS = new Set(cargaLista(CLAVE_OCULTOS));
+let LISTA_ACTUAL = [];
 
 const compara = (a, b) => a.localeCompare(b, IDIOMA);
 
@@ -1148,6 +1152,7 @@ function pinta() {
 
   pintaFlechas();
   guardaFiltros();
+  LISTA_ACTUAL = lista;
 
   $("resumen").textContent = numero(lista.length) + " " + T("de") + " " + numero(DATOS.length) + " " + T("juegos");
   $("vacio").hidden = lista.length > 0;
@@ -1287,6 +1292,33 @@ function pintaNombres() {
   caja.hidden = false;
   $("avisoNombresTexto").textContent = SIN_NOMBRE === 1
     ? T("sinNombreUno") : T("sinNombre").replace("%n%", SIN_NOMBRE);
+}
+
+function csvCampo(valor) {
+  const s = String(valor == null ? "" : valor);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function exportaCsv() {
+  const campos = ["appid", "name", "source", "playable", "exclude_reason",
+                  "playtime_minutes", "acquired", "last_played", "store_url"];
+  const lineas = [campos.join(",")];
+  LISTA_ACTUAL.forEach(d => {
+    lineas.push([
+      d.a, d.n, d.s, d.p ? "True" : "False", d.e || "", d.m,
+      d.q || "", d.u || "", "https://store.steampowered.com/app/" + d.a
+    ].map(csvCampo).join(","));
+  });
+  const blob = new Blob(["\ufeff" + lineas.join("\r\n") + "\r\n"],
+                        {type: "text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "steam-families-" + new Date().toISOString().slice(0, 10) + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function pintaMeses() {
@@ -1526,6 +1558,7 @@ $("verHistorial").addEventListener("click", () => {
   caja.hidden = !caja.hidden;
   pintaHistorial();
 });
+$("exportar").addEventListener("click", exportaCsv);
 ["hq", "hecho", "hdesde", "hhasta"].forEach(id => $(id).addEventListener("input", pintaHistorial));
 cargaFiltros();
 aplicaIdioma();

@@ -223,6 +223,23 @@ class PruebaInterfaz(unittest.TestCase):
         total = sum(int(t) for t in pagina.locator("#mesesCaja .num").all_inner_texts())
         self.assertEqual(total, 3)
 
+    def test_exportar_csv(self):
+        pagina = self.pagina("/panel.html")
+        with pagina.expect_download() as descarga:
+            pagina.click("#exportar")
+        texto = pathlib.Path(descarga.value.path()).read_text(encoding="utf-8-sig")
+        lineas = texto.strip().splitlines()
+        self.assertEqual(len(lineas), 4)
+        self.assertIn("appid,name,source", lineas[0])
+        self.assertIn("Alfa", texto)
+
+        pagina.fill("#q", "Alfa")
+        pagina.wait_for_timeout(250)
+        with pagina.expect_download() as descarga:
+            pagina.click("#exportar")
+        texto = pathlib.Path(descarga.value.path()).read_text(encoding="utf-8-sig")
+        self.assertEqual(len(texto.strip().splitlines()), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
