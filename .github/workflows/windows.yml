@@ -27,6 +27,13 @@ jobs:
       - name: Pruebas unitarias
         run: python -m unittest discover -s pruebas -v
 
+      - name: Cobertura
+        if: matrix.python == '3.12'
+        run: |
+          python -m pip install coverage
+          python -m coverage run --source=. -m unittest discover -s pruebas
+          python -m coverage report --include="steam_families.py" --fail-under=85
+
       - name: Rutas raras
         shell: pwsh
         run: |
