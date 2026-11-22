@@ -248,6 +248,30 @@ class PruebaInterfaz(unittest.TestCase):
         pagina.reload()
         self.assertEqual(pagina.get_attribute("html", "data-tema"), "oscuro")
 
+    def test_busqueda_por_dueno(self):
+        pagina = self.pagina("/panel.html")
+        filas = pagina.locator("#cuerpo tr")
+        pagina.fill("#q", "Ana")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 2)
+        pagina.fill("#q", "tú")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Alfa", pagina.inner_text("#cuerpo"))
+
+    def test_exportar_historial(self):
+        pagina = self.pagina("/panel.html")
+        pagina.click("#verHistorial")
+        pagina.select_option("#hecho", "fuera")
+        with pagina.expect_download() as descarga:
+            pagina.click("#exportarHistorial")
+        texto = pathlib.Path(descarga.value.path()).read_text(encoding="utf-8-sig")
+        lineas = texto.strip().splitlines()
+        self.assertEqual(lineas[0], "fecha,evento,appid,nombre,quien,propio")
+        self.assertEqual(len(lineas), 2)
+        self.assertIn("Viejo", texto)
+        self.assertIn("99", texto)
+
 
 if __name__ == "__main__":
     unittest.main()

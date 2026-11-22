@@ -108,7 +108,7 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 python -m unittest discover -s pruebas -v
 ```
 
-110 pruebas sin red, más 12 de interfaz con Playwright (se saltan si no está instalado; hacen falta `pip install -r requirements-dev.txt` y `playwright install chromium`). Tres de las unitarias son solo de Windows y se saltan en otros sistemas. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`, y las pruebas de navegador en Chromium. La cobertura de `steam_families.py` se mide en el CI con un mínimo del 85 %.
+110 pruebas sin red, más 14 de interfaz con Playwright (se saltan si no está instalado; hacen falta `pip install -r requirements-dev.txt` y `playwright install chromium`). Tres de las unitarias son solo de Windows y se saltan en otros sistemas. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`, y las pruebas de navegador en Chromium. La cobertura de `steam_families.py` se mide en el CI con un mínimo del 85 %.
 
 ## Créditos
 
@@ -220,7 +220,7 @@ The three family endpoints are undocumented: they work today and may change tomo
 python -m unittest discover -s pruebas -v
 ```
 
-110 tests with no network, plus 12 browser tests with Playwright (skipped if it is not installed; they need `pip install -r requirements-dev.txt` and `playwright install chromium`). Three of the unit tests are Windows-only and are skipped elsewhere. GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher, and the browser tests on Chromium. Coverage of `steam_families.py` is measured in CI with an 85 % floor.
+110 tests with no network, plus 14 browser tests with Playwright (skipped if it is not installed; they need `pip install -r requirements-dev.txt` and `playwright install chromium`). Three of the unit tests are Windows-only and are skipped elsewhere. GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher, and the browser tests on Chromium. Coverage of `steam_families.py` is measured in CI with an 85 % floor.
 
 ## Credits
 

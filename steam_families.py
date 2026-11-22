@@ -794,6 +794,7 @@ html[data-tema="claro"] #version { color:#8b98a8; }
     <input id="hhasta" type="date" data-ta="hasta" aria-label="Hasta">
   </div>
   <div id="historialTabla"></div>
+  <button type="button" id="exportarHistorial" class="sec" data-t="exportarHistorial" style="margin-top:10px">Exportar historial</button>
 </section>
 <div id="version">Steam Families v__VERSION__</div>
 
@@ -809,7 +810,7 @@ const NOMBRES = __NOMBRES__;
 const TEXTOS = {
   es: {
     titulo: "Biblioteca familiar de Steam",
-    buscar: "Buscar por nombre… (los acentos dan igual)",
+    buscar: "Buscar por nombre o dueño… (los acentos dan igual)",
     todo: "Todo",
     soloPrestados: "Solo prestados",
     soloMios: "Solo míos",
@@ -840,6 +841,7 @@ const TEXTOS = {
     historial: "Historial",
     historialTitulo: "Historial de novedades",
     exportar: "Exportar CSV",
+    exportarHistorial: "Exportar historial",
     historialVacio: "Todavía no hay novedades.",
     historialSinFiltros: "Ninguna novedad cumple esos filtros.",
     historialBuscar: "Buscar por juego o miembro…",
@@ -895,7 +897,7 @@ const TEXTOS = {
   },
   en: {
     titulo: "Steam family library",
-    buscar: "Search by name… (accents don't matter)",
+    buscar: "Search by name or owner… (accents don't matter)",
     todo: "All",
     soloPrestados: "Shared with me",
     soloMios: "Only mine",
@@ -926,6 +928,7 @@ const TEXTOS = {
     historial: "History",
     historialTitulo: "Changes history",
     exportar: "Export CSV",
+    exportarHistorial: "Export history",
     historialVacio: "No changes yet.",
     historialSinFiltros: "No change matches those filters.",
     historialBuscar: "Search by game or member…",
@@ -1002,7 +1005,14 @@ const fechaHora = s => {
 };
 
 const plano = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-DATOS.forEach(d => { d.b = plano(d.n); });
+function preparaBusqueda() {
+  DATOS.forEach(d => {
+    const miembro = /^Miembro (\d+)$/.exec(d.d || "");
+    const alterno = miembro && IDIOMA === "en" ? "Member " + miembro[1] : "";
+    const propio = d.d === "tú" ? T("tu") : "";
+    d.b = plano([d.n, d.d || "", alterno, propio].join(" "));
+  });
+}
 
 const MOTIVOS = {
   "excluido por el dueno": {es: "excluido por el dueño", en: "excluded by the owner"},
@@ -1051,6 +1061,7 @@ function guardaLista(clave, conjunto) {
 let FAVORITOS = new Set(cargaLista(CLAVE_FAV));
 let OCULTOS = new Set(cargaLista(CLAVE_OCULTOS));
 let LISTA_ACTUAL = [];
+let HISTORIAL_ACTUAL = [];
 
 const compara = (a, b) => a.localeCompare(b, IDIOMA);
 
@@ -1330,6 +1341,25 @@ function pintaNombres() {
     ? T("sinNombreUno") : T("sinNombre").replace("%n%", SIN_NOMBRE);
 }
 
+function exportaHistorial() {
+  const campos = ["fecha", "evento", "appid", "nombre", "quien", "propio"];
+  const lineas = [campos.join(",")];
+  HISTORIAL_ACTUAL.slice().reverse().forEach(h => {
+    lineas.push([h.f, h.e, h.a || "", h.n, h.q || "", h.p ? "si" : "no"]
+      .map(csvCampo).join(","));
+  });
+  const blob = new Blob(["\ufeff" + lineas.join("\r\n") + "\r\n"],
+                        {type: "text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "historial-" + new Date().toISOString().slice(0, 10) + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function csvCampo(valor) {
   const s = String(valor == null ? "" : valor);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -1464,6 +1494,7 @@ function pintaHistorial() {
     if (hasta && dia > hasta) return false;
     return true;
   });
+  HISTORIAL_ACTUAL = lista;
 
   const cuenta = document.createElement("p");
   cuenta.className = "dim";
@@ -1528,6 +1559,7 @@ function aplicaIdioma() {
   pintaMiembros();
   pintaHistorial();
   aplicaTema();
+  preparaBusqueda();
   pinta();
 }
 
@@ -1601,6 +1633,7 @@ $("verHistorial").addEventListener("click", () => {
   pintaHistorial();
 });
 $("exportar").addEventListener("click", exportaCsv);
+$("exportarHistorial").addEventListener("click", exportaHistorial);
 ["hq", "hecho", "hdesde", "hhasta"].forEach(id => $(id).addEventListener("input", pintaHistorial));
 cargaFiltros();
 aplicaIdioma();
@@ -1693,6 +1726,7 @@ def leer_historial(datos, limite=500):
                 filas.append({
                     "f": fila.get("fecha", ""),
                     "e": fila.get("evento", ""),
+                    "a": fila.get("appid", ""),
                     "n": fila.get("nombre", ""),
                     "q": fila.get("quien", ""),
                     "p": fila.get("propio", "") == "si",
