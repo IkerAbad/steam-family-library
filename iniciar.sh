@@ -14,4 +14,4 @@ if ! command -v python3 >/dev/null 2>&1; then
     fi
 fi
 
-exec "$PY" "$AQUI/steam_families.py" --datos "${1:-$AQUI}"
+exec "$PY" "$AQUI/steam_families.py" --datos "${1:-$AQUI/datos}"

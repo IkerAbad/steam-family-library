@@ -10,5 +10,5 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-python "%~dp0steam_families.py" --datos "%~dp0."
+python "%~dp0steam_families.py" --datos "%~dp0datos"
 if errorlevel 1 pause

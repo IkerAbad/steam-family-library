@@ -11,7 +11,7 @@ Steam fusiona todas las bibliotecas del grupo y no tiene ningún filtro para sep
 ## Empezar
 
 1. Instala [Python 3.8 o superior](https://www.python.org/downloads/). En Windows, marca «Add python.exe to PATH».
-2. Windows: doble clic en `iniciar.cmd`. Linux o macOS: `chmod +x iniciar.sh && ./iniciar.sh`.
+2. Windows: doble clic en `iniciar.cmd`. Linux o macOS: `chmod +x iniciar.sh && ./iniciar.sh`. Los datos se guardan en la subcarpeta `datos/`.
 3. Se abre una página en `127.0.0.1`. Pega el token la primera vez; a partir de ahí se guarda cifrado y la app se actualiza sola hasta que caduque.
 
 ### El token
@@ -33,6 +33,8 @@ En la propia página hay un marcador **Copiar token** que lo deja en el portapap
 | `historial.csv` | Una fila por novedad, con fecha |
 | `snapshot.json` | Retrato de la biblioteca para poder comparar |
 
+Todos se escriben en la subcarpeta `datos/`, que el lanzador pasa con `--datos`.
+
 El panel trae buscador sin acentos, filtros por origen, estado y antigüedad, columna **Añadido** con la fecha de adquisición, marca **nuevo**, marca **gratis** y el atajo **Compras de la familia (90 días)**. La interfaz y el panel están en español y en inglés: el botón **ES / EN** de la esquina cambia el idioma y la elección se recuerda. Los ficheros de datos (`novedades.txt`, `prestados.txt`) siguen en español.
 
 Debajo del título, el panel muestra la fecha de la última actualización y la pone en ámbar si tiene más de un día. También avisa si algún miembro sigue como «Miembro N», con enlace a la API key. Recuerda los filtros y el orden, y ordena al pulsar una cabecera.
@@ -51,9 +53,9 @@ Los CSV van en UTF-8 con BOM para que Excel respete los acentos.
 ## Terminal
 
 ```
-python steam_families.py                      # interfaz en el navegador
-python steam_families.py --exportar --token X # exporta sin interfaz
-python steam_families.py --panel              # solo regenera el panel
+python steam_families.py --datos datos              # interfaz en el navegador
+python steam_families.py --exportar --token X --datos datos # exporta sin interfaz
+python steam_families.py --panel --datos datos      # solo regenera el panel
 ```
 
 Opciones: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin-nombres`, `--sin-historial`, `--sin-precios`, `--puerto`, `--sin-navegador`.
@@ -101,7 +103,7 @@ Steam merges all the libraries of the group and has no filter to tell them apart
 ## Getting started
 
 1. Install [Python 3.8 or higher](https://www.python.org/downloads/). On Windows, tick "Add python.exe to PATH".
-2. Windows: double-click `iniciar.cmd`. Linux or macOS: `chmod +x iniciar.sh && ./iniciar.sh`.
+2. Windows: double-click `iniciar.cmd`. Linux or macOS: `chmod +x iniciar.sh && ./iniciar.sh`. Data is stored in the `datos/` subfolder.
 3. A page opens on `127.0.0.1`. Paste the token the first time; from then on it is stored encrypted and the app updates itself until it expires.
 
 ### The token
@@ -123,6 +125,8 @@ The page itself has a **Copiar token** bookmarklet that puts the token on the cl
 | `historial.csv` | One row per change, with a date |
 | `snapshot.json` | A snapshot of the library to compare against |
 
+All of them go into the `datos/` subfolder, which the launcher passes with `--datos`.
+
 The dashboard has accent-insensitive search, filters by origin, status and age, an **Añadido** (added) column with the acquisition date, a **nuevo** (new) tag, a **gratis** (free) tag and the **Compras de la familia (90 días)** shortcut (family purchases, last 90 days). The interface and the dashboard come in Spanish and English: the **ES / EN** button in the corner switches the language and the choice is remembered. The data files (`novedades.txt`, `prestados.txt`) stay in Spanish.
 
 Under the title, the dashboard shows the last update time and turns it amber when the data is over a day old. It also warns when a member is still "Miembro N", with a link to the API key. It remembers your filters and sort order, and sorts when you click a column header.
@@ -141,9 +145,9 @@ CSVs are UTF-8 with BOM so Excel respects accents.
 ## Terminal
 
 ```
-python steam_families.py                      # browser interface
-python steam_families.py --exportar --token X # export without the interface
-python steam_families.py --panel              # only regenerate the dashboard
+python steam_families.py --datos datos              # browser interface
+python steam_families.py --exportar --token X --datos datos # export without the interface
+python steam_families.py --panel --datos datos      # only regenerate the dashboard
 ```
 
 Options: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin-nombres`, `--sin-historial`, `--sin-precios`, `--puerto`, `--sin-navegador`.

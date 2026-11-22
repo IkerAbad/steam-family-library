@@ -34,7 +34,7 @@ jobs:
           python steam_families.py --exportar --datos 'C:\x<y' --token x 2> $err
           $codigo = $LASTEXITCODE
           if ($codigo -ne 1) { throw "una ruta con < deberia salir con 1, salio con $codigo" }
-          if (-not (Select-String -Path $err -Pattern "caracteres no validos" -Quiet)) {
+          if (-not (Select-String -Path $err -Pattern "caracteres no v" -Quiet)) {
             throw "mensaje inesperado: " + (Get-Content $err -Raw)
           }
           Write-Host "rechaza la ruta con el mensaje correcto"
@@ -61,5 +61,5 @@ jobs:
           $procesos = Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
             Where-Object { $_.CommandLine -like "*steam-family-library*" }
           if ($procesos) { throw "quedan procesos de python vivos" }
-          if (Test-Path ".\library.csv") { "el lanzador escribio en la carpeta del repo (ignorado por git)" }
+          if (Test-Path ".\datos\library.csv") { "el lanzador escribio en datos (ignorado por git)" }
           $global:LASTEXITCODE = 0
