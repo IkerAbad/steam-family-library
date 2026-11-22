@@ -1,5 +1,10 @@
 # Cambios
 
+## 2.2.1 — 2026-11-22
+
+- La búsqueda del panel mira también el dueño.
+- El historial filtrado se puede descargar en CSV.
+
 ## 2.2.0 — 2026-11-22
 
 - Historial con búsqueda, tipo y rango de fechas.
