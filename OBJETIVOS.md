@@ -2,6 +2,14 @@
 
 > Estado: los ocho primeros y la segunda tanda están implementados.
 
+## Tercera tanda (2.4.0)
+
+- Operadores `origen:`, `estado:` y `dueno:` en el buscador.
+- El orden por cabecera se guarda entre visitas.
+- Tema reactivo también en la interfaz local.
+- Etiquetas accesibles y prueba automática.
+- Fila de totales por miembro.
+
 ## Segunda tanda (2.3.0)
 
 - Historial paginado con «Mostrar más».

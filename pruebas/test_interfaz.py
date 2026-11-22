@@ -161,6 +161,15 @@ class PruebaInterfaz(unittest.TestCase):
         pagina.keyboard.press("Enter")
         self.assertEqual(cabecera.get_attribute("aria-sort"), "ascending")
 
+    def test_recuerda_orden_cabecera(self):
+        pagina = self.pagina("/panel.html")
+        pagina.click('th[data-campo="m"]')
+        self.assertEqual(
+            pagina.get_attribute('th[data-campo="m"]', "aria-sort"), "descending")
+        pagina.reload()
+        self.assertEqual(
+            pagina.get_attribute('th[data-campo="m"]', "aria-sort"), "descending")
+
     def test_historial(self):
         pagina = self.pagina("/panel.html")
         pagina.click("#verHistorial")
@@ -211,6 +220,12 @@ class PruebaInterfaz(unittest.TestCase):
             "#miembrosTabla .mini", "barras => barras.map(b => b.style.width)")
         self.assertIn("100%", anchos)
         self.assertIn("50%", anchos)
+
+        total = pagina.inner_text("#miembrosTabla tfoot")
+        self.assertIn("Total", total)
+        self.assertIn("3", total)
+        self.assertIn("2", total)
+        self.assertIn("3,0 h", total)
 
     def test_favoritos_y_ocultos(self):
         pagina = self.pagina("/panel.html")
@@ -273,6 +288,16 @@ class PruebaInterfaz(unittest.TestCase):
 
     def test_tema_sigue_al_sistema(self):
         pagina = self.pagina("/panel.html")
+        self.assertEqual(pagina.get_attribute("html", "data-tema"), "claro")
+        pagina.emulate_media(color_scheme="dark")
+        pagina.wait_for_timeout(200)
+        self.assertEqual(pagina.get_attribute("html", "data-tema"), "oscuro")
+        pagina.emulate_media(color_scheme="light")
+        pagina.wait_for_timeout(200)
+        self.assertEqual(pagina.get_attribute("html", "data-tema"), "claro")
+
+    def test_tema_local_sigue_al_sistema(self):
+        pagina = self.pagina("/")
         self.assertEqual(pagina.get_attribute("html", "data-tema"), "claro")
         pagina.emulate_media(color_scheme="dark")
         pagina.wait_for_timeout(200)
@@ -354,7 +379,6 @@ class PruebaInterfaz(unittest.TestCase):
     def test_busqueda_avanzada(self):
         pagina = self.pagina("/panel.html")
         filas = pagina.locator("#cuerpo tr")
-
         pagina.fill("#q", "horas:>1")
         pagina.wait_for_timeout(250)
         self.assertEqual(filas.count(), 1)
@@ -368,6 +392,51 @@ class PruebaInterfaz(unittest.TestCase):
         pagina.fill("#q", "anio:2025")
         pagina.wait_for_timeout(250)
         self.assertEqual(filas.count(), 0)
+
+        pagina.fill("#q", "origen:own")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Alfa", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "estado:jugable")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 2)
+        self.assertNotIn("Gamma", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "dueno:ana")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 2)
+        self.assertNotIn("Alfa", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "origen:family estado:jugable")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Beta", pagina.inner_text("#cuerpo"))
+
+    def test_accesibilidad_basica(self):
+        script = """() => {
+          const fallos = [];
+          document.querySelectorAll("button").forEach(b => {
+            const nombre = (b.textContent || "").trim() ||
+              b.getAttribute("aria-label") || b.getAttribute("title");
+            if (!nombre) fallos.push("boton sin nombre");
+          });
+          document.querySelectorAll(
+            "input:not([type=hidden]):not([hidden]), select:not([hidden])"
+          ).forEach(i => {
+            const id = i.id;
+            const label = id ? document.querySelector(`label[for="${id}"]`) : null;
+            const aria = i.getAttribute("aria-label");
+            const dentro = i.closest("label");
+            if (!label && !aria && !dentro) {
+              fallos.push("control sin etiqueta: " + (id || i.tagName));
+            }
+          });
+          return fallos;
+        }"""
+        for ruta in ("/", "/panel.html"):
+            pagina = self.pagina(ruta)
+            self.assertEqual(pagina.evaluate(script), [], ruta)
 
 
 if __name__ == "__main__":

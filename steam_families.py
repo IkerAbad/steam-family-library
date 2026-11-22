@@ -37,7 +37,7 @@ from pathlib import Path
 API = "https://api.steampowered.com"
 COMUNIDAD = "https://steamcommunity.com"
 TIENDA = "https://store.steampowered.com"
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 UA = f"steam-family-library/{VERSION}"
 EXCLUDE_REASONS = {
     0: "",
@@ -724,7 +724,7 @@ html[data-tema="claro"] #version { color:#8b98a8; }
   <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener" data-t="pedirClave">consíguela aquí</a>
 </div>
 <div class="controles">
-  <input id="q" type="search" data-tp="buscar" placeholder="Buscar por nombre… (los acentos dan igual)" autocomplete="off">
+  <input id="q" type="search" data-tp="buscar" data-ta="buscarEtiqueta" placeholder="Buscar por nombre… (los acentos dan igual)" autocomplete="off">
   <select id="origen" aria-label="Origen" data-ta="origen">
     <option value="todo" data-t="todo">Todo</option>
     <option value="family" data-t="soloPrestados">Solo prestados</option>
@@ -788,7 +788,7 @@ html[data-tema="claro"] #version { color:#8b98a8; }
 <section id="historialCaja" hidden>
   <h2 data-t="historialTitulo">Historial de novedades</h2>
   <div class="controles" style="padding:0 0 10px">
-    <input id="hq" type="search" data-tp="historialBuscar" placeholder="Buscar por juego o miembro…" autocomplete="off">
+    <input id="hq" type="search" data-tp="historialBuscar" data-ta="buscarEtiqueta" placeholder="Buscar por juego o miembro…" autocomplete="off">
     <select id="hecho" data-ta="tipo" aria-label="Tipo">
       <option value="todo" data-t="todo">Todo</option>
       <option value="nuevo" data-t="nuevo">nuevo</option>
@@ -821,6 +821,7 @@ const TEXTOS = {
   es: {
     titulo: "Biblioteca familiar de Steam",
     buscar: "Buscar por nombre o dueño… (horas:>10, anio:2026)",
+    buscarEtiqueta: "Buscar",
     todo: "Todo",
     soloPrestados: "Solo prestados",
     soloMios: "Solo míos",
@@ -864,6 +865,7 @@ const TEXTOS = {
     miembro: "Miembro",
     jugablesHeader: "Jugables",
     horasHeader: "Horas",
+    total: "Total",
     mesesTitulo: "Altas por mes",
     temaClaro: "Claro",
     temaOscuro: "Oscuro",
@@ -912,6 +914,7 @@ const TEXTOS = {
   en: {
     titulo: "Steam family library",
     buscar: "Search by name or owner… (horas:>10, anio:2026)",
+    buscarEtiqueta: "Search",
     todo: "All",
     soloPrestados: "Shared with me",
     soloMios: "Only mine",
@@ -955,6 +958,7 @@ const TEXTOS = {
     miembro: "Member",
     jugablesHeader: "Playable",
     horasHeader: "Hours",
+    total: "Total",
     mesesTitulo: "Added per month",
     temaClaro: "Light",
     temaOscuro: "Dark",
@@ -1027,6 +1031,9 @@ function analizaConsulta(texto) {
   const resto = [];
   let horas = null;
   let anio = null;
+  let origen = null;
+  let estado = null;
+  let dueno = null;
   (texto || "").split(/\s+/).forEach(t => {
     const h = /^horas:([<>])(\d+(?:[.,]\d+)?)$/i.exec(t);
     if (h) {
@@ -1038,9 +1045,24 @@ function analizaConsulta(texto) {
       anio = a[1];
       return;
     }
+    const o = /^origen:(family|own)$/i.exec(t);
+    if (o) {
+      origen = o[1].toLowerCase();
+      return;
+    }
+    const e = /^estado:(jugable|bloqueado|jugados|sinestrenar)$/i.exec(t);
+    if (e) {
+      estado = e[1].toLowerCase();
+      return;
+    }
+    const d = /^dueno:(.+)$/i.exec(t);
+    if (d) {
+      dueno = plano(d[1]);
+      return;
+    }
     if (t) resto.push(t);
   });
-  return {texto: resto.join(" "), horas, anio};
+  return {texto: resto.join(" "), horas, anio, origen, estado, dueno};
 }
 
 function preparaBusqueda() {  DATOS.forEach(d => {
@@ -1145,6 +1167,11 @@ function cargaFiltros() {
       $("duenoFiltro").value = g.dueno;
     }
     if (typeof g.q === "string") $("q").value = g.q.slice(0, 200);
+    if (g.cabecera && typeof g.cabecera.campo === "string" &&
+        ["n", "d", "s", "p", "m", "u", "q"].includes(g.cabecera.campo) &&
+        ["asc", "desc"].includes(g.cabecera.dir)) {
+      ORDEN_CABECERA = {campo: g.cabecera.campo, dir: g.cabecera.dir};
+    }
   } catch (e) {}
 }
 
@@ -1159,7 +1186,8 @@ function guardaFiltros() {
       soloFav: $("soloFav").checked,
       verOcultos: $("verOcultos").checked,
       dueno: $("duenoFiltro").value,
-      q: $("q").value
+      q: $("q").value,
+      cabecera: ORDEN_CABECERA
     }));
   } catch (e) {}
 }
@@ -1237,7 +1265,8 @@ function pinta() {
   const soloNuevos = $("soloNuevos").checked;
   const soloFav = $("soloFav").checked;
   const verOcultos = $("verOcultos").checked;
-  const filtrando = !!q || !!consulta.horas || !!consulta.anio || origen !== "todo" || dueno !== "todo" || estado !== "todo" ||
+  const filtrando = !!q || !!consulta.horas || !!consulta.anio || !!consulta.origen ||
+    !!consulta.estado || !!consulta.dueno || origen !== "todo" || dueno !== "todo" || estado !== "todo" ||
     antiguedad !== "todo" || soloNuevos || soloFav || verOcultos || !!ORDEN_CABECERA;
   $("limpiar").hidden = !filtrando;
 
@@ -1255,6 +1284,17 @@ function pinta() {
       if (!signo) return false;
     }
     if (consulta.anio && (!d.q || d.q.slice(0, 4) !== consulta.anio)) return false;
+    if (consulta.origen && d.s !== consulta.origen) return false;
+    if (consulta.estado) {
+      if (consulta.estado === "jugable" && !d.p) return false;
+      if (consulta.estado === "bloqueado" && d.p) return false;
+      if (consulta.estado === "jugados" && d.m === 0) return false;
+      if (consulta.estado === "sinestrenar" && d.m > 0) return false;
+    }
+    if (consulta.dueno) {
+      const nombres = [d.d || "", d.d === "tú" ? T("tu") : ""].map(plano);
+      if (!nombres.some(n => n.includes(consulta.dueno))) return false;
+    }
     if (origen !== "todo" && d.s !== origen) return false;
     if (dueno !== "todo" && !(d.o || []).includes(dueno)) return false;
     if (soloNuevos && d.w !== "nuevo") return false;
@@ -1608,7 +1648,24 @@ function pintaMiembros() {
     tr.append(nombre, juegos, jugables, tiempo);
     tbody.appendChild(tr);
   });
-  tabla.append(thead, tbody);
+  const total = filas.reduce((a, f) => ({j: a.j + f.j, p: a.p + f.p, m: a.m + f.m}),
+                             {j: 0, p: 0, m: 0});
+  const tfoot = document.createElement("tfoot");
+  const trTotal = document.createElement("tr");
+  const cNombre = document.createElement("td");
+  cNombre.textContent = T("total");
+  const cJuegos = document.createElement("td");
+  cJuegos.className = "der";
+  cJuegos.textContent = numero(total.j);
+  const cJugables = document.createElement("td");
+  cJugables.className = "der";
+  cJugables.textContent = numero(total.p);
+  const cHoras = document.createElement("td");
+  cHoras.className = "der";
+  cHoras.textContent = total.m > 0 ? horas(total.m) + " h" : "";
+  trTotal.append(cNombre, cJuegos, cJugables, cHoras);
+  tfoot.appendChild(trTotal);
+  tabla.append(thead, tbody, tfoot);
   $("miembrosTabla").replaceChildren(tabla);
 }
 
@@ -2650,7 +2707,7 @@ html[data-tema="claro"] .nota { background:#fdf6e3; border-color:#e5c98a; color:
   <section class="paso">
     <h2 data-t="paso2">Paso 2 · Pégalo aquí</h2>
     <div class="fila">
-      <input id="token" type="password" data-tp="tokenPlaceholder" placeholder="Token, o el JSON entero de esa página" autocomplete="off" spellcheck="false">
+      <input id="token" type="password" data-tp="tokenPlaceholder" data-ta="tokenEtiqueta" placeholder="Token, o el JSON entero de esa página" autocomplete="off" spellcheck="false">
       <button id="pegar" type="button" class="sec" data-t="pegar">Pegar</button>
       <button id="ver" type="button" class="sec" data-t="mostrar">Mostrar</button>
       <button id="lanzar" type="button" data-t="lanzar">Actualizar</button>
@@ -2682,7 +2739,7 @@ html[data-tema="claro"] .nota { background:#fdf6e3; border-color:#e5c98a; color:
         <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">API key gratuita</a>
         salen siempre. Solo se usa durante esta consulta y no se guarda.
       </p>
-      <input id="apikey" type="text" data-tp="apiKeyPlaceholder" placeholder="API key de Steam (opcional)" autocomplete="off" spellcheck="false" style="width:100%">
+      <input id="apikey" type="text" data-tp="apiKeyPlaceholder" data-ta="apiKeyEtiqueta" placeholder="API key de Steam (opcional)" autocomplete="off" spellcheck="false" style="width:100%">
     </details>
     <div id="estado" role="status" aria-live="polite"></div>
     <label class="check" style="margin-top:10px">
@@ -2725,6 +2782,7 @@ const TEXTOS = {
     porQue3: "La página que abres es la oficial de Steam: devuelve un JSON y dentro está el token.",
     paso2: "Paso 2 · Pégalo aquí",
     tokenPlaceholder: "Token, o el JSON entero de esa página",
+    tokenEtiqueta: "Token de Steam",
     pegar: "Pegar",
     mostrar: "Mostrar",
     ocultar: "Ocultar",
@@ -2741,6 +2799,7 @@ const TEXTOS = {
     duenosTitulo: "¿Los dueños salen como «Miembro 1»?",
     duenosTexto: 'Steam limita las consultas de nombres cuando se piden muchas seguidas. Con una <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">API key gratuita</a> salen siempre. Solo se usa durante esta consulta y no se guarda.',
     apiKeyPlaceholder: "API key de Steam (opcional)",
+    apiKeyEtiqueta: "API key de Steam",
     claveGuardada: "API key guardada (escribe otra para cambiarla)",
     recordar: "Recordar el token y la API key en este equipo, cifrados",
     olvidar: "olvidar",
@@ -2805,6 +2864,7 @@ const TEXTOS = {
     porQue3: "The page you open is Steam's own: it returns a JSON document with the token inside.",
     paso2: "Step 2 · Paste it here",
     tokenPlaceholder: "Token, or the whole JSON from that page",
+    tokenEtiqueta: "Steam token",
     pegar: "Paste",
     mostrar: "Show",
     ocultar: "Hide",
@@ -2821,6 +2881,7 @@ const TEXTOS = {
     duenosTitulo: "Owners show up as “Member 1”?",
     duenosTexto: 'Steam rate-limits name lookups when too many are requested in a row. With a <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">free API key</a> they always resolve. It is only used for this request and is not stored.',
     apiKeyPlaceholder: "Steam API key (optional)",
+    apiKeyEtiqueta: "Steam API key",
     claveGuardada: "API key stored (type another to replace it)",
     recordar: "Remember the token and the API key on this computer, encrypted",
     olvidar: "forget",
@@ -2899,6 +2960,8 @@ const fechaHora = s => {
 const $ = id => document.getElementById(id);
 const CLAVE_TEMA = "sf-tema";
 let TEMA = document.documentElement.dataset.tema === "claro" ? "claro" : "oscuro";
+let TEMA_MANUAL = false;
+try { TEMA_MANUAL = !!localStorage.getItem(CLAVE_TEMA); } catch (e) {}
 
 function aplicaTema() {
   document.documentElement.dataset.tema = TEMA;
@@ -2988,9 +3051,20 @@ document.querySelectorAll("[data-idioma]").forEach(b => b.addEventListener("clic
 }));
 $("tema").addEventListener("click", () => {
   TEMA = TEMA === "claro" ? "oscuro" : "claro";
+  TEMA_MANUAL = true;
   try { localStorage.setItem(CLAVE_TEMA, TEMA); } catch (e) {}
   aplicaTema();
 });
+if (window.matchMedia) {
+  const consultaTema = matchMedia("(prefers-color-scheme: light)");
+  const cambiaTema = e => {
+    if (TEMA_MANUAL) return;
+    TEMA = e.matches ? "claro" : "oscuro";
+    aplicaTema();
+  };
+  if (consultaTema.addEventListener) consultaTema.addEventListener("change", cambiaTema);
+  else if (consultaTema.addListener) consultaTema.addListener(cambiaTema);
+}
 
 $("ver").addEventListener("click", () => {
   const t = $("token");

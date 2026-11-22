@@ -1,5 +1,13 @@
 # Cambios
 
+## 2.4.0 — 2026-11-22
+
+- Búsqueda por operadores: `origen:`, `estado:` y `dueno:`.
+- El orden por cabecera se recuerda entre visitas.
+- El tema de la interfaz local también sigue al sistema.
+- Etiquetas accesibles en buscadores y campos del token, con prueba automática.
+- Fila de totales en las estadísticas por miembro.
+
 ## 2.3.0 — 2026-11-22
 
 - Historial paginado: 100 novedades y botón «Mostrar más».
