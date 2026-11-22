@@ -4,6 +4,7 @@
 [![Windows](https://github.com/IkerAbad/steam-family-library/actions/workflows/windows.yml/badge.svg)](https://github.com/IkerAbad/steam-family-library/actions/workflows/windows.yml)
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
 [![Interfaz](https://github.com/IkerAbad/steam-family-library/actions/workflows/interfaz.yml/badge.svg)](https://github.com/IkerAbad/steam-family-library/actions/workflows/interfaz.yml)
+[![Release](https://img.shields.io/github/v/release/IkerAbad/steam-family-library)](https://github.com/IkerAbad/steam-family-library/releases/latest)
 
 Ve qué juegos te presta tu familia en Steam, cuáles son tuyos y qué ha entrado nuevo desde la última vez. Un solo archivo de Python, sin dependencias, con interfaz en el navegador.
 
@@ -12,6 +13,8 @@ Ve qué juegos te presta tu familia en Steam, cuáles son tuyos y qué ha entrad
 Steam fusiona todas las bibliotecas del grupo y no tiene ningún filtro para separarlas. Esto sí.
 
 ## Empezar
+
+Sin Python: descarga la [última release](https://github.com/IkerAbad/steam-family-library/releases/latest), descomprime el ZIP y haz doble clic en `iniciar.cmd`.
 
 1. Instala [Python 3.8 o superior](https://www.python.org/downloads/). En Windows, marca «Add python.exe to PATH».
 2. Windows: doble clic en `iniciar.cmd`. Linux o macOS: `./iniciar.sh`. Los datos se guardan en la subcarpeta `datos/`.
@@ -122,6 +125,8 @@ See which games your family lends you on Steam, which ones are yours, and what i
 Steam merges all the libraries of the group and has no filter to tell them apart. This does.
 
 ## Getting started
+
+Without Python: download the [latest release](https://github.com/IkerAbad/steam-family-library/releases/latest), unzip it and double-click `iniciar.cmd`.
 
 1. Install [Python 3.8 or higher](https://www.python.org/downloads/). On Windows, tick "Add python.exe to PATH".
 2. Windows: double-click `iniciar.cmd`. Linux or macOS: `./iniciar.sh`. Data is stored in the `datos/` subfolder.
