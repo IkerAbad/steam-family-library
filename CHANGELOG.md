@@ -1,5 +1,9 @@
 # Cambios
 
+## 2.2.4 — 2026-11-22
+
+- Binario de macOS Intel (`steam-families-macos-intel`), además del de Apple Silicon.
+
 ## 2.2.3 — 2026-11-22
 
 - Tema claro y oscuro también en la interfaz local.
