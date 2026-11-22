@@ -73,6 +73,12 @@ class SteamFalso(BaseHTTPRequestHandler):
             self._json({"response": {"apps": APPS}})
             return
 
+        if "GetPlayerSummaries" in ruta:
+            ids = (consulta.get("steamids") or [""])[0].split(",")
+            self._json({"response": {"players": [
+                {"steamid": sid, "personaname": NOMBRES.get(sid, "?")} for sid in ids]}})
+            return
+
         if "ajaxresolveusers" in ruta:
             sid = (consulta.get("steamids") or [""])[0]
             if tipo.fallos.get(sid, 0) > 0:
@@ -270,6 +276,41 @@ class PruebaIntegracion(unittest.TestCase):
             sfl.exportar(d, self.token(), con_precios=False)
             snap = json.loads((d / "snapshot.json").read_text(encoding="utf-8"))
             self.assertIn("Miembro 1", snap["nombres"].values())
+
+    def test_con_api_key_resuelve_en_una_llamada(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            sfl.exportar(d, self.token(), api_key="0" * 32, con_precios=False)
+            self.assertEqual(self.nombres_pedidos(), [])
+            resumen = [r for r, c in SteamFalso.llamadas if "GetPlayerSummaries" in r]
+            self.assertEqual(len(resumen), 1)
+            snap = json.loads((d / "snapshot.json").read_text(encoding="utf-8"))
+            self.assertIn("Ana", snap["nombres"].values())
+
+    def test_pasa_los_filtros_a_steam(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sfl.exportar(pathlib.Path(tmp), self.token(), include_free=True,
+                         include_non_games=True, con_precios=False)
+            consulta = [c for r, c in SteamFalso.llamadas if "GetSharedLibraryApps" in r][0]
+            self.assertEqual(consulta["include_free"], ["true"])
+            self.assertEqual(consulta["include_non_games"], ["true"])
+
+    def test_sin_precios_no_consulta_la_tienda(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            (d / "snapshot.json").write_text(json.dumps({
+                "nombres": {}, "nombres_fecha": datetime.now().strftime("%Y-%m-%d"),
+                "juegos": {},
+            }), encoding="utf-8")
+            sfl.exportar(d, self.token(), con_precios=False)
+            self.assertFalse(any("appdetails" in r for r, c in SteamFalso.llamadas))
+
+    def test_sin_historial_no_escribe_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            sfl.exportar(d, self.token(), con_historial=False, con_precios=False)
+            self.assertFalse((d / "snapshot.json").exists())
+            self.assertTrue((d / "library.csv").exists())
 
 
 if __name__ == "__main__":
