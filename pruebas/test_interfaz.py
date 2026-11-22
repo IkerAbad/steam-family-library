@@ -188,6 +188,26 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertIn("2,0 h", ana)
         self.assertIn("1,0 h", yo)
 
+    def test_favoritos_y_ocultos(self):
+        pagina = self.pagina("/panel.html")
+        filas = pagina.locator("#cuerpo tr")
+        self.assertEqual(filas.count(), 3)
+
+        pagina.click('[data-fav="10"]')
+        self.assertEqual(pagina.get_attribute('[data-fav="10"]', "aria-pressed"), "true")
+        pagina.check("#soloFav")
+        self.assertEqual(filas.count(), 1)
+        pagina.uncheck("#soloFav")
+
+        pagina.click('[data-ocultar="10"]')
+        self.assertEqual(filas.count(), 2)
+        pagina.check("#verOcultos")
+        self.assertEqual(filas.count(), 3)
+
+        pagina.reload()
+        self.assertEqual(pagina.get_attribute('[data-fav="10"]', "aria-pressed"), "true")
+        self.assertEqual(filas.count(), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

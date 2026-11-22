@@ -644,6 +644,10 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
 .dim { color:var(--suave); }
 .si { color:var(--verde); }
 .no { color:var(--rojo); }
+.icono { background:none; border:0; color:var(--suave); cursor:pointer; font:inherit; font-size:13px; line-height:1; padding:0 2px; }
+.icono:hover { color:var(--acento); }
+.icono[aria-pressed="true"] { color:var(--ambar); }
+tr.oculto { opacity:.55; }
 .atajo { background:#22303c; color:var(--acento); border:1px solid #2b5878; border-radius:6px; padding:7px 12px; font:inherit; cursor:pointer; }
 .atajo:hover { background:#2a3d4d; }
 .sec { background:var(--panel); color:var(--suave); border:1px solid var(--borde); border-radius:6px; padding:7px 12px; font:inherit; cursor:pointer; }
@@ -713,6 +717,8 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
     <option value="anio" data-t="esteAnio">Añadidos este año</option>
   </select>
   <label class="check"><input type="checkbox" id="soloNuevos"> <span data-t="soloNuevos">Solo novedades</span></label>
+  <label class="check"><input type="checkbox" id="soloFav"> <span data-t="soloFavoritos">Solo favoritos</span></label>
+  <label class="check"><input type="checkbox" id="verOcultos"> <span data-t="verOcultos">Mostrar ocultos</span></label>
   <button type="button" id="presetCompras" class="atajo" data-t="preset">Añadidos (90 días)</button>
   <button type="button" id="limpiar" class="sec" data-t="limpiar" hidden>Limpiar filtros</button>
   <button type="button" id="verHistorial" class="sec" data-t="historial">Historial</button>
@@ -785,6 +791,12 @@ const TEXTOS = {
     dias90: "Añadidos en 90 días",
     esteAnio: "Añadidos este año",
     soloNuevos: "Solo novedades",
+    soloFavoritos: "Solo favoritos",
+    verOcultos: "Mostrar ocultos",
+    favorito: "Favorito",
+    quitarFavorito: "Quitar de favoritos",
+    ocultar: "Ocultar",
+    mostrar: "Mostrar",
     verNuevos: "Ver solo novedades",
     preset: "Añadidos (90 días)",
     limpiar: "Limpiar filtros",
@@ -861,6 +873,12 @@ const TEXTOS = {
     dias90: "Added in 90 days",
     esteAnio: "Added this year",
     soloNuevos: "Only new",
+    soloFavoritos: "Favourites only",
+    verOcultos: "Show hidden",
+    favorito: "Favourite",
+    quitarFavorito: "Remove from favourites",
+    ocultar: "Hide",
+    mostrar: "Show",
     verNuevos: "Show only new",
     preset: "Added (90 days)",
     limpiar: "Clear filters",
@@ -957,7 +975,27 @@ function motivo(texto) {
 const $ = id => document.getElementById(id);
 const cuerpo = $("cuerpo");
 const CLAVE_FILTROS = "sf-filtros";
+const CLAVE_FAV = "sf-favoritos";
+const CLAVE_OCULTOS = "sf-ocultos";
 let ORDEN_CABECERA = null;
+
+function cargaLista(clave) {
+  try {
+    const v = JSON.parse(localStorage.getItem(clave) || "[]");
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function guardaLista(clave, conjunto) {
+  try {
+    localStorage.setItem(clave, JSON.stringify([...conjunto]));
+  } catch (e) {}
+}
+
+let FAVORITOS = new Set(cargaLista(CLAVE_FAV));
+let OCULTOS = new Set(cargaLista(CLAVE_OCULTOS));
 
 const compara = (a, b) => a.localeCompare(b, IDIOMA);
 
@@ -969,6 +1007,8 @@ function cargaFiltros() {
     if (["anadido", "nombre", "horas", "reciente", "dueno"].includes(g.orden)) $("orden").value = g.orden;
     if (["todo", "30", "90", "anio"].includes(g.antiguedad)) $("antiguedad").value = g.antiguedad;
     if (typeof g.soloNuevos === "boolean") $("soloNuevos").checked = g.soloNuevos;
+    if (typeof g.soloFav === "boolean") $("soloFav").checked = g.soloFav;
+    if (typeof g.verOcultos === "boolean") $("verOcultos").checked = g.verOcultos;
     if (typeof g.q === "string") $("q").value = g.q.slice(0, 200);
   } catch (e) {}
 }
@@ -981,6 +1021,8 @@ function guardaFiltros() {
       orden: $("orden").value,
       antiguedad: $("antiguedad").value,
       soloNuevos: $("soloNuevos").checked,
+      soloFav: $("soloFav").checked,
+      verOcultos: $("verOcultos").checked,
       q: $("q").value
     }));
   } catch (e) {}
@@ -1055,8 +1097,10 @@ function pinta() {
   const orden = $("orden").value;
   const antiguedad = $("antiguedad").value;
   const soloNuevos = $("soloNuevos").checked;
+  const soloFav = $("soloFav").checked;
+  const verOcultos = $("verOcultos").checked;
   const filtrando = !!q || origen !== "todo" || estado !== "todo" ||
-    antiguedad !== "todo" || soloNuevos || !!ORDEN_CABECERA;
+    antiguedad !== "todo" || soloNuevos || soloFav || verOcultos || !!ORDEN_CABECERA;
   $("limpiar").hidden = !filtrando;
 
   let corte = "";
@@ -1068,6 +1112,8 @@ function pinta() {
     if (q && !d.b.includes(q)) return false;
     if (origen !== "todo" && d.s !== origen) return false;
     if (soloNuevos && d.w !== "nuevo") return false;
+    if (soloFav && !FAVORITOS.has(d.a)) return false;
+    if (!verOcultos && OCULTOS.has(d.a)) return false;
     if (corte && !(d.q && d.q >= corte)) return false;
     switch (estado) {
       case "jugable": if (!d.p) return false; break;
@@ -1129,6 +1175,37 @@ function pinta() {
       b.textContent = T("masDueno");
       cont.appendChild(b);
     }
+
+    const fav = document.createElement("button");
+    fav.type = "button";
+    fav.className = "icono";
+    fav.dataset.fav = d.a;
+    fav.textContent = FAVORITOS.has(d.a) ? "★" : "☆";
+    fav.title = FAVORITOS.has(d.a) ? T("quitarFavorito") : T("favorito");
+    fav.setAttribute("aria-label", fav.title);
+    fav.setAttribute("aria-pressed", String(FAVORITOS.has(d.a)));
+    fav.addEventListener("click", () => {
+      if (FAVORITOS.has(d.a)) FAVORITOS.delete(d.a); else FAVORITOS.add(d.a);
+      guardaLista(CLAVE_FAV, FAVORITOS);
+      pinta();
+    });
+    cont.appendChild(fav);
+
+    const ocultar = document.createElement("button");
+    ocultar.type = "button";
+    ocultar.className = "icono";
+    ocultar.dataset.ocultar = d.a;
+    ocultar.textContent = OCULTOS.has(d.a) ? "↺" : "✕";
+    ocultar.title = OCULTOS.has(d.a) ? T("mostrar") : T("ocultar");
+    ocultar.setAttribute("aria-label", ocultar.title);
+    ocultar.addEventListener("click", () => {
+      if (OCULTOS.has(d.a)) OCULTOS.delete(d.a); else OCULTOS.add(d.a);
+      guardaLista(CLAVE_OCULTOS, OCULTOS);
+      pinta();
+    });
+    cont.appendChild(ocultar);
+    if (OCULTOS.has(d.a)) tr.classList.add("oculto");
+
     td1.appendChild(cont);
 
     const td2 = document.createElement("td");
@@ -1331,7 +1408,7 @@ document.querySelectorAll("[data-idioma]").forEach(b => b.addEventListener("clic
   aplicaIdioma();
 }));
 
-["origen", "estado", "antiguedad", "soloNuevos"].forEach(id => $(id).addEventListener("input", pinta));
+["origen", "estado", "antiguedad", "soloNuevos", "soloFav", "verOcultos"].forEach(id => $(id).addEventListener("input", pinta));
 $("orden").addEventListener("input", () => {
   ORDEN_CABECERA = null;
   pinta();
