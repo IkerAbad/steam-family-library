@@ -1,5 +1,10 @@
 # Cambios
 
+## 2.0.1 — 2026-11-22
+
+- El servidor lee y descarta el cuerpo antes de responder 413: en Windows ya no corta la conexión.
+- README con badge de release y la vía sin Python.
+
 ## 2.0.0 — 2026-11-22
 
 - Interfaz y panel en español e inglés, con la elección recordada.
