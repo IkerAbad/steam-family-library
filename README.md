@@ -111,6 +111,8 @@ python -m unittest discover -s pruebas -v
 
 Basado en [salah153/steam-family-library](https://github.com/salah153/steam-family-library). MIT, ver `LICENSE`.
 
+Historial de cambios: [CHANGELOG.md](CHANGELOG.md).
+
 ---
 
 # Steam Families (English)
@@ -218,3 +220,5 @@ python -m unittest discover -s pruebas -v
 ## Credits
 
 Based on [salah153/steam-family-library](https://github.com/salah153/steam-family-library). MIT, see `LICENSE`.
+
+Changelog: [CHANGELOG.md](CHANGELOG.md).
