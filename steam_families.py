@@ -537,19 +537,26 @@ def anotar_historial(ruta, eventos, ahora):
 
 def chivato(eventos, ahora):
     def de(e):
-        return e["quien"] or ("ti" if e["propio"] else "otro miembro")
+        if e["quien"]:
+            return e["quien"]
+        return tr("ti", "you") if e["propio"] else tr("otro miembro", "another member")
 
-    lineas = [f"Novedades del {ahora}", ""]
+    lineas = [tr(f"Novedades del {ahora}", f"Changes from {ahora}"), ""]
     if not eventos:
-        lineas.append("Sin cambios desde la última vez.")
+        lineas.append(tr("Sin cambios desde la última vez.",
+                         "No changes since the last run."))
     for e in eventos:
-        extra = "  [gratis]" if e.get("gratis") else ""
+        extra = tr("  [gratis]", "  [free]") if e.get("gratis") else ""
+        quien = de(e)
         if e["evento"] == "nuevo":
-            lineas.append(f"+ {e['nombre']}  (de {de(e)}){extra}")
+            lineas.append(tr(f"+ {e['nombre']}  (de {quien}){extra}",
+                             f"+ {e['nombre']}  (from {quien}){extra}"))
         elif e["evento"] == "nuevo_dueno":
-            lineas.append(f"= {e['nombre']}  (ahora también de {de(e)})")
+            lineas.append(tr(f"= {e['nombre']}  (ahora también de {quien})",
+                             f"= {e['nombre']}  (now also from {quien})"))
         else:
-            lineas.append(f"- {e['nombre']}  (ya no está; era de {de(e)})")
+            lineas.append(tr(f"- {e['nombre']}  (ya no está; era de {quien})",
+                             f"- {e['nombre']}  (gone; it was from {quien})"))
     return "\n".join(lineas) + "\n"
 
 
@@ -595,7 +602,7 @@ input[type=search]:focus, select:focus { outline:none; border-color:var(--acento
 label.check { display:flex; align-items:center; gap:6px; color:var(--suave); font-size:13px; padding:0 4px; cursor:pointer; }
 label.check input { accent-color:var(--acento); }
 #resumen { padding:2px 24px 10px; color:var(--suave); font-size:13px; }
-table { width:100%; border-collapse:collapse; table-layout:fixed; }
+table { width:100%; min-width:900px; border-collapse:collapse; table-layout:fixed; }
 thead th { position:sticky; top:0; background:var(--panel); text-align:left; padding:9px 12px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--suave); border-bottom:1px solid var(--borde); user-select:none; cursor:pointer; }
 thead th[data-campo]:hover { color:var(--texto); }
 thead th:focus { outline:1px solid var(--acento); outline-offset:-1px; }
@@ -1680,6 +1687,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(datos)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
         for k, v in (extra or {}).items():
             self.send_header(k, v)
         self.end_headers()
@@ -1790,10 +1799,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._enviar(400, {"ok": False, "error": tr("eso no es un token", "that is not a token")})
                 return
             api_key = str(cuerpo.get("api_key") or "").strip()
-            if api_key and (len(api_key) > 64 or not all(c.isalnum() for c in api_key)):
+            if api_key and not (len(api_key) == 32
+                                and all(c in "0123456789abcdefABCDEF" for c in api_key)):
                 self._enviar(400, {"ok": False, "error": tr(
-                    "la API key no tiene buena pinta: son 32 caracteres en hexadecimal",
-                    "the API key does not look right: it is 32 hexadecimal characters")})
+                    "la API key debe tener 32 caracteres hexadecimales (0-9, a-f)",
+                    "the API key must be 32 hexadecimal characters (0-9, a-f)")})
                 return
             if not api_key:
                 api_key = leer_clave() or ""

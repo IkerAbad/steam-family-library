@@ -213,6 +213,16 @@ class PruebaChivato(unittest.TestCase):
     def test_sin_eventos(self):
         self.assertIn("Sin cambios", sfl.chivato([], "2026-01-01"))
 
+    def test_en_ingles(self):
+        eventos = [{"evento": "nuevo", "nombre": "X", "quien": "V", "propio": False}]
+        sfl.idioma("en")
+        try:
+            texto = sfl.chivato(eventos, "2026-01-01")
+        finally:
+            sfl.idioma("es")
+        self.assertIn("Changes from 2026-01-01", texto)
+        self.assertIn("+ X  (from V)", texto)
+
 
 class PruebaCarpeta(unittest.TestCase):
     def test_crea_carpetas_anidadas(self):

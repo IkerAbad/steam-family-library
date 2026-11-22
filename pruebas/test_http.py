@@ -162,6 +162,26 @@ class PruebaHttp(unittest.TestCase):
     def test_sin_token(self):
         self.assertEqual(self.post("/api/actualizar", {})[0], 400)
 
+    def test_api_key_invalida(self):
+        codigo, cuerpo = self.post("/api/actualizar", {"token": "x", "api_key": "no-es-hex"})
+        self.assertEqual(codigo, 400)
+        self.assertIn("32", json.loads(cuerpo)["error"])
+
+    def test_api_key_valida(self):
+        vistos = []
+        original = sfl.ejecutar
+        sfl.ejecutar = lambda datos, token, api_key="", **k: (vistos.append(api_key) or (True, "ok"))
+        try:
+            codigo, _ = self.post("/api/actualizar", {
+                "token": "x",
+                "api_key": "0123456789abcdef0123456789abcdef",
+                "guardar": False,
+            })
+        finally:
+            sfl.ejecutar = original
+        self.assertEqual(codigo, 200)
+        self.assertEqual(vistos, ["0123456789abcdef0123456789abcdef"])
+
     def test_acepta_el_json_entero(self):
         vistos = []
         original = sfl.ejecutar
