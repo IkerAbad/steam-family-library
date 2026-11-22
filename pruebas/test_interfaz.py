@@ -248,6 +248,14 @@ class PruebaInterfaz(unittest.TestCase):
         pagina.reload()
         self.assertEqual(pagina.get_attribute("html", "data-tema"), "oscuro")
 
+    def test_tema_local(self):
+        pagina = self.pagina("/")
+        self.assertEqual(pagina.get_attribute("html", "data-tema"), "claro")
+        pagina.click("#tema")
+        self.assertEqual(pagina.get_attribute("html", "data-tema"), "oscuro")
+        pagina.reload()
+        self.assertEqual(pagina.get_attribute("html", "data-tema"), "oscuro")
+
     def test_busqueda_por_dueno(self):
         pagina = self.pagina("/panel.html")
         filas = pagina.locator("#cuerpo tr")

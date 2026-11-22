@@ -2407,6 +2407,7 @@ PAGINA = r"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%2366c0f4'/><text x='8' y='12' font-size='10' font-family='sans-serif' text-anchor='middle' fill='%2312151a'>S</text></svg>">
 <title>Steam Families</title>
+<script>try{const t=localStorage.getItem("sf-tema");document.documentElement.dataset.tema=(t==="claro"||t==="oscuro")?t:(matchMedia("(prefers-color-scheme: light)").matches?"claro":"oscuro");}catch(e){}</script>
 <style>
 :root { --fondo:#12151a; --panel:#1a1f26; --borde:#2a313b; --texto:#dfe6ee; --suave:#8b98a8; --acento:#66c0f4; --verde:#7bd88f; --rojo:#e06c6c; }
 * { box-sizing:border-box; }
@@ -2456,6 +2457,16 @@ label.check { display:flex; align-items:center; gap:8px; color:var(--suave); fon
 label.check input { accent-color:var(--acento); }
 .seguridad { margin:8px 0 0 18px; padding:0; color:var(--suave); font-size:13px; }
 .seguridad li { margin-bottom:6px; }
+.acciones { display:flex; gap:8px; align-items:center; margin-top:4px; }
+html[data-tema="claro"] { --fondo:#f6f7f9; --panel:#ffffff; --borde:#d5dbe3; --texto:#1b2430; --suave:#5c6878; --acento:#1a6fa8; --verde:#1d7a3e; --rojo:#b03030; }
+html[data-tema="claro"] code { background:#eef2f7; }
+html[data-tema="claro"] input[type=password], html[data-tema="claro"] input[type=text] { background:#fff; }
+html[data-tema="claro"] button.sec { background:#f1f3f6; color:#374151; }
+html[data-tema="claro"] button.sec:hover { background:#e6ebf1; }
+html[data-tema="claro"] .idiomas button { background:#f1f3f6; }
+html[data-tema="claro"] .idiomas button[aria-pressed="true"] { background:#e3eef7; }
+html[data-tema="claro"] .tarjeta { background:#fff; }
+html[data-tema="claro"] .nota { background:#fdf6e3; border-color:#e5c98a; color:#8a5a00; }
 </style>
 </head>
 <body>
@@ -2465,9 +2476,12 @@ label.check input { accent-color:var(--acento); }
       <h1>Steam Families</h1>
       <p class="sub" data-t="sub">Exporta tu biblioteca familiar, separa lo que te prestan y detecta qué ha entrado nuevo.</p>
     </div>
-    <div class="idiomas" role="group" aria-label="Idioma" data-ta="idioma">
-      <button type="button" data-idioma="es" aria-pressed="true" title="Español">ES</button>
-      <button type="button" data-idioma="en" aria-pressed="false" title="English">EN</button>
+    <div class="acciones">
+      <button type="button" id="tema" class="sec" aria-label="Tema">Oscuro</button>
+      <div class="idiomas" role="group" aria-label="Idioma" data-ta="idioma">
+        <button type="button" data-idioma="es" aria-pressed="true" title="Español">ES</button>
+        <button type="button" data-idioma="en" aria-pressed="false" title="English">EN</button>
+      </div>
     </div>
   </div>
 
@@ -2632,7 +2646,9 @@ const TEXTOS = {
     copiado: "Token copiado. Vuelve a Steam Families y pulsa Pegar.",
     copiaManual: "Copia el token:",
     marcadorAviso: "No lo pulses aquí: arrástralo a la barra de marcadores y úsalo en la página del token de Steam.",
-    idioma: "Idioma"
+    idioma: "Idioma",
+    temaClaro: "Claro",
+    temaOscuro: "Oscuro"
   },
   en: {
     sub: "Export your family library, split what is shared with you and spot what is new.",
@@ -2710,7 +2726,9 @@ const TEXTOS = {
     copiado: "Token copied. Go back to Steam Families and press Paste.",
     copiaManual: "Copy the token:",
     marcadorAviso: "Don't click it here: drag it to the bookmarks bar and use it on Steam's token page.",
-    idioma: "Language"
+    idioma: "Language",
+    temaClaro: "Light",
+    temaOscuro: "Dark"
   }
 };
 
@@ -2734,6 +2752,15 @@ const fechaHora = s => {
 };
 
 const $ = id => document.getElementById(id);
+const CLAVE_TEMA = "sf-tema";
+let TEMA = document.documentElement.dataset.tema === "claro" ? "claro" : "oscuro";
+
+function aplicaTema() {
+  document.documentElement.dataset.tema = TEMA;
+  const boton = $("tema");
+  boton.textContent = TEMA === "claro" ? T("temaOscuro") : T("temaClaro");
+  boton.setAttribute("aria-label", boton.textContent);
+}
 let ULTIMO = null;
 let ULTIMA_FECHA = null;
 let OCUPADO = false;
@@ -2803,6 +2830,7 @@ function aplicaIdioma() {
     b.setAttribute("aria-pressed", String(b.dataset.idioma === IDIOMA));
   });
   $("ver").textContent = VISIBLE ? T("ocultar") : T("mostrar");
+  aplicaTema();
   construyeMarcador();
   pintaEstado();
   if (ULTIMO) pintar(ULTIMO);
@@ -2813,6 +2841,11 @@ document.querySelectorAll("[data-idioma]").forEach(b => b.addEventListener("clic
   try { localStorage.setItem("sf-idioma", IDIOMA); } catch (e) {}
   aplicaIdioma();
 }));
+$("tema").addEventListener("click", () => {
+  TEMA = TEMA === "claro" ? "oscuro" : "claro";
+  try { localStorage.setItem(CLAVE_TEMA, TEMA); } catch (e) {}
+  aplicaTema();
+});
 
 $("ver").addEventListener("click", () => {
   const t = $("token");
