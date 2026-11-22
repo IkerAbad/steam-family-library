@@ -1,5 +1,10 @@
 # Cambios
 
+## 2.1.1 — 2026-11-22
+
+- Los binarios de Linux y macOS ya no se pisan al publicar la release.
+- Las notas de la release salen del changelog y de la guía de instalación.
+
 ## 2.1.0 — 2026-11-22
 
 - El panel incluye el historial de novedades (últimas 500), con fecha, juego, qué y quién.
