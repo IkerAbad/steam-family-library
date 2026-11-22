@@ -71,7 +71,7 @@ Opciones: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--si
 
 ## Ejecutable
 
-Si no quieres instalar Python, `python empaquetar.py` genera un ejecutable de un solo fichero en `dist/` con PyInstaller (dependencia de desarrollo). Compílalo en el sistema donde lo vayas a usar. El workflow **Paquete** de GitHub Actions deja los binarios de Windows, Linux y macOS como artefactos. Windows puede avisar de que el ejecutable no está firmado; es normal en un binario sin certificado. En macOS el binario no está notarizado: ábrelo con clic derecho → Abrir, o quita la cuarentena con `xattr -d com.apple.quarantine steam-families`.
+Si no quieres instalar Python, `python empaquetar.py` genera un ejecutable de un solo fichero en `dist/` con PyInstaller (dependencia de desarrollo). Compílalo en el sistema donde lo vayas a usar. El workflow **Paquete** de GitHub Actions deja los binarios de Windows, Linux, macOS Apple Silicon y macOS Intel como artefactos. Windows puede avisar de que el ejecutable no está firmado; es normal en un binario sin certificado. En macOS el binario no está notarizado: ábrelo con clic derecho → Abrir, o quita la cuarentena con `xattr -d com.apple.quarantine steam-families`.
 
 ## Cómo funciona
 
@@ -183,7 +183,7 @@ Options: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin
 
 ## Executable
 
-If you do not want to install Python, `python empaquetar.py` builds a single-file executable in `dist/` with PyInstaller (a development dependency). Build it on the system where you are going to use it. The **Paquete** workflow in GitHub Actions uploads the Windows, Linux and macOS artifacts. Windows may warn that the executable is unsigned; that is normal for a binary without a certificate. On macOS the binary is not notarised: open it with right-click → Open, or remove the quarantine with `xattr -d com.apple.quarantine steam-families`.
+If you do not want to install Python, `python empaquetar.py` builds a single-file executable in `dist/` with PyInstaller (a development dependency). Build it on the system where you are going to use it. The **Paquete** workflow in GitHub Actions uploads the Windows, Linux, macOS Apple Silicon and macOS Intel artifacts. Windows may warn that the executable is unsigned; that is normal for a binary without a certificate. On macOS the binary is not notarised: open it with right-click → Open, or remove the quarantine with `xattr -d com.apple.quarantine steam-families`.
 
 ## How it works
 

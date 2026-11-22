@@ -25,6 +25,9 @@ jobs:
           - os: macos-latest
             nombre: steam-families-macos
             binario: dist/steam-families-macos
+          - os: macos-15-intel
+            nombre: steam-families-macos-intel
+            binario: dist/steam-families-macos-intel
 
     steps:
       - uses: actions/checkout@v4
