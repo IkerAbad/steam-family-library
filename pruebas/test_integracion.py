@@ -203,7 +203,7 @@ class PruebaIntegracion(unittest.TestCase):
 
             sfl.generar_panel(d)
             html = (d / "panel.html").read_text(encoding="utf-8")
-            self.assertIn("const SIN_NOMBRE = 1", html)
+            self.assertIn("const SIN_NOMBRE = 2", html)
 
     def test_token_rechazado(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -249,6 +249,27 @@ class PruebaIntegracion(unittest.TestCase):
                 sfl.idioma("es")
             consultas = [c for r, c in SteamFalso.llamadas if "GetSharedLibraryApps" in r]
             self.assertEqual(consultas[0]["language"], ["english"])
+
+    def test_no_pierde_los_nombres_si_falla_el_refresco(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            (d / "snapshot.json").write_text(json.dumps({
+                "nombres": {sfl.etiqueta("222"): "Ana"},
+                "nombres_fecha": "2020-01-01",
+                "juegos": {},
+            }), encoding="utf-8")
+            SteamFalso.fallos = {"222": 99}
+            sfl.exportar(d, self.token(), con_precios=False)
+            snap = json.loads((d / "snapshot.json").read_text(encoding="utf-8"))
+            self.assertEqual(snap["nombres"].get(sfl.etiqueta("222")), "Ana")
+
+    def test_numera_los_duenos_que_no_son_miembros(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            SteamFalso.fallos = {"333": 99}
+            sfl.exportar(d, self.token(), con_precios=False)
+            snap = json.loads((d / "snapshot.json").read_text(encoding="utf-8"))
+            self.assertIn("Miembro 1", snap["nombres"].values())
 
 
 if __name__ == "__main__":

@@ -20,7 +20,6 @@ import ctypes
 import hashlib
 import json
 import os
-import re
 import sys
 import threading
 import time
@@ -119,7 +118,7 @@ def api_get(metodo, params, intentos=3):
             with urllib.request.urlopen(req, timeout=30) as resp:
                 return json.load(resp).get("response", {})
         except urllib.error.HTTPError as e:
-            if e.code >= 500 and intento < intentos - 1:
+            if (e.code >= 500 or e.code == 429) and intento < intentos - 1:
                 time.sleep(2 + 3 * intento)
                 continue
             cuerpo = e.read().decode("utf-8", "replace")[:400]
@@ -256,10 +255,11 @@ def nombres(steamids, previos=None, api_key="", aviso=None):
     return out
 
 
-def rellenar_huecos(alias, miembros, yo):
+def rellenar_huecos(alias, miembros, yo, otros=()):
     """Quien no se haya podido resolver sale como Miembro 1, 2... siempre el mismo."""
     n = 0
-    for sid in miembros:
+    orden = list(miembros) + [s for s in sorted(otros) if s not in miembros]
+    for sid in orden:
         if sid == yo or sid in alias:
             continue
         n += 1
@@ -315,14 +315,21 @@ def descargar(token, con_free, con_no_juegos, con_nombres=True, previo=None, api
     todos = set(miembros)
     for a in apps:
         todos.update(str(o) for o in a.get("owner_steamids", []))
-    previos_nombres = (previo or {}).get("nombres") or {}
+    cacheados = (previo or {}).get("nombres") or {}
+    previos_nombres = cacheados
     alias = {}
     if con_nombres:
         # Con API key se refrescan siempre (una sola llamada); sin ella, cada semana.
         if api_key or nombres_caducados((previo or {}).get("nombres_fecha")):
             previos_nombres = {}
         alias = nombres([s for s in sorted(todos) if s != yo], previos_nombres, api_key, aviso)
-        alias = rellenar_huecos(alias, miembros, yo)
+        # Si el refresco falla, se conserva el último nombre bueno antes de numerar.
+        for sid in todos:
+            if sid not in alias and sid != yo:
+                anterior = cacheados.get(etiqueta(sid), "")
+                if anterior and not anterior.startswith("Miembro "):
+                    alias[sid] = anterior
+        alias = rellenar_huecos(alias, miembros, yo, todos)
     else:
         # Sin consultar: los nombres guardados se reutilizan para «quién».
         for sid in todos:
@@ -1332,7 +1339,6 @@ def ejecutar(datos, token, api_key="", aviso=None):
     return True, texto
 
 
-AQUI = Path(__file__).resolve().parent
 PROHIBIDOS = set('"<>|*?')
 CANDADO = threading.Lock()
 FICHEROS = {
@@ -2288,6 +2294,7 @@ async function lanzar(auto) {
       body: JSON.stringify({token, api_key: $("apikey").value.trim(), guardar: $("recordar").checked, idioma: IDIOMA})
     });
     const d = await r.json();
+    paraSondeo();
     if (!d.ok) {
       ponError(d.error || T("actualizarFallo"));
       return;
@@ -2312,6 +2319,12 @@ async function lanzar(auto) {
   }
 }
 $("lanzar").addEventListener("click", () => lanzar(false));
+$("token").addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    lanzar(false);
+  }
+});
 
 $("olvidar").addEventListener("click", async e => {
   e.preventDefault();

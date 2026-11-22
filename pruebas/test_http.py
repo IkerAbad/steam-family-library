@@ -126,6 +126,22 @@ class PruebaHttp(unittest.TestCase):
         finally:
             sfl.olvidar_clave()
 
+    def test_usa_el_token_guardado_si_no_se_pega(self):
+        carga = base64.urlsafe_b64encode(
+            json.dumps({"exp": 2000000000, "sub": "1"}).encode()).decode().rstrip("=")
+        tok = "x." + carga + "." + "a" * 43
+        sfl.guardar_token(tok)
+        vistos = []
+        original = sfl.ejecutar
+        sfl.ejecutar = lambda datos, token, api_key="", **k: (vistos.append(token) or (True, "ok"))
+        try:
+            codigo, _ = self.post("/api/actualizar", {"guardar": False})
+        finally:
+            sfl.ejecutar = original
+            sfl.olvidar_token()
+        self.assertEqual(codigo, 200)
+        self.assertEqual(vistos, [tok])
+
     def test_panel_inexistente(self):
         self.assertEqual(self.get("/panel.html")[0], 404)
 

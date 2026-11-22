@@ -97,6 +97,12 @@ class PruebaNombres(unittest.TestCase):
         self.assertEqual(alias["ddd"], "Miembro 2")
         self.assertNotIn("aaa", alias)
 
+    def test_rellena_tambien_otros_duenos(self):
+        alias = sfl.rellenar_huecos({}, ["bbb"], "aaa", ["ccc", "ddd"])
+        self.assertEqual(alias["bbb"], "Miembro 1")
+        self.assertEqual(alias["ccc"], "Miembro 2")
+        self.assertEqual(alias["ddd"], "Miembro 3")
+
 
 class PruebaNombresRed(unittest.TestCase):
     """Sin red: se sustituye urlopen y la pausa entre peticiones."""
