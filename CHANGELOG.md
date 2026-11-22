@@ -1,5 +1,9 @@
 # Cambios
 
+## 2.2.2 — 2026-11-22
+
+- Filtro por dueño en el panel.
+
 ## 2.2.1 — 2026-11-22
 
 - La búsqueda del panel mira también el dueño.
