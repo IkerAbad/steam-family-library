@@ -272,6 +272,22 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertIn("Viejo", texto)
         self.assertIn("99", texto)
 
+    def test_filtro_por_dueno(self):
+        pagina = self.pagina("/panel.html")
+        filas = pagina.locator("#cuerpo tr")
+        anna = sfl.etiqueta("222")
+        yo = sfl.etiqueta("111")
+
+        pagina.select_option("#duenoFiltro", anna)
+        self.assertEqual(filas.count(), 2)
+        pagina.select_option("#duenoFiltro", yo)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Alfa", pagina.inner_text("#cuerpo"))
+
+        pagina.reload()
+        self.assertEqual(pagina.input_value("#duenoFiltro"), yo)
+        self.assertEqual(filas.count(), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

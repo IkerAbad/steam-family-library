@@ -728,6 +728,9 @@ html[data-tema="claro"] #version { color:#8b98a8; }
     <option value="family" data-t="soloPrestados">Solo prestados</option>
     <option value="own" data-t="soloMios">Solo míos</option>
   </select>
+  <select id="duenoFiltro" data-ta="dueno" aria-label="Dueño">
+    <option value="todo" data-t="todo">Todo</option>
+  </select>
   <select id="estado" aria-label="Estado" data-ta="estado">
     <option value="todo" data-t="cualquierEstado">Cualquier estado</option>
     <option value="jugable" data-t="jugables">Jugables ahora</option>
@@ -1014,6 +1017,31 @@ function preparaBusqueda() {
   });
 }
 
+function pintaDuenos() {
+  const sel = $("duenoFiltro");
+  const actual = sel.value || "todo";
+  const hashes = new Set();
+  DATOS.forEach(d => (d.o || []).forEach(h => hashes.add(h)));
+  const opciones = [...hashes].map(h => {
+    let nombre = NOMBRES[h] || h;
+    nombre = nombre === "tú" ? T("tu")
+      : nombre.replace(/^Miembro (\d+)$/, (todo, n) => IDIOMA === "en" ? "Member " + n : todo);
+    return {h, nombre};
+  }).sort((a, b) => compara(a.nombre, b.nombre));
+  sel.replaceChildren();
+  const todo = document.createElement("option");
+  todo.value = "todo";
+  todo.textContent = T("todo");
+  sel.appendChild(todo);
+  opciones.forEach(o => {
+    const op = document.createElement("option");
+    op.value = o.h;
+    op.textContent = o.nombre;
+    sel.appendChild(op);
+  });
+  sel.value = [...sel.options].some(o => o.value === actual) ? actual : "todo";
+}
+
 const MOTIVOS = {
   "excluido por el dueno": {es: "excluido por el dueño", en: "excluded by the owner"},
   "no se puede compartir": {es: "no se puede compartir", en: "can't be shared"},
@@ -1075,6 +1103,10 @@ function cargaFiltros() {
     if (typeof g.soloNuevos === "boolean") $("soloNuevos").checked = g.soloNuevos;
     if (typeof g.soloFav === "boolean") $("soloFav").checked = g.soloFav;
     if (typeof g.verOcultos === "boolean") $("verOcultos").checked = g.verOcultos;
+    if (typeof g.dueno === "string" &&
+        [...$("duenoFiltro").options].some(o => o.value === g.dueno)) {
+      $("duenoFiltro").value = g.dueno;
+    }
     if (typeof g.q === "string") $("q").value = g.q.slice(0, 200);
   } catch (e) {}
 }
@@ -1089,6 +1121,7 @@ function guardaFiltros() {
       soloNuevos: $("soloNuevos").checked,
       soloFav: $("soloFav").checked,
       verOcultos: $("verOcultos").checked,
+      dueno: $("duenoFiltro").value,
       q: $("q").value
     }));
   } catch (e) {}
@@ -1159,13 +1192,14 @@ function pintaAviso() {
 function pinta() {
   const q = plano($("q").value.trim());
   const origen = $("origen").value;
+  const dueno = $("duenoFiltro").value;
   const estado = $("estado").value;
   const orden = $("orden").value;
   const antiguedad = $("antiguedad").value;
   const soloNuevos = $("soloNuevos").checked;
   const soloFav = $("soloFav").checked;
   const verOcultos = $("verOcultos").checked;
-  const filtrando = !!q || origen !== "todo" || estado !== "todo" ||
+  const filtrando = !!q || origen !== "todo" || dueno !== "todo" || estado !== "todo" ||
     antiguedad !== "todo" || soloNuevos || soloFav || verOcultos || !!ORDEN_CABECERA;
   $("limpiar").hidden = !filtrando;
 
@@ -1177,6 +1211,7 @@ function pinta() {
   let lista = DATOS.filter(d => {
     if (q && !d.b.includes(q)) return false;
     if (origen !== "todo" && d.s !== origen) return false;
+    if (dueno !== "todo" && !(d.o || []).includes(dueno)) return false;
     if (soloNuevos && d.w !== "nuevo") return false;
     if (soloFav && !FAVORITOS.has(d.a)) return false;
     if (!verOcultos && OCULTOS.has(d.a)) return false;
@@ -1559,6 +1594,7 @@ function aplicaIdioma() {
   pintaMiembros();
   pintaHistorial();
   aplicaTema();
+  pintaDuenos();
   preparaBusqueda();
   pinta();
 }
@@ -1574,7 +1610,7 @@ $("tema").addEventListener("click", () => {
   aplicaTema();
 });
 
-["origen", "estado", "antiguedad", "soloNuevos", "soloFav", "verOcultos"].forEach(id => $(id).addEventListener("input", pinta));
+["origen", "duenoFiltro", "estado", "antiguedad", "soloNuevos", "soloFav", "verOcultos"].forEach(id => $(id).addEventListener("input", pinta));
 $("orden").addEventListener("input", () => {
   ORDEN_CABECERA = null;
   pinta();
@@ -1635,6 +1671,7 @@ $("verHistorial").addEventListener("click", () => {
 $("exportar").addEventListener("click", exportaCsv);
 $("exportarHistorial").addEventListener("click", exportaHistorial);
 ["hq", "hecho", "hdesde", "hhasta"].forEach(id => $(id).addEventListener("input", pintaHistorial));
+pintaDuenos();
 cargaFiltros();
 aplicaIdioma();
 </script>
