@@ -647,6 +647,7 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
 .sec { background:var(--panel); color:var(--suave); border:1px solid var(--borde); border-radius:6px; padding:7px 12px; font:inherit; cursor:pointer; }
 .sec:hover { background:#1f252d; color:var(--texto); }
 #vacio { padding:30px 24px; color:var(--suave); }
+#version { padding:8px 24px 20px; color:#5d6773; font-size:11px; text-align:right; }
 #actualizado { margin:4px 0 0; color:var(--suave); font-size:12px; }
 #actualizado.viejo { color:var(--ambar); }
 .aviso.ambar { background:#241f11; border-color:#5a4a22; color:var(--ambar); }
@@ -721,6 +722,7 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
   <tbody id="cuerpo"></tbody>
 </table>
 <div id="vacio" hidden data-t="vacio">Ningún juego cumple esos filtros.</div>
+<div id="version">Steam Families v__VERSION__</div>
 
 <script>
 const DATOS = __DATOS__;
@@ -1375,6 +1377,7 @@ def generar_panel(datos):
     html = html.replace("__ACTUALIZADO__", json.dumps(snap.get("fecha", ""), ensure_ascii=False))
     sin_nombre = sum(1 for v in alias.values() if str(v).startswith("Miembro "))
     html = html.replace("__SIN_NOMBRE__", str(sin_nombre))
+    html = html.replace("__VERSION__", VERSION)
     # Los datos van al final: si un nombre de juego coincide con un marcador, no se toca.
     html = html.replace("__DATOS__", blob)
 
@@ -1763,7 +1766,7 @@ class Handler(BaseHTTPRequestHandler):
         idioma((consulta.get("lang") or [""])[0])
         pedida = urllib.parse.urlparse(self.path).path
         if pedida in ("/", "/index.html"):
-            self._enviar(200, PAGINA, "text/html; charset=utf-8")
+            self._enviar(200, PAGINA.replace("__VERSION__", VERSION), "text/html; charset=utf-8")
             return
         if pedida == "/api/estado":
             self._enviar(200, estado(self.datos))
@@ -1935,6 +1938,7 @@ td.quien { color:var(--suave); }
 details summary { cursor:pointer; color:var(--suave); font-size:13px; }
 details ol { margin:8px 0 0 18px; padding:0; color:var(--suave); font-size:13px; }
 .pie { margin-top:26px; color:var(--suave); font-size:12px; }
+.pie .version { color:#5d6773; }
 label.check { display:flex; align-items:center; gap:8px; color:var(--suave); font-size:13px; }
 label.check input { accent-color:var(--acento); }
 .seguridad { margin:8px 0 0 18px; padding:0; color:var(--suave); font-size:13px; }
@@ -2033,6 +2037,7 @@ label.check input { accent-color:var(--acento); }
   <p class="pie">
     <span data-th="pie">Todo se ejecuta en tu ordenador y no se guarda ninguna cookie de Steam. Si marcas «recordar», el token queda guardado solo para tu usuario: cifrado con DPAPI en Windows, permisos 600 en Linux y macOS.</span>
     <a href="#" id="detener" data-t="detener">Detener la interfaz</a>
+    · <span class="version">v__VERSION__</span>
   </p>
 </main>
 

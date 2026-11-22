@@ -91,6 +91,7 @@ class PruebaHttp(unittest.TestCase):
         codigo, cuerpo = self.get("/")
         self.assertEqual(codigo, 200)
         self.assertIn("Steam Families", cuerpo)
+        self.assertIn("v" + sfl.VERSION, cuerpo)
 
     def test_estado(self):
         codigo, cuerpo = self.get("/api/estado")

@@ -484,6 +484,7 @@ class PruebaPanel(unittest.TestCase):
             self.assertIn("const ACTUALIZADO = \"2026-11-21T10:00:00+00:00\"", html)
             self.assertIn("const SIN_NOMBRE = 0", html)
             self.assertIn('"n":"__FECHA_NOV__"', html)
+            self.assertIn("v" + sfl.VERSION, html)
 
             prestados = list(csv.DictReader((d / "prestados.csv").open(encoding="utf-8-sig")))
             self.assertEqual(len(prestados), 2)
