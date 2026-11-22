@@ -1,5 +1,7 @@
 # Objetivos
 
+> Estado: los ocho están implementados en `main`, pendientes de etiquetar.
+
 Ordenados por valor para quien usa el programa. Cada uno con su criterio de
 aceptación para saber cuándo está terminado.
 

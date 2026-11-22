@@ -1,5 +1,16 @@
 # Cambios
 
+## 2.2.0 — 2026-11-22
+
+- Historial con búsqueda, tipo y rango de fechas.
+- Actualización automática cada 6 horas mientras la app está abierta (`--cada`).
+- Estadísticas por miembro: juegos, jugables y horas.
+- Favoritos y juegos ocultos, con sus filtros.
+- Gráfico de altas de los últimos 12 meses.
+- Exportar la vista filtrada a CSV.
+- Tema claro y oscuro, con `prefers-color-scheme`.
+- Cobertura del 86 % medida en el CI.
+
 ## 2.1.1 — 2026-11-22
 
 - Los binarios de Linux y macOS ya no se pisan al publicar la release.
