@@ -19,6 +19,12 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-dev.txt
 
+      - name: Cachea el navegador
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('requirements-dev.txt') }}
+
       - name: Instala dependencias
         run: |
           python -m pip install --upgrade pip
