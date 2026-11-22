@@ -66,6 +66,10 @@ python steam_families.py --panel --datos datos      # solo regenera el panel
 
 Opciones: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin-nombres`, `--sin-historial`, `--sin-precios`, `--puerto`, `--sin-navegador`, `--version`.
 
+## Ejecutable
+
+Si no quieres instalar Python, `python empaquetar.py` genera un ejecutable de un solo fichero en `dist/` con PyInstaller (dependencia de desarrollo). Compílalo en el sistema donde lo vayas a usar. El workflow **Paquete** de GitHub Actions deja el `.exe` de Windows como artefacto.
+
 ## Cómo funciona
 
 1. El token es un JWT firmado por Steam; su campo `sub` es tu SteamID64 y `exp` la caducidad.
@@ -169,6 +173,10 @@ python steam_families.py --panel --datos datos      # only regenerate the dashbo
 ```
 
 Options: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin-nombres`, `--sin-historial`, `--sin-precios`, `--puerto`, `--sin-navegador`, `--version`.
+
+## Executable
+
+If you do not want to install Python, `python empaquetar.py` builds a single-file executable in `dist/` with PyInstaller (a development dependency). Build it on the system where you are going to use it. The **Paquete** workflow in GitHub Actions uploads the Windows `.exe` as an artifact.
 
 ## How it works
 

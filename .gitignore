@@ -16,6 +16,8 @@ __pycache__/
 *.pyc
 .coverage
 htmlcov/
+build/
+dist/
 snapshot.corrupto.json
 historial.corrupto.csv
 .lock
