@@ -240,6 +240,14 @@ class PruebaInterfaz(unittest.TestCase):
         texto = pathlib.Path(descarga.value.path()).read_text(encoding="utf-8-sig")
         self.assertEqual(len(texto.strip().splitlines()), 2)
 
+    def test_tema(self):
+        pagina = self.pagina("/panel.html")
+        self.assertEqual(pagina.get_attribute("html", "data-tema"), "claro")
+        pagina.click("#tema")
+        self.assertEqual(pagina.get_attribute("html", "data-tema"), "oscuro")
+        pagina.reload()
+        self.assertEqual(pagina.get_attribute("html", "data-tema"), "oscuro")
+
 
 if __name__ == "__main__":
     unittest.main()

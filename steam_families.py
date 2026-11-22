@@ -594,6 +594,7 @@ PLANTILLA = r"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%2366c0f4'/><text x='8' y='12' font-size='10' font-family='sans-serif' text-anchor='middle' fill='%2312151a'>S</text></svg>">
 <title>Biblioteca familiar de Steam</title>
+<script>try{const t=localStorage.getItem("sf-tema");document.documentElement.dataset.tema=(t==="claro"||t==="oscuro")?t:(matchMedia("(prefers-color-scheme: light)").matches?"claro":"oscuro");}catch(e){}</script>
 <style>
 :root { --fondo:#12151a; --panel:#1a1f26; --borde:#2a313b; --texto:#dfe6ee; --suave:#8b98a8; --acento:#66c0f4; --verde:#7bd88f; --ambar:#e0b341; --rojo:#e06c6c; }
 * { box-sizing:border-box; }
@@ -671,6 +672,25 @@ tr.oculto { opacity:.55; }
 #historialCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
 #historialCaja table { min-width:0; }
 #historialCaja th, #historialCaja td { font-size:12px; padding:6px 8px; }
+.acciones { display:flex; gap:8px; align-items:center; }
+html[data-tema="claro"] {
+  --fondo:#f6f7f9; --panel:#ffffff; --borde:#d5dbe3; --texto:#1b2430; --suave:#5c6878;
+  --acento:#1a6fa8; --verde:#1d7a3e; --ambar:#8a5a00; --rojo:#b03030;
+}
+html[data-tema="claro"] tbody td { border-bottom-color:#e6eaf0; }
+html[data-tema="claro"] tbody tr:hover { background:#eef2f7; }
+html[data-tema="claro"] .prestado { color:#1d7a3e; border-color:#9fd3b0; background:#eaf7ee; }
+html[data-tema="claro"] .propio { color:#5c6878; border-color:#d5dbe3; background:#f1f3f6; }
+html[data-tema="claro"] .bloqueado { color:#8a5a00; border-color:#e5c98a; background:#fdf6e3; }
+html[data-tema="claro"] .nuevo { color:#1a6fa8; border-color:#a9cfe8; background:#eaf4fb; }
+html[data-tema="claro"] .fuera { color:#b03030; border-color:#e5a9a9; background:#fdecec; }
+html[data-tema="claro"] .aviso { background:#eaf7ee; border-color:#9fd3b0; color:#1d7a3e; }
+html[data-tema="claro"] .aviso.ambar { background:#fdf6e3; border-color:#e5c98a; color:#8a5a00; }
+html[data-tema="claro"] .atajo { background:#eaf4fb; color:#1a6fa8; border-color:#a9cfe8; }
+html[data-tema="claro"] .atajo:hover { background:#dcecf7; }
+html[data-tema="claro"] .sec { background:#fff; color:#5c6878; border-color:#d5dbe3; }
+html[data-tema="claro"] .sec:hover { background:#f1f3f6; color:#1b2430; }
+html[data-tema="claro"] #version { color:#8b98a8; }
 #actualizado { margin:4px 0 0; color:var(--suave); font-size:12px; }
 #actualizado.viejo { color:var(--ambar); }
 .aviso.ambar { background:#241f11; border-color:#5a4a22; color:var(--ambar); }
@@ -685,9 +705,12 @@ tr.oculto { opacity:.55; }
     <p id="stats"></p>
     <p id="actualizado"></p>
   </div>
-  <div class="idiomas" role="group" aria-label="Idioma" data-ta="idioma">
-    <button type="button" data-idioma="es" aria-pressed="true" title="Español">ES</button>
-    <button type="button" data-idioma="en" aria-pressed="false" title="English">EN</button>
+  <div class="acciones">
+    <button type="button" id="tema" class="sec" aria-label="Tema">Oscuro</button>
+    <div class="idiomas" role="group" aria-label="Idioma" data-ta="idioma">
+      <button type="button" data-idioma="es" aria-pressed="true" title="Español">ES</button>
+      <button type="button" data-idioma="en" aria-pressed="false" title="English">EN</button>
+    </div>
   </div>
 </header>
 <div class="aviso" id="aviso" hidden>
@@ -826,6 +849,8 @@ const TEXTOS = {
     jugablesHeader: "Jugables",
     horasHeader: "Horas",
     mesesTitulo: "Altas por mes",
+    temaClaro: "Claro",
+    temaOscuro: "Oscuro",
     tipo: "Tipo",
     desde: "Desde",
     hasta: "Hasta",
@@ -910,6 +935,8 @@ const TEXTOS = {
     jugablesHeader: "Playable",
     horasHeader: "Hours",
     mesesTitulo: "Added per month",
+    temaClaro: "Light",
+    temaOscuro: "Dark",
     tipo: "Type",
     desde: "From",
     hasta: "To",
@@ -992,6 +1019,15 @@ function motivo(texto) {
 
 const $ = id => document.getElementById(id);
 const cuerpo = $("cuerpo");
+const CLAVE_TEMA = "sf-tema";
+let TEMA = document.documentElement.dataset.tema === "claro" ? "claro" : "oscuro";
+
+function aplicaTema() {
+  document.documentElement.dataset.tema = TEMA;
+  const boton = $("tema");
+  boton.textContent = TEMA === "claro" ? T("temaOscuro") : T("temaClaro");
+  boton.setAttribute("aria-label", boton.textContent);
+}
 const CLAVE_FILTROS = "sf-filtros";
 const CLAVE_FAV = "sf-favoritos";
 const CLAVE_OCULTOS = "sf-ocultos";
@@ -1491,6 +1527,7 @@ function aplicaIdioma() {
   pintaMeses();
   pintaMiembros();
   pintaHistorial();
+  aplicaTema();
   pinta();
 }
 
@@ -1499,6 +1536,11 @@ document.querySelectorAll("[data-idioma]").forEach(b => b.addEventListener("clic
   try { localStorage.setItem("sf-idioma", IDIOMA); } catch (e) {}
   aplicaIdioma();
 }));
+$("tema").addEventListener("click", () => {
+  TEMA = TEMA === "claro" ? "oscuro" : "claro";
+  try { localStorage.setItem(CLAVE_TEMA, TEMA); } catch (e) {}
+  aplicaTema();
+});
 
 ["origen", "estado", "antiguedad", "soloNuevos", "soloFav", "verOcultos"].forEach(id => $(id).addEventListener("input", pinta));
 $("orden").addEventListener("input", () => {
