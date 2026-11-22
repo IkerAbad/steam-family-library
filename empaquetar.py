@@ -9,6 +9,7 @@ destino: PyInstaller no compila para otra plataforma.
 """
 
 import pathlib
+import shutil
 import subprocess
 import sys
 
@@ -33,6 +34,7 @@ def main():
     ]
     codigo = subprocess.call(orden)
     if codigo == 0:
+        shutil.rmtree(RAIZ / "build", ignore_errors=True)
         nombre = "steam-families.exe" if sys.platform.startswith("win") else "steam-families"
         print(f"hecho: {RAIZ / 'dist' / nombre}")
     return codigo

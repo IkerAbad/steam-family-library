@@ -4,9 +4,19 @@ on:
   workflow_dispatch:
 
 jobs:
-  windows:
-    name: Ejecutable de Windows
-    runs-on: windows-latest
+  paquete:
+    name: Ejecutable (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            binario: dist/steam-families.exe
+            artefacto: steam-families-windows
+          - os: ubuntu-latest
+            binario: dist/steam-families
+            artefacto: steam-families-linux
 
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +35,10 @@ jobs:
       - name: Empaqueta
         run: python empaquetar.py
 
+      - name: Comprueba el ejecutable
+        run: ${{ matrix.binario }} --version
+
       - uses: actions/upload-artifact@v4
         with:
-          name: steam-families-windows
-          path: dist/steam-families.exe
+          name: ${{ matrix.artefacto }}
+          path: ${{ matrix.binario }}
