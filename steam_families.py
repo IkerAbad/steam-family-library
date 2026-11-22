@@ -535,13 +535,22 @@ def anotar_historial(ruta, eventos, ahora):
     return len(nuevas)
 
 
+def fecha_legible(texto):
+    """'2026-11-22 10:00' -> '22/11/2026 10:00'. Si no encaja, se deja igual."""
+    try:
+        return datetime.strptime(str(texto), "%Y-%m-%d %H:%M").strftime("%d/%m/%Y %H:%M")
+    except (TypeError, ValueError):
+        return str(texto)
+
+
 def chivato(eventos, ahora):
     def de(e):
         if e["quien"]:
             return e["quien"]
         return tr("ti", "you") if e["propio"] else tr("otro miembro", "another member")
 
-    lineas = [tr(f"Novedades del {ahora}", f"Changes from {ahora}"), ""]
+    lineas = [tr(f"Novedades del {fecha_legible(ahora)}",
+                 f"Changes from {fecha_legible(ahora)}"), ""]
     if not eventos:
         lineas.append(tr("Sin cambios desde la última vez.",
                          "No changes since the last run."))
@@ -859,6 +868,10 @@ const num = opciones => new Intl.NumberFormat(LOCALE(), opciones || {});
 const numero = n => num().format(n);
 const horas = m => num({minimumFractionDigits: 1, maximumFractionDigits: 1}).format(m / 60);
 const fecha = u => u ? u.split("-").reverse().join("/") : "";
+const fechaHora = s => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(s || "");
+  return m ? m[3] + "/" + m[2] + "/" + m[1] + " " + m[4] + ":" + m[5] : (s || "");
+};
 
 const plano = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 DATOS.forEach(d => { d.b = plano(d.n); });
@@ -966,7 +979,7 @@ function pintaAviso() {
   const nuevos = DATOS.filter(d => d.w === "nuevo").length;
   const fuera = DATOS.filter(d => d.w === "fuera").length;
   $("aviso").hidden = false;
-  $("avisoTexto").textContent = T("resumenNovedades") + " (" + FECHA_NOV + "): " +
+  $("avisoTexto").textContent = T("resumenNovedades") + " (" + fechaHora(FECHA_NOV) + "): " +
     nuevos + " " + T("juegosNuevos") + ", " + fuera + " " + T("yaNoEstan") + ".";
 }
 
@@ -2185,6 +2198,10 @@ const LOCALE = () => IDIOMA === "es" ? "es-ES" : "en-GB";
 const num = opciones => new Intl.NumberFormat(LOCALE(), opciones || {});
 const fmt = n => num().format(n);
 const fmtHoras = n => num({minimumFractionDigits: 1, maximumFractionDigits: 1}).format(n);
+const fechaHora = s => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(s || "");
+  return m ? m[3] + "/" + m[2] + "/" + m[1] + " " + m[4] + ":" + m[5] : (s || "");
+};
 
 const $ = id => document.getElementById(id);
 let ULTIMO = null;
@@ -2339,7 +2356,7 @@ function pintar(d) {
   if (!d.primera && ev.length) {
     const titulo = document.createElement("p");
     titulo.style.cssText = "margin:14px 0 0;color:var(--suave);font-size:13px";
-    titulo.textContent = T("novedadesDel") + " " + d.fecha_novedades;
+    titulo.textContent = T("novedadesDel") + " " + fechaHora(d.fecha_novedades);
 
     const tabla = document.createElement("table");
     const thead = document.createElement("thead");

@@ -213,6 +213,11 @@ class PruebaChivato(unittest.TestCase):
     def test_sin_eventos(self):
         self.assertIn("Sin cambios", sfl.chivato([], "2026-01-01"))
 
+    def test_fecha_legible(self):
+        self.assertEqual(sfl.fecha_legible("2026-11-22 10:00"), "22/11/2026 10:00")
+        self.assertEqual(sfl.fecha_legible("2026-11-22"), "2026-11-22")
+        self.assertEqual(sfl.fecha_legible(""), "")
+
     def test_en_ingles(self):
         eventos = [{"evento": "nuevo", "nombre": "X", "quien": "V", "propio": False}]
         sfl.idioma("en")
