@@ -1,5 +1,9 @@
 # Cambios
 
+## 2.2.3 — 2026-11-22
+
+- Tema claro y oscuro también en la interfaz local.
+
 ## 2.2.2 — 2026-11-22
 
 - Filtro por dueño en el panel.
