@@ -3,106 +3,25 @@
     python -m unittest discover -s pruebas -v
 """
 
-import base64
 import csv
 import json
 import pathlib
 import sys
 import tempfile
-import threading
 import unittest
-import urllib.parse
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import steam_families as sfl  # noqa: E402
-
-NOMBRES = {"111": "Yo", "222": "Ana", "333": "Luis"}
-
-APPS = [
-    {"appid": 10, "name": "Mio", "owner_steamids": ["111"], "exclude_reason": 0,
-     "rt_playtime": 60, "rt_time_acquired": 1700000000, "rt_last_played": 1700000000},
-    {"appid": 20, "name": "Prestado", "owner_steamids": ["222"], "exclude_reason": 1,
-     "rt_playtime": 30, "rt_time_acquired": 1700000000, "rt_last_played": 0},
-    {"appid": 30, "name": "De otro", "owner_steamids": ["333"], "exclude_reason": 0,
-     "rt_playtime": 0, "rt_time_acquired": 0, "rt_last_played": 0},
-]
-
-
-class SteamFalso(BaseHTTPRequestHandler):
-    fallos = {}
-    caida = 0
-    llamadas = []
-
-    def log_message(self, *args):
-        pass
-
-    def _enviar(self, cuerpo, codigo=200, tipo="application/json"):
-        datos = cuerpo.encode("utf-8") if isinstance(cuerpo, str) else cuerpo
-        self.send_response(codigo)
-        self.send_header("Content-Type", tipo + "; charset=utf-8")
-        self.send_header("Content-Length", str(len(datos)))
-        self.end_headers()
-        self.wfile.write(datos)
-
-    def _json(self, datos, codigo=200):
-        self._enviar(json.dumps(datos), codigo)
-
-    def do_GET(self):
-        partes = urllib.parse.urlparse(self.path)
-        ruta = partes.path
-        consulta = urllib.parse.parse_qs(partes.query)
-        tipo = type(self)
-        tipo.llamadas.append((ruta, consulta))
-
-        if "GetFamilyGroupForUser" in ruta:
-            if tipo.caida:
-                self._enviar("<html><body>Unauthorized</body></html>", tipo.caida, "text/html")
-                return
-            self._json({"response": {
-                "family_groupid": "grupo1",
-                "family_group": {"name": "Basados",
-                                 "members": [{"steamid": "111"}, {"steamid": "222"}]},
-            }})
-            return
-
-        if "GetSharedLibraryApps" in ruta:
-            self._json({"response": {"apps": APPS}})
-            return
-
-        if "GetPlayerSummaries" in ruta:
-            ids = (consulta.get("steamids") or [""])[0].split(",")
-            self._json({"response": {"players": [
-                {"steamid": sid, "personaname": NOMBRES.get(sid, "?")} for sid in ids]}})
-            return
-
-        if "ajaxresolveusers" in ruta:
-            sid = (consulta.get("steamids") or [""])[0]
-            if tipo.fallos.get(sid, 0) > 0:
-                tipo.fallos[sid] -= 1
-                self._enviar("Too Many Requests", 429, "text/plain")
-                return
-            self._json([{"steamid": sid, "persona_name": NOMBRES.get(sid, "?")}])
-            return
-
-        if "appdetails" in ruta:
-            appid = (consulta.get("appids") or [""])[0]
-            self._json({appid: {"data": {"is_free": False}}})
-            return
-
-        self._enviar("no existe", 404, "text/plain")
-
+from falso import SteamFalso, arranca, para, token as token_falso  # noqa: E402
 
 class PruebaIntegracion(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.servidor = ThreadingHTTPServer(("127.0.0.1", 0), SteamFalso)
-        cls.hilo = threading.Thread(target=cls.servidor.serve_forever, daemon=True)
-        cls.hilo.start()
-        base = f"http://127.0.0.1:{cls.servidor.server_address[1]}"
+        cls.servidor, cls.hilo, base = arranca()
         cls.originales = (sfl.API, sfl.COMUNIDAD, sfl.TIENDA)
         sfl.API = base
         sfl.COMUNIDAD = base
@@ -110,9 +29,7 @@ class PruebaIntegracion(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls.servidor.shutdown()
-        cls.servidor.server_close()
-        cls.hilo.join(timeout=5)
+        para(cls.servidor, cls.hilo)
         sfl.API, sfl.COMUNIDAD, sfl.TIENDA = cls.originales
 
     def setUp(self):
@@ -126,10 +43,7 @@ class PruebaIntegracion(unittest.TestCase):
         sfl.time.sleep = self.dormir
 
     def token(self):
-        cabecera = base64.urlsafe_b64encode(b'{"alg":"HS256"}').decode().rstrip("=")
-        carga = base64.urlsafe_b64encode(
-            json.dumps({"exp": 2000000000, "sub": "111"}).encode()).decode().rstrip("=")
-        return cabecera + "." + carga + "." + "a" * 43
+        return token_falso()
 
     def nombres_pedidos(self):
         return [c.get("steamids", [""])[0] for r, c in SteamFalso.llamadas
@@ -311,6 +225,18 @@ class PruebaIntegracion(unittest.TestCase):
             sfl.exportar(d, self.token(), con_historial=False, con_precios=False)
             self.assertFalse((d / "snapshot.json").exists())
             self.assertTrue((d / "library.csv").exists())
+
+    def test_ejecutar_completo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            ok, texto = sfl.ejecutar(d, self.token())
+            self.assertTrue(ok, texto)
+            self.assertIn("panel", texto)
+            self.assertTrue((d / "panel.html").exists())
+            self.assertTrue((d / "library.csv").exists())
+
+    def test_es_gratis(self):
+        self.assertFalse(sfl.es_gratis(10))
 
 
 if __name__ == "__main__":

@@ -14,6 +14,8 @@ token.txt
 .env
 __pycache__/
 *.pyc
+.coverage
+htmlcov/
 snapshot.corrupto.json
 historial.corrupto.csv
 .lock

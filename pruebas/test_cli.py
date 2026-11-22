@@ -11,8 +11,10 @@ import unittest
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import steam_families as sfl  # noqa: E402
+from falso import arranca, para, token as token_falso  # noqa: E402
 
 
 def escribe_datos(d):
@@ -29,6 +31,19 @@ def escribe_datos(d):
 
 
 class PruebaCli(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.servidor, cls.hilo, base = arranca()
+        cls.originales = (sfl.API, sfl.COMUNIDAD, sfl.TIENDA)
+        sfl.API = base
+        sfl.COMUNIDAD = base
+        sfl.TIENDA = base
+
+    @classmethod
+    def tearDownClass(cls):
+        para(cls.servidor, cls.hilo)
+        sfl.API, sfl.COMUNIDAD, sfl.TIENDA = cls.originales
+
     def ejecuta(self, args):
         salida = io.StringIO()
         with contextlib.redirect_stdout(salida), contextlib.redirect_stderr(salida):
@@ -63,6 +78,15 @@ class PruebaCli(unittest.TestCase):
             codigo, texto = self.ejecuta(["--exportar", "--datos", tmp])
             self.assertEqual(codigo, 1)
             self.assertIn("falta el token", texto)
+
+    def test_exportar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            codigo, texto = self.ejecuta(["--exportar", "--token", token_falso(),
+                                          "--datos", tmp, "--sin-precios"])
+            self.assertEqual(codigo, 0)
+            self.assertIn("3 juegos", texto)
+            self.assertTrue((pathlib.Path(tmp) / "library.csv").exists())
+            self.assertTrue((pathlib.Path(tmp) / "snapshot.json").exists())
 
 
 if __name__ == "__main__":
