@@ -68,7 +68,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          python notas_release.py "$GITHUB_REF_NAME" > notas.md
           gh release create "$GITHUB_REF_NAME" \
             --title "Steam Families $GITHUB_REF_NAME" \
-            --generate-notes \
+            --notes-file notas.md \
             dist/*
