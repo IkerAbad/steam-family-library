@@ -15,6 +15,8 @@ Steam fusiona todas las bibliotecas del grupo y no tiene ningún filtro para sep
 2. Windows: doble clic en `iniciar.cmd`. Linux o macOS: `chmod +x iniciar.sh && ./iniciar.sh`. Los datos se guardan en la subcarpeta `datos/`.
 3. Se abre una página en `127.0.0.1`. Pega el token la primera vez; a partir de ahí se guarda cifrado y la app se actualiza sola hasta que caduque.
 
+Solo puede haber una ventana usando la misma carpeta de datos. Si abres otra, avisa y se cierra.
+
 ### El token
 
 1. Abre `https://store.steampowered.com/pointssummary/ajaxgetasyncconfig` con la sesión de Steam iniciada.
@@ -31,7 +33,7 @@ En la propia página hay un marcador **Copiar token** que lo deja en el portapap
 | `library.csv` | Biblioteca entera con la columna `source` (`own` / `family`) |
 | `prestados.csv`, `prestados.txt` | Solo lo que te prestan |
 | `novedades.txt`, `novedades.json` | Lo que cambió en la última ejecución |
-| `historial.csv` | Una fila por novedad, con fecha |
+| `historial.csv` | Una fila por novedad y día, sin repetir el mismo evento si actualizas dos veces |
 | `snapshot.json` | Retrato de la biblioteca para poder comparar |
 
 Todos se escriben en la subcarpeta `datos/`, que el lanzador pasa con `--datos`.
@@ -89,7 +91,7 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 python -m unittest discover -s pruebas -v
 ```
 
-65 pruebas sin red, más 5 de interfaz con Playwright (se saltan si no está instalado; hacen falta `pip install playwright` y `playwright install chromium`). Tres de las unitarias son solo de Windows y se saltan en otros sistemas. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`, y las pruebas de navegador en Chromium.
+67 pruebas sin red, más 5 de interfaz con Playwright (se saltan si no está instalado; hacen falta `pip install playwright` y `playwright install chromium`). Tres de las unitarias son solo de Windows y se saltan en otros sistemas. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`, y las pruebas de navegador en Chromium.
 
 ## Créditos
 
@@ -109,6 +111,8 @@ Steam merges all the libraries of the group and has no filter to tell them apart
 2. Windows: double-click `iniciar.cmd`. Linux or macOS: `chmod +x iniciar.sh && ./iniciar.sh`. Data is stored in the `datos/` subfolder.
 3. A page opens on `127.0.0.1`. Paste the token the first time; from then on it is stored encrypted and the app updates itself until it expires.
 
+Only one window can use the same data folder. If you open another one, it warns and closes.
+
 ### The token
 
 1. Open `https://store.steampowered.com/pointssummary/ajaxgetasyncconfig` while signed in to Steam.
@@ -125,7 +129,7 @@ The page itself has a **Copiar token** bookmarklet that puts the token on the cl
 | `library.csv` | The whole library with a `source` column (`own` / `family`) |
 | `prestados.csv`, `prestados.txt` | Only what is lent to you |
 | `novedades.txt`, `novedades.json` | What changed in the last run |
-| `historial.csv` | One row per change, with a date |
+| `historial.csv` | One row per change and day, without repeating the same event if you update twice |
 | `snapshot.json` | A snapshot of the library to compare against |
 
 All of them go into the `datos/` subfolder, which the launcher passes with `--datos`.
@@ -183,7 +187,7 @@ The three family endpoints are undocumented: they work today and may change tomo
 python -m unittest discover -s pruebas -v
 ```
 
-65 tests with no network, plus 5 browser tests with Playwright (skipped if it is not installed; they need `pip install playwright` and `playwright install chromium`). Three of the unit tests are Windows-only and are skipped elsewhere. GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher, and the browser tests on Chromium.
+67 tests with no network, plus 5 browser tests with Playwright (skipped if it is not installed; they need `pip install playwright` and `playwright install chromium`). Three of the unit tests are Windows-only and are skipped elsewhere. GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher, and the browser tests on Chromium.
 
 ## Credits
 

@@ -15,3 +15,6 @@ token.txt
 __pycache__/
 *.pyc
 snapshot.corrupto.json
+historial.corrupto.csv
+.lock
+*.lock

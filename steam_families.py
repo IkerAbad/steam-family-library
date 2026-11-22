@@ -485,14 +485,54 @@ def escribir_csv(ruta, filas, campos=None):
 
 
 def anotar_historial(ruta, eventos, ahora):
+    """Añade novedades sin repetir el mismo evento del mismo día. Devuelve cuántas añade."""
     ruta = Path(ruta)
-    nuevo = not ruta.exists() or ruta.stat().st_size == 0
-    with open(ruta, "a", newline="", encoding="utf-8-sig") as f:
-        w = csv.writer(f)
-        if nuevo:
-            w.writerow(["fecha", "evento", "appid", "nombre", "quien", "propio"])
-        for e in eventos:
-            w.writerow([ahora, e["evento"], e["appid"], e["nombre"], e["quien"], "si" if e["propio"] else "no"])
+    filas = []
+    claves = set()
+    if ruta.exists() and ruta.stat().st_size:
+        try:
+            with ruta.open(encoding="utf-8-sig", newline="") as f:
+                for fila in csv.DictReader(f):
+                    filas.append(fila)
+                    claves.add((str(fila.get("fecha", ""))[:10],
+                                fila.get("evento", ""),
+                                str(fila.get("appid", ""))))
+        except (OSError, csv.Error, UnicodeDecodeError):
+            try:
+                ruta.replace(ruta.with_name("historial.corrupto.csv"))
+            except OSError:
+                pass
+            filas, claves = [], set()
+
+    dia = ahora[:10]
+    nuevas = []
+    for e in eventos:
+        clave = (dia, e["evento"], str(e["appid"]))
+        if clave in claves:
+            continue
+        claves.add(clave)
+        nuevas.append(e)
+    if not nuevas:
+        return 0
+
+    campos = ["fecha", "evento", "appid", "nombre", "quien", "propio"]
+    temporal = ruta.with_name(ruta.name + ".tmp")
+    try:
+        with open(temporal, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.DictWriter(f, fieldnames=campos, extrasaction="ignore")
+            w.writeheader()
+            w.writerows(filas)
+            for e in nuevas:
+                w.writerow({"fecha": ahora, "evento": e["evento"], "appid": e["appid"],
+                            "nombre": e["nombre"], "quien": e.get("quien", ""),
+                            "propio": "si" if e["propio"] else "no"})
+        os.replace(temporal, ruta)
+    finally:
+        try:
+            temporal.unlink()
+        except OSError:
+            pass
+    return len(nuevas)
 
 
 def chivato(eventos, ahora):
@@ -1525,6 +1565,56 @@ def carpeta_de_datos(texto):
     return ruta
 
 
+_CANDADOS_DATOS = []
+
+
+def bloquear_datos(datos):
+    """Un solo proceso por carpeta de datos. El sistema suelta el cerrojo al cerrar."""
+    ruta = Path(datos) / ".lock"
+    try:
+        fichero = open(ruta, "a+b")
+    except OSError as e:
+        die(tr(f"no puedo abrir el cerrojo de {datos}: {e}",
+               f"cannot open the lock in {datos}: {e}"))
+    try:
+        fichero.write(b"l")
+        fichero.flush()
+        fichero.seek(0)
+        if os.name == "nt":
+            import msvcrt
+            msvcrt.locking(fichero.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fichero.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        fichero.close()
+        die(tr(f"ya hay otra ventana de Steam Families usando {datos}",
+               f"another Steam Families window is already using {datos}"))
+    _CANDADOS_DATOS.append(fichero)
+    return fichero
+
+
+def liberar_datos(fichero):
+    if fichero is None:
+        return
+    try:
+        if os.name == "nt":
+            import msvcrt
+            fichero.seek(0)
+            msvcrt.locking(fichero.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fichero.fileno(), fcntl.LOCK_UN)
+    except (OSError, ValueError):
+        pass
+    try:
+        fichero.close()
+    except OSError:
+        pass
+    if fichero in _CANDADOS_DATOS:
+        _CANDADOS_DATOS.remove(fichero)
+
+
 def estado(datos: Path):
     snap = leer_json(datos / "snapshot.json")
     nov = leer_json(datos / "novedades.json")
@@ -2398,10 +2488,17 @@ def main(argv=None):
     if args.panel:
         try:
             datos = carpeta(args.datos)
+            candado = bloquear_datos(datos)
+        except SystemExit as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        try:
             resumen = generar_panel(datos)
         except SystemExit as e:
             print(f"error: {e}", file=sys.stderr)
             return 1
+        finally:
+            liberar_datos(candado)
         print(f"panel con {resumen['juegos']} juegos y {resumen['prestados']} prestados")
         return 0
 
@@ -2411,8 +2508,10 @@ def main(argv=None):
             print("error: falta el token para exportar. Usa --token o STEAM_WEBAPI_TOKEN.",
                   file=sys.stderr)
             return 1
+        candado = None
         try:
             datos = carpeta(args.datos)
+            candado = bloquear_datos(datos)
             resumen = exportar(datos, token, args.api_key, args.include_free,
                                args.include_non_games, not args.sin_nombres,
                                not args.sin_historial, not args.sin_precios)
@@ -2423,6 +2522,8 @@ def main(argv=None):
         except OSError as e:
             print(f"error: {e}", file=sys.stderr)
             return 1
+        finally:
+            liberar_datos(candado)
         print(f"grupo {resumen['grupo']['nombre']} ({resumen['grupo']['miembros']} miembros)")
         print(f"{resumen['juegos']} juegos | {resumen['juegos'] - resumen['prestados']} tuyos | "
               f"{resumen['prestados']} prestados")
@@ -2440,6 +2541,7 @@ def main(argv=None):
 
 def interfaz(args):
     datos = carpeta_de_datos(args.datos)
+    candado = bloquear_datos(datos)
 
     Handler.datos = datos
     servidor = None
@@ -2452,6 +2554,7 @@ def interfaz(args):
     if servidor is None:
         print(f"No he encontrado un puerto libre entre {args.puerto} y {args.puerto + 11}. "
               "Cierra la otra ventana de Steam Families.", file=sys.stderr)
+        liberar_datos(candado)
         return 1
 
     Handler.servidor = servidor
@@ -2475,6 +2578,7 @@ def interfaz(args):
         return 1
     finally:
         servidor.server_close()
+        liberar_datos(candado)
     return 0
 
 

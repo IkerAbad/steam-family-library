@@ -334,6 +334,28 @@ class PruebaHistorial(unittest.TestCase):
             self.assertEqual(lineas[0], "fecha,evento,appid,nombre,quien,propio")
             self.assertEqual(len(lineas), 2)
 
+    def test_no_repite_el_mismo_evento_del_dia(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = pathlib.Path(tmp) / "historial.csv"
+            eventos = [{"evento": "nuevo", "appid": 1, "nombre": "X", "quien": "V", "propio": False}]
+            self.assertEqual(sfl.anotar_historial(ruta, eventos, "2026-01-01 10:00"), 1)
+            self.assertEqual(sfl.anotar_historial(ruta, eventos, "2026-01-01 18:00"), 0)
+            lineas = ruta.read_text(encoding="utf-8-sig").splitlines()
+            self.assertEqual(len(lineas), 2)
+
+
+class PruebaCandado(unittest.TestCase):
+    def test_una_instancia_por_carpeta(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            primero = sfl.bloquear_datos(tmp)
+            try:
+                with self.assertRaises(SystemExit):
+                    sfl.bloquear_datos(tmp)
+            finally:
+                sfl.liberar_datos(primero)
+            segundo = sfl.bloquear_datos(tmp)
+            sfl.liberar_datos(segundo)
+
 
 class PruebaPanel(unittest.TestCase):
     def test_genera_todo(self):
