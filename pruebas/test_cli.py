@@ -88,6 +88,14 @@ class PruebaCli(unittest.TestCase):
             self.assertTrue((pathlib.Path(tmp) / "library.csv").exists())
             self.assertTrue((pathlib.Path(tmp) / "snapshot.json").exists())
 
+    def test_version(self):
+        salida = io.StringIO()
+        with contextlib.redirect_stdout(salida):
+            with self.assertRaises(SystemExit) as error:
+                sfl.main(["--version"])
+        self.assertEqual(error.exception.code, 0)
+        self.assertIn(sfl.VERSION, salida.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

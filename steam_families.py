@@ -37,7 +37,8 @@ from pathlib import Path
 API = "https://api.steampowered.com"
 COMUNIDAD = "https://steamcommunity.com"
 TIENDA = "https://store.steampowered.com"
-UA = "steam-family-library/2.0"
+VERSION = "2.0"
+UA = f"steam-family-library/{VERSION}"
 EXCLUDE_REASONS = {
     0: "",
     1: "excluido por el dueño",
@@ -2527,6 +2528,7 @@ def main(argv=None):
     p.add_argument("--sin-precios", action="store_true", help="no consulta la tienda")
     p.add_argument("--puerto", type=int, default=8087, help="puerto de la interfaz")
     p.add_argument("--sin-navegador", action="store_true", help="no abre el navegador")
+    p.add_argument("--version", action="version", version=f"Steam Families {VERSION}")
     args = p.parse_args(argv)
 
     for flujo in (sys.stdout, sys.stderr):
