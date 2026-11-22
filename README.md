@@ -68,7 +68,7 @@ Opciones: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--si
 
 ## Ejecutable
 
-Si no quieres instalar Python, `python empaquetar.py` genera un ejecutable de un solo fichero en `dist/` con PyInstaller (dependencia de desarrollo). Compílalo en el sistema donde lo vayas a usar. El workflow **Paquete** de GitHub Actions deja el binario de Windows y el de Linux como artefactos.
+Si no quieres instalar Python, `python empaquetar.py` genera un ejecutable de un solo fichero en `dist/` con PyInstaller (dependencia de desarrollo). Compílalo en el sistema donde lo vayas a usar. El workflow **Paquete** de GitHub Actions deja el binario de Windows y el de Linux como artefactos. Windows puede avisar de que el ejecutable no está firmado; es normal en un binario sin certificado.
 
 ## Cómo funciona
 
@@ -176,7 +176,7 @@ Options: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin
 
 ## Executable
 
-If you do not want to install Python, `python empaquetar.py` builds a single-file executable in `dist/` with PyInstaller (a development dependency). Build it on the system where you are going to use it. The **Paquete** workflow in GitHub Actions uploads the Windows and Linux binaries as artifacts.
+If you do not want to install Python, `python empaquetar.py` builds a single-file executable in `dist/` with PyInstaller (a development dependency). Build it on the system where you are going to use it. The **Paquete** workflow in GitHub Actions uploads the Windows and Linux binaries as artifacts. Windows may warn that the executable is unsigned; that is normal for a binary without a certificate.
 
 ## How it works
 

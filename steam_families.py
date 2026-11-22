@@ -1696,7 +1696,7 @@ class Handler(BaseHTTPRequestHandler):
     servidor = None
 
 
-    def log_message(self, formato, *args):
+    def log_message(self, *args):
         pass
 
     def _enviar(self, codigo, cuerpo, tipo="application/json; charset=utf-8", extra=None):
