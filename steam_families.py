@@ -1813,6 +1813,14 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             largo = 0
         if largo > 100_000:
+            # Se lee y se tira el cuerpo antes de contestar: si no, Windows cierra
+            # la conexión con datos pendientes y el cliente ve un reset.
+            restante = min(largo, 1_000_000)
+            while restante > 0:
+                trozo = self.rfile.read(min(65536, restante))
+                if not trozo:
+                    break
+                restante -= len(trozo)
             self._enviar(413, {"ok": False, "error": tr("cuerpo demasiado grande", "body too large")})
             return
         try:
