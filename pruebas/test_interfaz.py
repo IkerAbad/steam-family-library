@@ -49,6 +49,10 @@ def escribe_datos(d):
                        "20": {"o": [sfl.etiqueta("222")], "p": True},
                        "30": {"o": [sfl.etiqueta("222")], "p": False}}}
     (d / "snapshot.json").write_text(json.dumps(snap), encoding="utf-8")
+    (d / "historial.csv").write_text(
+        "fecha,evento,appid,nombre,quien,propio\n"
+        "2026-11-20 10:00,nuevo,20,Paseo,Ana,no\n",
+        encoding="utf-8-sig")
 
 
 @unittest.skipUnless(sync_playwright, "Playwright no está instalado")
@@ -145,6 +149,13 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertEqual(cabecera.get_attribute("aria-sort"), "descending")
         pagina.keyboard.press("Enter")
         self.assertEqual(cabecera.get_attribute("aria-sort"), "ascending")
+
+    def test_historial(self):
+        pagina = self.pagina("/panel.html")
+        pagina.click("#verHistorial")
+        texto = pagina.inner_text("#historialCaja")
+        self.assertIn("Paseo", texto)
+        self.assertIn("20/11/2026", texto)
 
 
 if __name__ == "__main__":

@@ -37,7 +37,7 @@ from pathlib import Path
 API = "https://api.steampowered.com"
 COMUNIDAD = "https://steamcommunity.com"
 TIENDA = "https://store.steampowered.com"
-VERSION = "2.0.1"
+VERSION = "2.1.0"
 UA = f"steam-family-library/{VERSION}"
 EXCLUDE_REASONS = {
     0: "",
@@ -642,12 +642,18 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
 .nuevo { color:var(--acento); border-color:#2b5878; background:#14222c; }
 .fuera { color:var(--rojo); border-color:#5c2f2f; background:#241717; }
 .dim { color:var(--suave); }
+.si { color:var(--verde); }
+.no { color:var(--rojo); }
 .atajo { background:#22303c; color:var(--acento); border:1px solid #2b5878; border-radius:6px; padding:7px 12px; font:inherit; cursor:pointer; }
 .atajo:hover { background:#2a3d4d; }
 .sec { background:var(--panel); color:var(--suave); border:1px solid var(--borde); border-radius:6px; padding:7px 12px; font:inherit; cursor:pointer; }
 .sec:hover { background:#1f252d; color:var(--texto); }
 #vacio { padding:30px 24px; color:var(--suave); }
 #version { padding:8px 24px 20px; color:#5d6773; font-size:11px; text-align:right; }
+#historialCaja { padding:16px 24px 30px; border-top:1px solid var(--borde); }
+#historialCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
+#historialCaja table { min-width:0; }
+#historialCaja th, #historialCaja td { font-size:12px; padding:6px 8px; }
 #actualizado { margin:4px 0 0; color:var(--suave); font-size:12px; }
 #actualizado.viejo { color:var(--ambar); }
 .aviso.ambar { background:#241f11; border-color:#5a4a22; color:var(--ambar); }
@@ -705,6 +711,7 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
   <label class="check"><input type="checkbox" id="soloNuevos"> <span data-t="soloNuevos">Solo novedades</span></label>
   <button type="button" id="presetCompras" class="atajo" data-t="preset">Añadidos (90 días)</button>
   <button type="button" id="limpiar" class="sec" data-t="limpiar" hidden>Limpiar filtros</button>
+  <button type="button" id="verHistorial" class="sec" data-t="historial">Historial</button>
 </div>
 <div id="resumen" aria-live="polite"></div>
 <table>
@@ -722,6 +729,10 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
   <tbody id="cuerpo"></tbody>
 </table>
 <div id="vacio" hidden data-t="vacio">Ningún juego cumple esos filtros.</div>
+<section id="historialCaja" hidden>
+  <h2 data-t="historialTitulo">Historial de novedades</h2>
+  <div id="historialTabla"></div>
+</section>
 <div id="version">Steam Families v__VERSION__</div>
 
 <script>
@@ -730,6 +741,7 @@ const FECHA_NOV = __FECHA_NOV__;
 const HAY_NOV = __HAY_NOV__;
 const ACTUALIZADO = __ACTUALIZADO__;
 const SIN_NOMBRE = __SIN_NOMBRE__;
+const HISTORIAL = __HISTORIAL__;
 
 const TEXTOS = {
   es: {
@@ -756,6 +768,9 @@ const TEXTOS = {
     verNuevos: "Ver solo novedades",
     preset: "Añadidos (90 días)",
     limpiar: "Limpiar filtros",
+    historial: "Historial",
+    historialTitulo: "Historial de novedades",
+    historialVacio: "Todavía no hay novedades.",
     juego: "Juego",
     dueno: "Dueño",
     origen: "Origen",
@@ -819,6 +834,9 @@ const TEXTOS = {
     verNuevos: "Show only new",
     preset: "Added (90 days)",
     limpiar: "Clear filters",
+    historial: "History",
+    historialTitulo: "Changes history",
+    historialVacio: "No changes yet.",
     juego: "Game",
     dueno: "Owner",
     origen: "Source",
@@ -1139,6 +1157,49 @@ function pintaNombres() {
     ? T("sinNombreUno") : T("sinNombre").replace("%n%", SIN_NOMBRE);
 }
 
+function pintaHistorial() {
+  const caja = $("historialCaja");
+  if (caja.hidden) return;
+  const tabla = document.createElement("table");
+  const thead = document.createElement("thead");
+  const fila = document.createElement("tr");
+  [T("fecha"), T("juego"), T("que"), T("quien")].forEach(texto => {
+    const th = document.createElement("th");
+    th.textContent = texto;
+    fila.appendChild(th);
+  });
+  thead.appendChild(fila);
+
+  const tbody = document.createElement("tbody");
+  HISTORIAL.slice().reverse().slice(0, 300).forEach(h => {
+    const tr = document.createElement("tr");
+    const f = document.createElement("td");
+    f.className = "dim";
+    f.textContent = fechaHora(h.f);
+    const juego = document.createElement("td");
+    juego.textContent = h.n;
+    const que = document.createElement("td");
+    que.className = h.e === "nuevo" ? "si" : "no";
+    que.textContent = h.e === "nuevo" ? T("nuevo") : (h.e === "fuera" ? T("fuera") : T("otroDueno"));
+    const quien = document.createElement("td");
+    quien.className = "quien";
+    quien.textContent = h.q || (h.p ? T("tu") : T("otroMiembro"));
+    tr.append(f, juego, que, quien);
+    tbody.appendChild(tr);
+  });
+  if (!HISTORIAL.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 4;
+    td.className = "dim";
+    td.textContent = T("historialVacio");
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  }
+  tabla.append(thead, tbody);
+  $("historialTabla").replaceChildren(tabla);
+}
+
 function aplicaIdioma() {
   document.documentElement.lang = IDIOMA;
   document.title = T("titulo");
@@ -1152,6 +1213,7 @@ function aplicaIdioma() {
   pintaAviso();
   pintaActualizado();
   pintaNombres();
+  pintaHistorial();
   pinta();
 }
 
@@ -1213,6 +1275,11 @@ $("limpiar").addEventListener("click", () => {
   ORDEN_CABECERA = null;
   try { localStorage.removeItem(CLAVE_FILTROS); } catch (e) {}
   pinta();
+});
+$("verHistorial").addEventListener("click", () => {
+  const caja = $("historialCaja");
+  caja.hidden = !caja.hidden;
+  pintaHistorial();
 });
 cargaFiltros();
 aplicaIdioma();
@@ -1291,6 +1358,27 @@ def exportar(datos, token, api_key="", include_free=False, include_non_games=Fal
         "grupo": datos_nuevos["grupo"],
         "primera": not previo,
     }
+
+
+def leer_historial(datos, limite=500):
+    """Últimas novedades guardadas en historial.csv, para el panel."""
+    ruta = Path(datos) / "historial.csv"
+    if not ruta.exists():
+        return []
+    filas = []
+    try:
+        with ruta.open(encoding="utf-8-sig", newline="") as f:
+            for fila in csv.DictReader(f):
+                filas.append({
+                    "f": fila.get("fecha", ""),
+                    "e": fila.get("evento", ""),
+                    "n": fila.get("nombre", ""),
+                    "q": fila.get("quien", ""),
+                    "p": fila.get("propio", "") == "si",
+                })
+    except (OSError, csv.Error, UnicodeDecodeError):
+        return []
+    return filas[-limite:]
 
 
 def generar_panel(datos):
@@ -1378,6 +1466,9 @@ def generar_panel(datos):
     sin_nombre = sum(1 for v in alias.values() if str(v).startswith("Miembro "))
     html = html.replace("__SIN_NOMBRE__", str(sin_nombre))
     html = html.replace("__VERSION__", VERSION)
+    historial = json.dumps(leer_historial(datos), ensure_ascii=False,
+                           separators=(",", ":")).replace("</", "<\\/")
+    html = html.replace("__HISTORIAL__", historial)
     # Los datos van al final: si un nombre de juego coincide con un marcador, no se toca.
     html = html.replace("__DATOS__", blob)
 

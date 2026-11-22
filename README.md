@@ -71,7 +71,7 @@ Opciones: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--si
 
 ## Ejecutable
 
-Si no quieres instalar Python, `python empaquetar.py` genera un ejecutable de un solo fichero en `dist/` con PyInstaller (dependencia de desarrollo). Compílalo en el sistema donde lo vayas a usar. El workflow **Paquete** de GitHub Actions deja el binario de Windows y el de Linux como artefactos. Windows puede avisar de que el ejecutable no está firmado; es normal en un binario sin certificado.
+Si no quieres instalar Python, `python empaquetar.py` genera un ejecutable de un solo fichero en `dist/` con PyInstaller (dependencia de desarrollo). Compílalo en el sistema donde lo vayas a usar. El workflow **Paquete** de GitHub Actions deja los binarios de Windows, Linux y macOS como artefactos. Windows puede avisar de que el ejecutable no está firmado; es normal en un binario sin certificado. En macOS el binario no está notarizado: ábrelo con clic derecho → Abrir, o quita la cuarentena con `xattr -d com.apple.quarantine steam-families`.
 
 ## Cómo funciona
 
@@ -108,7 +108,7 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 python -m unittest discover -s pruebas -v
 ```
 
-94 pruebas sin red, más 5 de interfaz con Playwright (se saltan si no está instalado; hacen falta `pip install -r requirements-dev.txt` y `playwright install chromium`). Tres de las unitarias son solo de Windows y se saltan en otros sistemas. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`, y las pruebas de navegador en Chromium.
+95 pruebas sin red, más 5 de interfaz con Playwright (se saltan si no está instalado; hacen falta `pip install -r requirements-dev.txt` y `playwright install chromium`). Tres de las unitarias son solo de Windows y se saltan en otros sistemas. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`, y las pruebas de navegador en Chromium.
 
 ## Créditos
 
@@ -183,7 +183,7 @@ Options: `--datos`, `--api-key`, `--include-free`, `--include-non-games`, `--sin
 
 ## Executable
 
-If you do not want to install Python, `python empaquetar.py` builds a single-file executable in `dist/` with PyInstaller (a development dependency). Build it on the system where you are going to use it. The **Paquete** workflow in GitHub Actions uploads the Windows and Linux binaries as artifacts. Windows may warn that the executable is unsigned; that is normal for a binary without a certificate.
+If you do not want to install Python, `python empaquetar.py` builds a single-file executable in `dist/` with PyInstaller (a development dependency). Build it on the system where you are going to use it. The **Paquete** workflow in GitHub Actions uploads the Windows, Linux and macOS artifacts. Windows may warn that the executable is unsigned; that is normal for a binary without a certificate. On macOS the binary is not notarised: open it with right-click → Open, or remove the quarantine with `xattr -d com.apple.quarantine steam-families`.
 
 ## How it works
 
@@ -220,7 +220,7 @@ The three family endpoints are undocumented: they work today and may change tomo
 python -m unittest discover -s pruebas -v
 ```
 
-94 tests with no network, plus 5 browser tests with Playwright (skipped if it is not installed; they need `pip install -r requirements-dev.txt` and `playwright install chromium`). Three of the unit tests are Windows-only and are skipped elsewhere. GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher, and the browser tests on Chromium.
+95 tests with no network, plus 5 browser tests with Playwright (skipped if it is not installed; they need `pip install -r requirements-dev.txt` and `playwright install chromium`). Three of the unit tests are Windows-only and are skipped elsewhere. GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher, and the browser tests on Chromium.
 
 ## Credits
 

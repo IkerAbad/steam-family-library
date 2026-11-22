@@ -17,6 +17,9 @@ jobs:
           - os: ubuntu-latest
             binario: dist/steam-families
             artefacto: steam-families-linux
+          - os: macos-latest
+            binario: dist/steam-families
+            artefacto: steam-families-macos
 
     steps:
       - uses: actions/checkout@v4

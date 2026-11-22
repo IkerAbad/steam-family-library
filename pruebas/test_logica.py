@@ -471,6 +471,10 @@ class PruebaPanel(unittest.TestCase):
                                "20": {"n": "Prestado", "o": ["bbb"], "p": True, "v": "2026-02-01"},
                                "30": {"n": "Bloqueado", "o": ["bbb"], "p": False, "v": "2026-02-01"}}}
             (d / "snapshot.json").write_text(json.dumps(snap), encoding="utf-8")
+            (d / "historial.csv").write_text(
+                "fecha,evento,appid,nombre,quien,propio\n"
+                "2026-11-20 10:00,nuevo,20,Paseo,Ana,no\n",
+                encoding="utf-8-sig")
 
             resumen = sfl.generar_panel(d)
             self.assertEqual(resumen["prestados"], 2)
@@ -485,6 +489,8 @@ class PruebaPanel(unittest.TestCase):
             self.assertIn("const SIN_NOMBRE = 0", html)
             self.assertIn('"n":"__FECHA_NOV__"', html)
             self.assertIn("v" + sfl.VERSION, html)
+            self.assertIn("const HISTORIAL = [", html)
+            self.assertIn("Paseo", html)
 
             prestados = list(csv.DictReader((d / "prestados.csv").open(encoding="utf-8-sig")))
             self.assertEqual(len(prestados), 2)

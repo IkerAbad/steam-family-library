@@ -1,5 +1,9 @@
 # Cambios
 
+## 2.1.0 — 2026-11-22
+
+- El panel incluye el historial de novedades (últimas 500), con fecha, juego, qué y quién.
+
 ## 2.0.1 — 2026-11-22
 
 - El servidor lee y descarta el cuerpo antes de responder 413: en Windows ya no corta la conexión.
