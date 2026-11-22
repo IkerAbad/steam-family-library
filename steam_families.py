@@ -656,6 +656,15 @@ tr.oculto { opacity:.55; }
 #version { padding:8px 24px 20px; color:#5d6773; font-size:11px; text-align:right; }
 #historialCaja { padding:16px 24px 30px; border-top:1px solid var(--borde); }
 #miembrosCaja { padding:16px 24px 0; border-top:1px solid var(--borde); }
+#mesesCaja { padding:16px 24px 0; border-top:1px solid var(--borde); }
+#mesesCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
+.meses { display:flex; gap:6px; align-items:flex-end; height:120px; }
+.mes { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:4px; height:100%; }
+.mes .col { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; width:100%; }
+.mes .num { font-size:10px; color:var(--suave); }
+.mes .barra { width:100%; max-width:40px; min-height:2px; background:var(--acento); border-radius:3px 3px 0 0; opacity:.75; }
+.mes .et { font-size:10px; color:var(--suave); text-transform:capitalize; }
+.mes:focus { outline:1px solid var(--acento); outline-offset:2px; }
 #miembrosCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
 #miembrosCaja table { min-width:0; }
 #miembrosCaja th, #miembrosCaja td { font-size:12px; padding:6px 8px; }
@@ -739,6 +748,10 @@ tr.oculto { opacity:.55; }
   <tbody id="cuerpo"></tbody>
 </table>
 <div id="vacio" hidden data-t="vacio">Ningún juego cumple esos filtros.</div>
+<section id="mesesCaja">
+  <h2 data-t="mesesTitulo">Altas por mes</h2>
+  <div id="mesesTabla"></div>
+</section>
 <section id="miembrosCaja">
   <h2 data-t="miembrosTitulo">Por miembro</h2>
   <div id="miembrosTabla"></div>
@@ -810,6 +823,7 @@ const TEXTOS = {
     miembro: "Miembro",
     jugablesHeader: "Jugables",
     horasHeader: "Horas",
+    mesesTitulo: "Altas por mes",
     tipo: "Tipo",
     desde: "Desde",
     hasta: "Hasta",
@@ -892,6 +906,7 @@ const TEXTOS = {
     miembro: "Member",
     jugablesHeader: "Playable",
     horasHeader: "Hours",
+    mesesTitulo: "Added per month",
     tipo: "Type",
     desde: "From",
     hasta: "To",
@@ -1274,6 +1289,50 @@ function pintaNombres() {
     ? T("sinNombreUno") : T("sinNombre").replace("%n%", SIN_NOMBRE);
 }
 
+function pintaMeses() {
+  const hoy = new Date();
+  const meses = [];
+  for (let i = 11; i >= 0; i--) {
+    const f = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    meses.push({
+      clave: f.getFullYear() + "-" + String(f.getMonth() + 1).padStart(2, "0"),
+      fecha: f, n: 0
+    });
+  }
+  const indice = new Map(meses.map((m, i) => [m.clave, i]));
+  DATOS.forEach(d => {
+    if (!d.q) return;
+    const i = indice.get(d.q.slice(0, 7));
+    if (i !== undefined) meses[i].n += 1;
+  });
+  const max = Math.max(1, ...meses.map(m => m.n));
+  const caja = document.createElement("div");
+  caja.className = "meses";
+  meses.forEach(m => {
+    const nombreMes = m.fecha.toLocaleDateString(LOCALE(), {month: "short"});
+    const item = document.createElement("div");
+    item.className = "mes";
+    item.tabIndex = 0;
+    item.setAttribute("aria-label", nombreMes + " " + m.fecha.getFullYear() + ": " + m.n + " " + T("juegos"));
+    item.title = item.getAttribute("aria-label");
+    const col = document.createElement("div");
+    col.className = "col";
+    const num = document.createElement("span");
+    num.className = "num";
+    num.textContent = m.n;
+    const barra = document.createElement("div");
+    barra.className = "barra";
+    barra.style.height = Math.round((m.n / max) * 100) + "%";
+    col.append(num, barra);
+    const et = document.createElement("span");
+    et.className = "et";
+    et.textContent = nombreMes;
+    item.append(col, et);
+    caja.appendChild(item);
+  });
+  $("mesesTabla").replaceChildren(caja);
+}
+
 function pintaMiembros() {
   const acumulado = new Map();
   DATOS.forEach(d => (d.o || []).forEach(h => {
@@ -1397,6 +1456,7 @@ function aplicaIdioma() {
   pintaAviso();
   pintaActualizado();
   pintaNombres();
+  pintaMeses();
   pintaMiembros();
   pintaHistorial();
   pinta();

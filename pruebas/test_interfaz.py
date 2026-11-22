@@ -14,6 +14,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from datetime import date
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
@@ -26,17 +27,25 @@ except ImportError:
     sync_playwright = None
 
 
+def mes(offset):
+    y, m = date.today().year, date.today().month - offset
+    while m <= 0:
+        m += 12
+        y -= 1
+    return f"{y:04d}-{m:02d}-01"
+
+
 def escribe_datos(d):
     filas = [
         {"appid": "10", "name": "Alfa", "source": "own", "playable": "True",
-         "exclude_reason": "", "playtime_minutes": "60", "acquired": "2026-01-01",
+         "exclude_reason": "", "playtime_minutes": "60", "acquired": mes(2),
          "last_played": "2026-03-01", "store_url": "u"},
         {"appid": "20", "name": "Beta", "source": "family", "playable": "True",
-         "exclude_reason": "", "playtime_minutes": "120", "acquired": "2026-02-01",
+         "exclude_reason": "", "playtime_minutes": "120", "acquired": mes(1),
          "last_played": "2026-01-01", "store_url": "u"},
         {"appid": "30", "name": "Gamma", "source": "family", "playable": "False",
          "exclude_reason": "excluido por el dueño", "playtime_minutes": "0",
-         "acquired": "2026-03-01", "last_played": "", "store_url": "u"},
+         "acquired": mes(0), "last_played": "", "store_url": "u"},
     ]
     with (d / "library.csv").open("w", newline="", encoding="utf-8-sig") as f:
         w = csv.DictWriter(f, fieldnames=sfl.COLUMNAS)
@@ -207,6 +216,12 @@ class PruebaInterfaz(unittest.TestCase):
         pagina.reload()
         self.assertEqual(pagina.get_attribute('[data-fav="10"]', "aria-pressed"), "true")
         self.assertEqual(filas.count(), 3)
+
+    def test_altas_por_mes(self):
+        pagina = self.pagina("/panel.html")
+        self.assertEqual(pagina.locator("#mesesCaja .mes").count(), 12)
+        total = sum(int(t) for t in pagina.locator("#mesesCaja .num").all_inner_texts())
+        self.assertEqual(total, 3)
 
 
 if __name__ == "__main__":
