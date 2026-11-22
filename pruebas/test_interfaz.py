@@ -296,6 +296,28 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertEqual(pagina.input_value("#duenoFiltro"), yo)
         self.assertEqual(filas.count(), 1)
 
+    def test_ajustes(self):
+        pagina = self.pagina("/panel.html")
+        with pagina.expect_download() as descarga:
+            pagina.click("#guardarAjustes")
+        datos = json.loads(pathlib.Path(descarga.value.path()).read_text(encoding="utf-8"))
+        self.assertEqual(datos["version"], 1)
+        self.assertEqual(datos["tema"], "claro")
+        self.assertEqual(datos["idioma"], "es")
+
+        fichero = pathlib.Path(self.tmp.name) / "ajustes-prueba.json"
+        fichero.write_text(json.dumps({
+            "version": 1, "tema": "oscuro", "idioma": "en",
+            "favoritos": ["20"], "ocultos": ["10"], "filtros": {},
+        }), encoding="utf-8")
+        pagina.set_input_files("#ficheroAjustes", str(fichero))
+        pagina.wait_for_timeout(300)
+
+        self.assertEqual(pagina.get_attribute("html", "data-tema"), "oscuro")
+        self.assertIn("Steam family library", pagina.inner_text("h1"))
+        self.assertEqual(pagina.get_attribute('[data-fav="20"]', "aria-pressed"), "true")
+        self.assertEqual(pagina.locator("#cuerpo tr").count(), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

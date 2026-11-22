@@ -1,5 +1,9 @@
 # Cambios
 
+## 2.2.5 — 2026-11-22
+
+- Guardar y cargar los ajustes del panel: favoritos, ocultos, tema, idioma y filtros.
+
 ## 2.2.4 — 2026-11-22
 
 - Binario de macOS Intel (`steam-families-macos-intel`), además del de Apple Silicon.

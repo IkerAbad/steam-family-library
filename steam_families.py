@@ -37,7 +37,7 @@ from pathlib import Path
 API = "https://api.steampowered.com"
 COMUNIDAD = "https://steamcommunity.com"
 TIENDA = "https://store.steampowered.com"
-VERSION = "2.2.4"
+VERSION = "2.2.5"
 UA = f"steam-family-library/{VERSION}"
 EXCLUDE_REASONS = {
     0: "",
@@ -655,6 +655,7 @@ tr.oculto { opacity:.55; }
 .sec:hover { background:#1f252d; color:var(--texto); }
 #vacio { padding:30px 24px; color:var(--suave); }
 #version { padding:8px 24px 20px; color:#5d6773; font-size:11px; text-align:right; }
+#ajustes { padding:8px 24px 0; text-align:right; }
 #historialCaja { padding:16px 24px 30px; border-top:1px solid var(--borde); }
 #miembrosCaja { padding:16px 24px 0; border-top:1px solid var(--borde); }
 #mesesCaja { padding:16px 24px 0; border-top:1px solid var(--borde); }
@@ -799,6 +800,11 @@ html[data-tema="claro"] #version { color:#8b98a8; }
   <div id="historialTabla"></div>
   <button type="button" id="exportarHistorial" class="sec" data-t="exportarHistorial" style="margin-top:10px">Exportar historial</button>
 </section>
+<div id="ajustes">
+  <button type="button" id="guardarAjustes" class="sec" data-t="guardarAjustes">Guardar ajustes</button>
+  <button type="button" id="cargarAjustes" class="sec" data-t="cargarAjustes">Cargar ajustes</button>
+  <input id="ficheroAjustes" type="file" accept="application/json,.json" hidden>
+</div>
 <div id="version">Steam Families v__VERSION__</div>
 
 <script>
@@ -845,6 +851,9 @@ const TEXTOS = {
     historialTitulo: "Historial de novedades",
     exportar: "Exportar CSV",
     exportarHistorial: "Exportar historial",
+    guardarAjustes: "Guardar ajustes",
+    cargarAjustes: "Cargar ajustes",
+    ajustesMal: "Ese fichero no es una copia de ajustes válida.",
     historialVacio: "Todavía no hay novedades.",
     historialSinFiltros: "Ninguna novedad cumple esos filtros.",
     historialBuscar: "Buscar por juego o miembro…",
@@ -932,6 +941,9 @@ const TEXTOS = {
     historialTitulo: "Changes history",
     exportar: "Export CSV",
     exportarHistorial: "Export history",
+    guardarAjustes: "Save settings",
+    cargarAjustes: "Load settings",
+    ajustesMal: "That file is not a valid settings backup.",
     historialVacio: "No changes yet.",
     historialSinFiltros: "No change matches those filters.",
     historialBuscar: "Search by game or member…",
@@ -1395,6 +1407,53 @@ function exportaHistorial() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function guardaAjustesFichero() {
+  const datos = {
+    version: 1,
+    tema: TEMA,
+    idioma: IDIOMA,
+    favoritos: [...FAVORITOS],
+    ocultos: [...OCULTOS],
+    filtros: JSON.parse(localStorage.getItem(CLAVE_FILTROS) || "{}")
+  };
+  const blob = new Blob([JSON.stringify(datos, null, 2)], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "steam-families-ajustes-" + new Date().toISOString().slice(0, 10) + ".json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function cargaAjustesFichero(fichero) {
+  try {
+    const d = JSON.parse(await fichero.text());
+    if (!d || typeof d !== "object") throw new Error("no es un objeto");
+    if (Array.isArray(d.favoritos)) FAVORITOS = new Set(d.favoritos.map(String));
+    if (Array.isArray(d.ocultos)) OCULTOS = new Set(d.ocultos.map(String));
+    guardaLista(CLAVE_FAV, FAVORITOS);
+    guardaLista(CLAVE_OCULTOS, OCULTOS);
+    if (d.tema === "claro" || d.tema === "oscuro") {
+      TEMA = d.tema;
+      try { localStorage.setItem(CLAVE_TEMA, TEMA); } catch (e) {}
+    }
+    if (d.idioma === "es" || d.idioma === "en") {
+      IDIOMA = d.idioma;
+      try { localStorage.setItem("sf-idioma", IDIOMA); } catch (e) {}
+    }
+    if (d.filtros && typeof d.filtros === "object") {
+      try { localStorage.setItem(CLAVE_FILTROS, JSON.stringify(d.filtros)); } catch (e) {}
+    }
+    pintaDuenos();
+    cargaFiltros();
+    aplicaIdioma();
+  } catch (e) {
+    alert(T("ajustesMal"));
+  }
+}
+
 function csvCampo(valor) {
   const s = String(valor == null ? "" : valor);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -1670,6 +1729,13 @@ $("verHistorial").addEventListener("click", () => {
 });
 $("exportar").addEventListener("click", exportaCsv);
 $("exportarHistorial").addEventListener("click", exportaHistorial);
+$("guardarAjustes").addEventListener("click", guardaAjustesFichero);
+$("cargarAjustes").addEventListener("click", () => $("ficheroAjustes").click());
+$("ficheroAjustes").addEventListener("change", async e => {
+  const fichero = e.target.files && e.target.files[0];
+  if (fichero) await cargaAjustesFichero(fichero);
+  e.target.value = "";
+});
 ["hq", "hecho", "hdesde", "hhasta"].forEach(id => $(id).addEventListener("input", pintaHistorial));
 pintaDuenos();
 cargaFiltros();
