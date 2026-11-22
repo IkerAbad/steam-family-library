@@ -546,6 +546,8 @@ class PruebaPanel(unittest.TestCase):
             self.assertIn("v" + sfl.VERSION, html)
             self.assertIn("const HISTORIAL = [", html)
             self.assertIn("Paseo", html)
+            self.assertIn("const NOMBRES = {", html)
+            self.assertIn('"o":["', html)
 
             prestados = list(csv.DictReader((d / "prestados.csv").open(encoding="utf-8-sig")))
             self.assertEqual(len(prestados), 2)

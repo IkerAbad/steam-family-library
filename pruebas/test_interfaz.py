@@ -178,6 +178,16 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertEqual(pagina.locator(filas).count(), 1)
         self.assertIn("Viejo", pagina.inner_text("#historialTabla"))
 
+    def test_miembros(self):
+        pagina = self.pagina("/panel.html")
+        filas = pagina.locator("#miembrosTabla tbody tr").all_inner_texts()
+        self.assertEqual(len(filas), 2)
+        ana = [f for f in filas if "Ana" in f][0]
+        yo = [f for f in filas if "tú" in f][0]
+        self.assertIn("2", ana)
+        self.assertIn("2,0 h", ana)
+        self.assertIn("1,0 h", yo)
+
 
 if __name__ == "__main__":
     unittest.main()

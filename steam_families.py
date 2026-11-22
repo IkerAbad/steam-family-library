@@ -651,6 +651,10 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
 #vacio { padding:30px 24px; color:var(--suave); }
 #version { padding:8px 24px 20px; color:#5d6773; font-size:11px; text-align:right; }
 #historialCaja { padding:16px 24px 30px; border-top:1px solid var(--borde); }
+#miembrosCaja { padding:16px 24px 0; border-top:1px solid var(--borde); }
+#miembrosCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
+#miembrosCaja table { min-width:0; }
+#miembrosCaja th, #miembrosCaja td { font-size:12px; padding:6px 8px; }
 #historialCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
 #historialCaja table { min-width:0; }
 #historialCaja th, #historialCaja td { font-size:12px; padding:6px 8px; }
@@ -729,6 +733,10 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
   <tbody id="cuerpo"></tbody>
 </table>
 <div id="vacio" hidden data-t="vacio">Ningún juego cumple esos filtros.</div>
+<section id="miembrosCaja">
+  <h2 data-t="miembrosTitulo">Por miembro</h2>
+  <div id="miembrosTabla"></div>
+</section>
 <section id="historialCaja" hidden>
   <h2 data-t="historialTitulo">Historial de novedades</h2>
   <div class="controles" style="padding:0 0 10px">
@@ -753,6 +761,7 @@ const HAY_NOV = __HAY_NOV__;
 const ACTUALIZADO = __ACTUALIZADO__;
 const SIN_NOMBRE = __SIN_NOMBRE__;
 const HISTORIAL = __HISTORIAL__;
+const NOMBRES = __NOMBRES__;
 
 const TEXTOS = {
   es: {
@@ -785,6 +794,10 @@ const TEXTOS = {
     historialSinFiltros: "Ninguna novedad cumple esos filtros.",
     historialBuscar: "Buscar por juego o miembro…",
     historialCuenta: "%n% de %m% novedades",
+    miembrosTitulo: "Por miembro",
+    miembro: "Miembro",
+    jugablesHeader: "Jugables",
+    horasHeader: "Horas",
     tipo: "Tipo",
     desde: "Desde",
     hasta: "Hasta",
@@ -857,6 +870,10 @@ const TEXTOS = {
     historialSinFiltros: "No change matches those filters.",
     historialBuscar: "Search by game or member…",
     historialCuenta: "%n% of %m% changes",
+    miembrosTitulo: "By member",
+    miembro: "Member",
+    jugablesHeader: "Playable",
+    horasHeader: "Hours",
     tipo: "Type",
     desde: "From",
     hasta: "To",
@@ -1180,6 +1197,54 @@ function pintaNombres() {
     ? T("sinNombreUno") : T("sinNombre").replace("%n%", SIN_NOMBRE);
 }
 
+function pintaMiembros() {
+  const acumulado = new Map();
+  DATOS.forEach(d => (d.o || []).forEach(h => {
+    const m = acumulado.get(h) || {j: 0, p: 0, m: 0};
+    m.j += 1;
+    if (d.p) m.p += 1;
+    m.m += d.m;
+    acumulado.set(h, m);
+  }));
+  const filas = [...acumulado.entries()].map(([h, m]) => {
+    let nombre = NOMBRES[h] || h;
+    nombre = nombre === "tú" ? T("tu")
+      : nombre.replace(/^Miembro (\d+)$/, (todo, n) => IDIOMA === "en" ? "Member " + n : todo);
+    return {nombre, j: m.j, p: m.p, m: m.m};
+  });
+  filas.sort((a, b) => b.j - a.j || compara(a.nombre, b.nombre));
+
+  const tabla = document.createElement("table");
+  const thead = document.createElement("thead");
+  const fila = document.createElement("tr");
+  [T("miembro"), T("juegos"), T("jugablesHeader"), T("horasHeader")].forEach(texto => {
+    const th = document.createElement("th");
+    th.textContent = texto;
+    fila.appendChild(th);
+  });
+  thead.appendChild(fila);
+
+  const tbody = document.createElement("tbody");
+  filas.forEach(f => {
+    const tr = document.createElement("tr");
+    const nombre = document.createElement("td");
+    nombre.textContent = f.nombre;
+    const juegos = document.createElement("td");
+    juegos.className = "der";
+    juegos.textContent = numero(f.j);
+    const jugables = document.createElement("td");
+    jugables.className = "der";
+    jugables.textContent = numero(f.p);
+    const tiempo = document.createElement("td");
+    tiempo.className = "der";
+    tiempo.textContent = f.m > 0 ? horas(f.m) + " h" : "";
+    tr.append(nombre, juegos, jugables, tiempo);
+    tbody.appendChild(tr);
+  });
+  tabla.append(thead, tbody);
+  $("miembrosTabla").replaceChildren(tabla);
+}
+
 function pintaHistorial() {
   const caja = $("historialCaja");
   if (caja.hidden) return;
@@ -1255,6 +1320,7 @@ function aplicaIdioma() {
   pintaAviso();
   pintaActualizado();
   pintaNombres();
+  pintaMiembros();
   pintaHistorial();
   pinta();
 }
@@ -1488,6 +1554,7 @@ def generar_panel(datos):
             "g": bool(e.get("gratis")) if e else False,
             "v": (por_appid.get(appid) or {}).get("v", ""),
             "q": r["acquired"],
+            "o": (por_appid.get(appid) or {}).get("o", []),
         })
 
     prestados = [j for j in juegos if j["s"] == "family"]
@@ -1509,6 +1576,8 @@ def generar_panel(datos):
     sin_nombre = sum(1 for v in alias.values() if str(v).startswith("Miembro "))
     html = html.replace("__SIN_NOMBRE__", str(sin_nombre))
     html = html.replace("__VERSION__", VERSION)
+    html = html.replace("__NOMBRES__", json.dumps(alias, ensure_ascii=False,
+                                                 separators=(",", ":")).replace("</", "<\\/"))
     historial = json.dumps(leer_historial(datos), ensure_ascii=False,
                            separators=(",", ":")).replace("</", "<\\/")
     html = html.replace("__HISTORIAL__", historial)
