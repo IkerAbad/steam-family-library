@@ -51,7 +51,8 @@ def escribe_datos(d):
     (d / "snapshot.json").write_text(json.dumps(snap), encoding="utf-8")
     (d / "historial.csv").write_text(
         "fecha,evento,appid,nombre,quien,propio\n"
-        "2026-11-20 10:00,nuevo,20,Paseo,Ana,no\n",
+        "2026-11-20 10:00,nuevo,20,Paseo,Ana,no\n"
+        "2026-11-21 09:00,fuera,99,Viejo,Luis,no\n",
         encoding="utf-8-sig")
 
 
@@ -156,6 +157,26 @@ class PruebaInterfaz(unittest.TestCase):
         texto = pagina.inner_text("#historialCaja")
         self.assertIn("Paseo", texto)
         self.assertIn("20/11/2026", texto)
+
+    def test_historial_filtros(self):
+        pagina = self.pagina("/panel.html")
+        pagina.click("#verHistorial")
+        filas = "#historialTabla tbody tr"
+        self.assertEqual(pagina.locator(filas).count(), 2)
+
+        pagina.fill("#hq", "Paseo")
+        self.assertEqual(pagina.locator(filas).count(), 1)
+        self.assertIn("Paseo", pagina.inner_text("#historialTabla"))
+
+        pagina.fill("#hq", "")
+        pagina.select_option("#hecho", "fuera")
+        self.assertIn("Viejo", pagina.inner_text("#historialTabla"))
+        self.assertNotIn("Paseo", pagina.inner_text("#historialTabla"))
+
+        pagina.select_option("#hecho", "todo")
+        pagina.fill("#hdesde", "2026-11-21")
+        self.assertEqual(pagina.locator(filas).count(), 1)
+        self.assertIn("Viejo", pagina.inner_text("#historialTabla"))
 
 
 if __name__ == "__main__":

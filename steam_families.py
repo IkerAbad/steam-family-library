@@ -731,6 +731,17 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
 <div id="vacio" hidden data-t="vacio">Ningún juego cumple esos filtros.</div>
 <section id="historialCaja" hidden>
   <h2 data-t="historialTitulo">Historial de novedades</h2>
+  <div class="controles" style="padding:0 0 10px">
+    <input id="hq" type="search" data-tp="historialBuscar" placeholder="Buscar por juego o miembro…" autocomplete="off">
+    <select id="hecho" data-ta="tipo" aria-label="Tipo">
+      <option value="todo" data-t="todo">Todo</option>
+      <option value="nuevo" data-t="nuevo">nuevo</option>
+      <option value="fuera" data-t="fuera">fuera</option>
+      <option value="nuevo_dueno" data-t="otroDueno">otro dueño</option>
+    </select>
+    <input id="hdesde" type="date" data-ta="desde" aria-label="Desde">
+    <input id="hhasta" type="date" data-ta="hasta" aria-label="Hasta">
+  </div>
   <div id="historialTabla"></div>
 </section>
 <div id="version">Steam Families v__VERSION__</div>
@@ -771,6 +782,12 @@ const TEXTOS = {
     historial: "Historial",
     historialTitulo: "Historial de novedades",
     historialVacio: "Todavía no hay novedades.",
+    historialSinFiltros: "Ninguna novedad cumple esos filtros.",
+    historialBuscar: "Buscar por juego o miembro…",
+    historialCuenta: "%n% de %m% novedades",
+    tipo: "Tipo",
+    desde: "Desde",
+    hasta: "Hasta",
     juego: "Juego",
     dueno: "Dueño",
     origen: "Origen",
@@ -837,6 +854,12 @@ const TEXTOS = {
     historial: "History",
     historialTitulo: "Changes history",
     historialVacio: "No changes yet.",
+    historialSinFiltros: "No change matches those filters.",
+    historialBuscar: "Search by game or member…",
+    historialCuenta: "%n% of %m% changes",
+    tipo: "Type",
+    desde: "From",
+    hasta: "To",
     juego: "Game",
     dueno: "Owner",
     origen: "Source",
@@ -1160,6 +1183,25 @@ function pintaNombres() {
 function pintaHistorial() {
   const caja = $("historialCaja");
   if (caja.hidden) return;
+  const q = plano($("hq").value.trim());
+  const tipo = $("hecho").value;
+  const desde = $("hdesde").value;
+  const hasta = $("hhasta").value;
+  const lista = HISTORIAL.filter(h => {
+    if (q && !(plano(h.n).includes(q) || plano(h.q || "").includes(q))) return false;
+    if (tipo !== "todo" && h.e !== tipo) return false;
+    const dia = (h.f || "").slice(0, 10);
+    if (desde && dia < desde) return false;
+    if (hasta && dia > hasta) return false;
+    return true;
+  });
+
+  const cuenta = document.createElement("p");
+  cuenta.className = "dim";
+  cuenta.style.cssText = "margin:0 0 8px;font-size:12px";
+  cuenta.textContent = T("historialCuenta")
+    .replace("%n%", lista.length).replace("%m%", HISTORIAL.length);
+
   const tabla = document.createElement("table");
   const thead = document.createElement("thead");
   const fila = document.createElement("tr");
@@ -1171,7 +1213,7 @@ function pintaHistorial() {
   thead.appendChild(fila);
 
   const tbody = document.createElement("tbody");
-  HISTORIAL.slice().reverse().slice(0, 300).forEach(h => {
+  lista.slice().reverse().slice(0, 300).forEach(h => {
     const tr = document.createElement("tr");
     const f = document.createElement("td");
     f.className = "dim";
@@ -1187,17 +1229,17 @@ function pintaHistorial() {
     tr.append(f, juego, que, quien);
     tbody.appendChild(tr);
   });
-  if (!HISTORIAL.length) {
+  if (!HISTORIAL.length || !lista.length) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
     td.colSpan = 4;
     td.className = "dim";
-    td.textContent = T("historialVacio");
+    td.textContent = HISTORIAL.length ? T("historialSinFiltros") : T("historialVacio");
     tr.appendChild(td);
     tbody.appendChild(tr);
   }
   tabla.append(thead, tbody);
-  $("historialTabla").replaceChildren(tabla);
+  $("historialTabla").replaceChildren(cuenta, tabla);
 }
 
 function aplicaIdioma() {
@@ -1281,6 +1323,7 @@ $("verHistorial").addEventListener("click", () => {
   caja.hidden = !caja.hidden;
   pintaHistorial();
 });
+["hq", "hecho", "hdesde", "hhasta"].forEach(id => $(id).addEventListener("input", pintaHistorial));
 cargaFiltros();
 aplicaIdioma();
 </script>
