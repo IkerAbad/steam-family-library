@@ -43,6 +43,12 @@ def escribe_datos(d):
     (d / "snapshot.json").write_text(json.dumps(snap), encoding="utf-8")
 
 
+def token_falso(exp=2000000000):
+    carga = base64.urlsafe_b64encode(
+        json.dumps({"exp": exp, "sub": "1"}).encode()).decode().rstrip("=")
+    return "x." + carga + "." + "a" * 43
+
+
 class PruebaHttp(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -119,8 +125,48 @@ class PruebaHttp(unittest.TestCase):
             self.assertTrue(datos["guardado"])
             self.assertNotIn("token", datos)
             self.assertIn("/", datos["caduca"])
+            self.assertFalse(datos["caducado"])
+            self.assertEqual(datos["motivo"], "ok")
         finally:
             sfl.olvidar_token()
+
+    def test_token_caducado_guardado(self):
+        sfl.guardar_token(token_falso(1000000000))
+        try:
+            datos = json.loads(self.get("/api/token")[1])
+            self.assertTrue(datos["guardado"])
+            self.assertTrue(datos["caducado"])
+            self.assertEqual(datos["motivo"], "caducado")
+            self.assertTrue(datos["caduca"])
+            self.assertIsNone(sfl.leer_token())
+            self.assertTrue(sfl.estado_token()["guardado"])
+
+            codigo, cuerpo = self.post("/api/actualizar", {})
+            self.assertEqual(codigo, 400)
+            self.assertEqual(json.loads(cuerpo)["codigo"], "token_caducado")
+        finally:
+            sfl.olvidar_token()
+
+    def test_token_caduca_pronto(self):
+        sfl.guardar_token(token_falso(int(time.time()) + 3600))
+        try:
+            datos = json.loads(self.get("/api/token")[1])
+            self.assertTrue(datos["guardado"])
+            self.assertFalse(datos["caducado"])
+            self.assertEqual(datos["motivo"], "pronto")
+        finally:
+            sfl.olvidar_token()
+
+    def test_token_post_caducado(self):
+        codigo, cuerpo = self.post("/api/actualizar", {
+            "token": token_falso(1000000000)})
+        self.assertEqual(codigo, 400)
+        self.assertEqual(json.loads(cuerpo)["codigo"], "token_caducado")
+
+    def test_token_post_invalido(self):
+        codigo, cuerpo = self.post("/api/actualizar", {"token": "no.es.un.jwt"})
+        self.assertEqual(codigo, 400)
+        self.assertEqual(json.loads(cuerpo)["codigo"], "token_invalido")
 
     def test_clave_guardada_no_se_devuelve(self):
         sfl.guardar_clave("0123456789abcdef")
@@ -222,10 +268,12 @@ class PruebaHttp(unittest.TestCase):
         self.assertEqual(codigo, 400)
 
     def test_sin_token(self):
+        sfl.olvidar_token()
         self.assertEqual(self.post("/api/actualizar", {})[0], 400)
 
     def test_api_key_invalida(self):
-        codigo, cuerpo = self.post("/api/actualizar", {"token": "x", "api_key": "no-es-hex"})
+        codigo, cuerpo = self.post("/api/actualizar", {
+            "token": token_falso(), "api_key": "no-es-hex"})
         self.assertEqual(codigo, 400)
         self.assertIn("32", json.loads(cuerpo)["error"])
 
@@ -235,7 +283,7 @@ class PruebaHttp(unittest.TestCase):
         sfl.ejecutar = lambda datos, token, api_key="", **k: (vistos.append(api_key) or (True, "ok"))
         try:
             codigo, _ = self.post("/api/actualizar", {
-                "token": "x",
+                "token": token_falso(),
                 "api_key": "0123456789abcdef0123456789abcdef",
                 "guardar": False,
             })
@@ -246,17 +294,18 @@ class PruebaHttp(unittest.TestCase):
 
     def test_acepta_el_json_entero(self):
         vistos = []
+        valido = token_falso()
         original = sfl.ejecutar
         sfl.ejecutar = lambda datos, token, api_key="", **k: (vistos.append((token, api_key)) or (True, "ok"))
         try:
             codigo, _ = self.post("/api/actualizar", {
-                "token": '{"success":1,"data":{"webapi_token":"aaa.bbb.ccc"}}',
+                "token": '{"success":1,"data":{"webapi_token":"' + valido + '"}}',
                 "guardar": False,
             })
         finally:
             sfl.ejecutar = original
         self.assertEqual(codigo, 200)
-        self.assertEqual(vistos, [("aaa.bbb.ccc", "")])
+        self.assertEqual(vistos, [(valido, "")])
 
     def test_token_larguisimo(self):
         self.assertEqual(self.post("/api/actualizar", {"token": "x" * 5000})[0], 400)
@@ -306,7 +355,8 @@ class PruebaHttp(unittest.TestCase):
         codigos = []
 
         def golpe():
-            codigos.append(self.post("/api/actualizar", {"token": "x"})[0])
+            codigos.append(self.post("/api/actualizar", {
+                "token": token_falso(), "guardar": False})[0])
 
         try:
             h1 = threading.Thread(target=golpe)

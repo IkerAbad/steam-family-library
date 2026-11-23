@@ -32,7 +32,7 @@ jobs:
           playwright install --with-deps chromium
 
       - name: Estilo (pyflakes)
-        run: python -m ruff check --isolated --select F steam_families.py empaquetar.py notas_release.py pruebas
+        run: python -m ruff check --isolated --select F steam_families.py empaquetar.py notas_release.py pruebas pruebas_interfaz pruebas_plataforma
 
       - name: Pruebas de interfaz
-        run: python -m unittest discover -s pruebas -p "test_interfaz.py" -v
+        run: python -m unittest discover -s pruebas_interfaz -v

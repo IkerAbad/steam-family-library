@@ -24,6 +24,8 @@ Solo puede haber una ventana usando la misma carpeta de datos. Si abres otra, av
 
 ### El token
 
+El token es un JWT que Steam caduca cada 24 horas. La app lo comprueba al arrancar y cada minuto: si ha caducado (o le queda menos de una hora), enseña el motivo y un enlace **Renovar token** a la página oficial, enfoca el campo y no intenta actualizar hasta que pegues uno nuevo. El token caducado no se borra en silencio: queda marcado para que sepas qué pasó.
+
 1. Abre `https://store.steampowered.com/pointssummary/ajaxgetasyncconfig` con la sesión de Steam iniciada.
 2. Copia el valor de `webapi_token`. Vale el token suelto o el JSON entero.
 3. Pégalo en la interfaz.
@@ -112,9 +114,12 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 
 ```
 python -m unittest discover -s pruebas -v
+python -m unittest discover -s pruebas_interfaz -v
+python -m unittest discover -s pruebas_plataforma -p "test_windows.py" -v  # Windows
+python -m unittest discover -s pruebas_plataforma -p "test_posix.py" -v    # Linux y macOS
 ```
 
-118 pruebas sin red, más 55 de interfaz con Playwright (se saltan si no está instalado; hacen falta `pip install -r requirements-dev.txt` y `playwright install chromium`). Tres de las unitarias son solo de Windows y se saltan en otros sistemas. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`, y las pruebas de navegador en Chromium. La cobertura de `steam_families.py` se mide en el CI con un mínimo del 85 %.
+152 pruebas comunes, 58 de navegador y 4 de plataforma (3 de Windows y 1 de POSIX). Ninguna se salta: la suite común no lleva pruebas de plataforma ni de navegador; la de interfaz se ejecuta en el workflow **Interfaz** con Chromium instalado, y cada workflow de sistema ejecuta su módulo de plataforma. Son las 173 pruebas que ya había, sin borrar ninguna, más las nuevas de errores, empaquetado y renovación del token. Ninguna prueba toca la red real: `pruebas/falso.py` imita la API de Steam y la interfaz levanta un servidor local. La cobertura se publica como `htmlcov` y `coverage.xml`: 91 % de `steam_families.py`, 96 % de `empaquetar.py` y 96 % de `notas_release.py`; el CI falla por debajo del 90 %.
 
 ## Créditos
 
@@ -141,6 +146,8 @@ Without Python: download the [latest release](https://github.com/IkerAbad/steam-
 Only one window can use the same data folder. If you open another one, it warns and closes.
 
 ### The token
+
+The token is a JWT that Steam expires every 24 hours. The app checks it on startup and every minute: if it has expired (or less than an hour is left), it shows the reason and a **Renew token** link to the official page, focuses the field and does not try to update until you paste a new one. The expired token is not silently deleted: it stays flagged so you know what happened.
 
 1. Open `https://store.steampowered.com/pointssummary/ajaxgetasyncconfig` while signed in to Steam.
 2. Copy the value of `webapi_token`. Either the bare token or the whole JSON works.
@@ -230,9 +237,12 @@ The three family endpoints are undocumented: they work today and may change tomo
 
 ```
 python -m unittest discover -s pruebas -v
+python -m unittest discover -s pruebas_interfaz -v
+python -m unittest discover -s pruebas_plataforma -p "test_windows.py" -v  # Windows
+python -m unittest discover -s pruebas_plataforma -p "test_posix.py" -v    # Linux and macOS
 ```
 
-118 tests with no network, plus 55 browser tests with Playwright (skipped if it is not installed; they need `pip install -r requirements-dev.txt` and `playwright install chromium`). Three of the unit tests are Windows-only and are skipped elsewhere. GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher, and the browser tests on Chromium. Coverage of `steam_families.py` is measured in CI with an 85 % floor.
+152 common tests, 58 browser tests and 4 platform tests (3 Windows and 1 POSIX). None is skipped: the common suite has no platform or browser tests, the interface suite runs in the **Interfaz** workflow with Chromium installed, and each OS workflow runs its platform module. These are the 173 tests that already existed, with none removed, plus the new error, packaging and token-renewal tests. No test touches the real network: `pruebas/falso.py` imitates the Steam API and the interface starts a local server. Coverage is published as `htmlcov` and `coverage.xml`: 91 % for `steam_families.py`, 96 % for `empaquetar.py` and 96 % for `notas_release.py`; CI fails below 90 %.
 
 ## Credits
 

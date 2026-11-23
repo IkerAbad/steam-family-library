@@ -17,3 +17,5 @@ chmod +x steam-families-macos
 Si Gatekeeper lo bloquea: clic derecho -> Abrir, o `xattr -d com.apple.quarantine steam-families-macos`.
 
 En los tres casos se abre una página en el navegador: pega el token de Steam y pulsa **Actualizar**.
+
+**Windows sin Python.** `steam-families.zip` lleva el ejecutable, `iniciar.cmd`, el LEEME y la licencia. Descomprímelo y haz doble clic en `iniciar.cmd`. El código fuente está en la pestaña *Code* del repositorio.

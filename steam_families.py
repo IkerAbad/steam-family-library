@@ -39,7 +39,7 @@ from pathlib import Path
 API = "https://api.steampowered.com"
 COMUNIDAD = "https://steamcommunity.com"
 TIENDA = "https://store.steampowered.com"
-VERSION = "2.10.0"
+VERSION = "3.0.0"
 UA = f"steam-family-library/{VERSION}"
 EXCLUDE_REASONS = {
     0: "",
@@ -797,7 +797,11 @@ html[data-tema="claro"] #version { color:#8b98a8; }
   <span id="avisoNombresTexto"></span>
   <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener" data-t="pedirClave">consíguela aquí</a>
 </div>
-<div id="viejo" hidden></div>
+<div class="aviso ambar" id="tokenAviso" hidden>
+  <span id="tokenAvisoTexto"></span>
+  <a href="https://store.steampowered.com/pointssummary/ajaxgetasyncconfig" target="_blank" rel="noopener" data-t="renovarToken">Renovar token</a>
+  <a href="/" target="_blank" rel="noopener" data-t="abrirAppToken">Abrir la app</a>
+</div>
 <div class="controles">
   <input id="q" type="search" data-tp="buscar" data-ta="buscarEtiqueta" placeholder="Buscar por nombre… (los acentos dan igual)" autocomplete="off">
   <select id="origen" aria-label="Origen" data-ta="origen">
@@ -1046,6 +1050,10 @@ const TEXTOS = {
     detener: "Detener la app",
     detenida: "Aplicación detenida",
     detenidaTexto: "Ya puedes cerrar esta pestaña.",
+    tokenCaducadoPanel: "El token ha caducado: el panel no se actualizará hasta que lo renueves.",
+    tokenInvalidoPanel: "El token guardado no se puede leer.",
+    tokenCaducaProntoPanel: "El token caduca pronto: quedan %n% h.",
+    abrirAppToken: "Abrir la app para renovarlo",
     sinNombre: "Hay %n% miembros sin nombre.",
     sinNombreUno: "Hay 1 miembro sin nombre.",
     pedirClave: "consíguela aquí",
@@ -1179,6 +1187,10 @@ const TEXTOS = {
     detener: "Stop the app",
     detenida: "Application stopped",
     detenidaTexto: "You can close this tab now.",
+    tokenCaducadoPanel: "The token has expired: the dashboard will not update until you renew it.",
+    tokenInvalidoPanel: "The stored token cannot be read.",
+    tokenCaducaProntoPanel: "The token expires soon: %n% h left.",
+    abrirAppToken: "Open the app to renew it",
     sinNombre: "%n% members have no name yet.",
     sinNombreUno: "1 member has no name yet.",
     pedirClave: "get one here",
@@ -2790,9 +2802,27 @@ async function hayPanelNuevo() {
     const r = await fetch("/api/estado", {cache: "no-store"});
     if (!r.ok) return false;
     const d = await r.json();
+    pintaToken(d.token);
     return !!(d.actualizado && ACTUALIZADO && d.actualizado !== ACTUALIZADO);
   } catch (e) {
     return false;
+  }
+}
+
+function pintaToken(estado) {
+  const caja = $("tokenAviso");
+  if (!estado || !estado.guardado || (!estado.caducado && estado.motivo !== "pronto")) {
+    caja.hidden = true;
+    $("tokenAvisoTexto").textContent = "";
+    return;
+  }
+  caja.hidden = false;
+  if (estado.caducado) {
+    $("tokenAvisoTexto").textContent = estado.motivo === "invalido"
+      ? T("tokenInvalidoPanel") : T("tokenCaducadoPanel");
+  } else {
+    $("tokenAvisoTexto").textContent = T("tokenCaducaProntoPanel")
+      .replace("%n%", estado.horas > 0 ? estado.horas : 1);
   }
 }
 
@@ -2828,6 +2858,7 @@ try {
 aplicaIdioma();
 aplicaCompacto();
 cargaCada();
+compruebaPanel();
 </script>
 </body>
 </html>
@@ -3153,29 +3184,51 @@ def ruta_token():
     return Path(base) / "steam-families" / "token.bin"
 
 
-def caduca_token(token):
-    """Fecha de caducidad legible del JWT, o cadena vacia si no se puede leer."""
+def caducidad_token(token):
+    """Momento de caducidad del JWT (epoch), o None si no se puede leer."""
     try:
         parte = token.split(".")[1]
         parte += "=" * (-len(parte) % 4)
         datos = json.loads(base64.urlsafe_b64decode(parte))
         exp = datos.get("exp")
-        if exp:
-            return datetime.fromtimestamp(exp, tz=timezone.utc).astimezone().strftime("%d/%m/%Y %H:%M")
+        return float(exp) if exp else None
     except Exception:
-        pass
+        return None
+
+
+def caduca_token(token):
+    """Fecha de caducidad legible del JWT, o cadena vacia si no se puede leer."""
+    exp = caducidad_token(token)
+    if exp:
+        return datetime.fromtimestamp(exp, tz=timezone.utc).astimezone().strftime("%d/%m/%Y %H:%M")
     return ""
 
 
 def token_caducado(token):
-    try:
-        parte = token.split(".")[1]
-        parte += "=" * (-len(parte) % 4)
-        datos = json.loads(base64.urlsafe_b64decode(parte))
-        exp = datos.get("exp")
-        return bool(exp) and datetime.now(tz=timezone.utc).timestamp() > exp
-    except Exception:
-        return True
+    exp = caducidad_token(token)
+    return exp is None or datetime.now(tz=timezone.utc).timestamp() > exp
+
+
+def estado_token():
+    """Estado no secreto del token guardado, para guiar la renovación."""
+    ruta = ruta_token()
+    token = _leer_secreto(ruta)
+    if not token:
+        if ruta is not None and ruta.exists():
+            return {"guardado": True, "caduca": "", "caducado": True,
+                    "horas": 0, "motivo": "invalido"}
+        return {"guardado": False, "caduca": "", "caducado": False,
+                "horas": 0, "motivo": "ausente"}
+    exp = caducidad_token(token)
+    if exp is None:
+        return {"guardado": True, "caduca": "", "caducado": True,
+                "horas": 0, "motivo": "invalido"}
+    restante = exp - datetime.now(tz=timezone.utc).timestamp()
+    caducado = restante <= 0
+    horas = max(0, int(restante // 3600))
+    motivo = "caducado" if caducado else ("pronto" if restante < 2 * 3600 else "ok")
+    return {"guardado": True, "caduca": caduca_token(token), "caducado": caducado,
+            "horas": horas, "motivo": motivo}
 
 
 def _guardar_secreto(ruta, texto):
@@ -3221,7 +3274,6 @@ def guardar_token(token):
 def leer_token():
     token = _leer_secreto(ruta_token())
     if not token or token_caducado(token):
-        olvidar_token()
         return None
     return token
 
@@ -3369,6 +3421,7 @@ def estado(datos: Path):
         "yo": yo,
         "novedades": nov.get("eventos", []),
         "fecha_novedades": nov.get("fecha", ""),
+        "token": estado_token(),
         "ficheros": {k: (datos / v[0]).exists() for k, v in FICHEROS.items()},
     }
 
@@ -3462,9 +3515,7 @@ class Handler(BaseHTTPRequestHandler):
             self._enviar(200, estado(self.datos))
             return
         if pedida == "/api/token":
-            guardado = leer_token()
-            self._enviar(200, {"ok": True, "guardado": bool(guardado),
-                               "caduca": caduca_token(guardado) if guardado else ""})
+            self._enviar(200, dict(estado_token(), ok=True))
             return
         if pedida == "/api/clave":
             self._enviar(200, {"ok": True, "guardada": bool(leer_clave())})
@@ -3546,17 +3597,38 @@ class Handler(BaseHTTPRequestHandler):
         idioma(cuerpo.get("idioma"))
 
         if self.path == "/api/actualizar":
+            guardado = _leer_secreto(ruta_token())
             token = normaliza_token(str(cuerpo.get("token") or ""))
             if not token:
                 # La página ya no recibe el token: si está guardado, se usa aquí.
                 token = leer_token() or ""
             if not token:
-                self._enviar(400, {"ok": False, "error": tr(
+                caducado = bool(guardado) and token_caducado(guardado)
+                codigo = "token_caducado" if caducado else "token_ausente"
+                error = tr(
+                    "el token guardado ha caducado. Abre la página del token, copia uno nuevo y pégalo aquí",
+                    "the stored token has expired. Open the token page, copy a new one and paste it here",
+                ) if caducado else tr(
                     "no hay token: pega uno nuevo (el guardado ha caducado o no existe)",
-                    "there is no token: paste a new one (the stored one expired or does not exist)")})
+                    "there is no token: paste a new one (the stored one expired or does not exist)",
+                )
+                self._enviar(400, {"ok": False, "codigo": codigo, "error": error})
                 return
             if len(token) > 4000:
-                self._enviar(400, {"ok": False, "error": tr("eso no es un token", "that is not a token")})
+                self._enviar(400, {"ok": False, "codigo": "token_invalido",
+                                   "error": tr("eso no es un token", "that is not a token")})
+                return
+            if caducidad_token(token) is None:
+                self._enviar(400, {"ok": False, "codigo": "token_invalido", "error": tr(
+                    "el token no parece un JWT de Steam o está cortado. Copia el valor de webapi_token entero",
+                    "the token does not look like a Steam JWT or it is truncated. Copy the whole webapi_token value",
+                )})
+                return
+            if token_caducado(token):
+                self._enviar(400, {"ok": False, "codigo": "token_caducado", "error": tr(
+                    "ese token ya ha caducado. Recarga la página del token para tener uno nuevo",
+                    "that token has already expired. Reload the token page to get a new one",
+                )})
                 return
             api_key = str(cuerpo.get("api_key") or "").strip()
             if api_key and not (len(api_key) == 32
@@ -3590,6 +3662,7 @@ class Handler(BaseHTTPRequestHandler):
             datos = estado(self.datos)
             datos["log"] = mensaje
             datos["caduca"] = caduca_token(token)
+            datos["token"] = estado_token()
             self._enviar(200, datos)
             return
 
@@ -3658,6 +3731,10 @@ button:disabled { opacity:.55; cursor:default; }
 button.sec { background:#232a33; color:var(--texto); border:1px solid var(--borde); }
 button.sec:hover { background:#2b333d; }
 #estado { margin-top:10px; min-height:22px; font-size:13px; color:var(--suave); }
+#avisoToken { margin:0 0 12px; padding:10px 12px; border:1px solid #5a4a22; border-radius:8px; background:#241f11; color:var(--ambar); font-size:13px; }
+#avisoToken a { color:var(--ambar); margin-left:8px; font-weight:600; white-space:nowrap; }
+html[data-tema="claro"] #avisoToken { background:#fdf6e3; border-color:#e2c98a; color:#8a5a00; }
+html[data-tema="claro"] #avisoToken a { color:#8a5a00; }
 .error { color:var(--rojo); white-space:pre-wrap; }
 .tarjetas { display:flex; gap:10px; flex-wrap:wrap; margin:6px 0 4px; }
 .tarjeta { flex:1 1 130px; background:#0e1116; border:1px solid var(--borde); border-radius:8px; padding:12px 14px; }
@@ -3728,6 +3805,10 @@ html[data-tema="claro"] .nota { background:#fdf6e3; border-color:#e5c98a; color:
 
   <section class="paso">
     <h2 data-t="paso2">Paso 2 · Pégalo aquí</h2>
+    <div id="avisoToken" role="alert" hidden>
+      <span id="avisoTokenTexto"></span>
+      <a id="renovarToken" href="https://store.steampowered.com/pointssummary/ajaxgetasyncconfig" target="_blank" rel="noopener" data-t="renovarToken">Renovar token</a>
+    </div>
     <div class="fila">
       <input id="token" type="password" data-tp="tokenPlaceholder" data-ta="tokenEtiqueta" placeholder="Token, o el JSON entero de esa página" autocomplete="off" spellcheck="false">
       <button id="pegar" type="button" class="sec" data-t="pegar">Pegar</button>
@@ -3859,6 +3940,14 @@ const TEXTOS = {
     portapapelesVacio: "El portapapeles está vacío.",
     pegado: "Token pegado. Pulsa Actualizar.",
     faltaToken: "Pega antes el token.",
+    tokenCaducadoAviso: "El token guardado ha caducado. Abre la página del token, copia uno nuevo y pégalo aquí.",
+    tokenInvalidoAviso: "El token guardado no se puede leer. Abre la página del token y pega uno nuevo.",
+    tokenCaducaPronto: "El token caduca pronto: quedan %n% h. Puedes renovarlo ya.",
+    tokenCaducaMenos: "El token caduca en menos de una hora. Puedes renovarlo ya.",
+    caducoEl: "Caducó el",
+    renovarToken: "Renovar token",
+    tokenCaducadoEstado: "Token caducado. Renueva el token para seguir actualizando.",
+    tokenInvalidoEstado: "El token guardado no es válido. Pega uno nuevo.",
     guardadoActualizando: "Token guardado en este equipo. Actualizando…",
     consultando: "Consultando Steam. La primera vez tarda unos segundos más porque busca los nombres de los miembros…",
     listoGuardado: "Listo. Token guardado, caduca el",
@@ -3942,6 +4031,14 @@ const TEXTOS = {
     portapapelesVacio: "The clipboard is empty.",
     pegado: "Token pasted. Press Update.",
     faltaToken: "Paste the token first.",
+    tokenCaducadoAviso: "The stored token has expired. Open the token page, copy a new one and paste it here.",
+    tokenInvalidoAviso: "The stored token cannot be read. Open the token page and paste a new one.",
+    tokenCaducaPronto: "The token expires soon: %n% h left. You can renew it now.",
+    tokenCaducaMenos: "The token expires in less than an hour. You can renew it now.",
+    caducoEl: "Expired on",
+    renovarToken: "Renew token",
+    tokenCaducadoEstado: "Token expired. Renew it to keep updating.",
+    tokenInvalidoEstado: "The stored token is not valid. Paste a new one.",
     guardadoActualizando: "Token loaded from this computer. Updating…",
     consultando: "Asking Steam. The first time takes a few seconds longer while it looks up member names…",
     listoGuardado: "Done. Token stored, expires on",
@@ -4013,6 +4110,26 @@ function ponEstado(clave, extra) {
 function ponError(texto) {
   ESTADO = {clave: "", extra: "", texto, error: true};
   pintaEstado();
+}
+
+function muestraAvisoToken(estado) {
+  const caja = $("avisoToken");
+  if (!estado || !estado.guardado ||
+      (!estado.caducado && estado.motivo !== "pronto")) {
+    caja.hidden = true;
+    $("avisoTokenTexto").textContent = "";
+    return;
+  }
+  caja.hidden = false;
+  if (estado.caducado) {
+    const clave = estado.motivo === "invalido" ? "tokenInvalidoAviso" : "tokenCaducadoAviso";
+    const fecha = estado.caduca ? " " + T("caducoEl") + " " + estado.caduca + "." : "";
+    $("avisoTokenTexto").textContent = T(clave) + fecha;
+  } else if (estado.horas > 0) {
+    $("avisoTokenTexto").textContent = T("tokenCaducaPronto").replace("%n%", estado.horas);
+  } else {
+    $("avisoTokenTexto").textContent = T("tokenCaducaMenos");
+  }
 }
 
 let sondeo = null;
@@ -4239,6 +4356,17 @@ async function lanzar(auto) {
     paraSondeo();
     if (!d.ok) {
       ponError(d.error || T("actualizarFallo"));
+      if (d.codigo === "token_caducado" || d.codigo === "token_invalido") {
+        HAY_TOKEN = false;
+        muestraAvisoToken({
+          guardado: true,
+          caducado: true,
+          motivo: d.codigo === "token_invalido" ? "invalido" : "caducado"
+        });
+        $("token").focus();
+      } else if (d.codigo === "token_ausente") {
+        $("token").focus();
+      }
       return;
     }
     if (!$("recordar").checked) {
@@ -4247,6 +4375,7 @@ async function lanzar(auto) {
     } else {
       HAY_TOKEN = true;
     }
+    if (d.token) muestraAvisoToken(d.token);
     if (d.caduca) {
       ponEstado($("recordar").checked ? "listoGuardado" : "listoValido", d.caduca + ".");
     } else {
@@ -4274,6 +4403,7 @@ $("olvidar").addEventListener("click", async e => {
   try { await fetch("/api/olvidar", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"}); } catch (x) {}
   $("token").value = "";
   HAY_TOKEN = false;
+  muestraAvisoToken({guardado: false});
   ponEstado("olvidado");
 });
 
@@ -4290,7 +4420,12 @@ async function arranque() {
   try {
     const r = await fetch("/api/token");
     const d = await r.json();
-    if (d && d.guardado) {
+    muestraAvisoToken(d);
+    if (d && d.guardado && d.caducado) {
+      HAY_TOKEN = false;
+      ponEstado(d.motivo === "invalido" ? "tokenInvalidoEstado" : "tokenCaducadoEstado");
+      $("token").focus();
+    } else if (d && d.guardado) {
       HAY_TOKEN = true;
       $("recordar").checked = true;
       await lanzar(true);
@@ -4317,6 +4452,20 @@ async function vigila() {
   } catch (e) {}
 }
 setInterval(vigila, 30000);
+
+async function vigilaToken() {
+  if (OCUPADO) return;
+  try {
+    const r = await fetch("/api/token");
+    const d = await r.json();
+    muestraAvisoToken(d);
+    if (HAY_TOKEN && d && d.guardado && d.caducado) {
+      HAY_TOKEN = false;
+      ponEstado(d.motivo === "invalido" ? "tokenInvalidoEstado" : "tokenCaducadoEstado");
+    }
+  } catch (e) {}
+}
+setInterval(vigilaToken, 60000);
 
 aplicaIdioma();
 arranque();

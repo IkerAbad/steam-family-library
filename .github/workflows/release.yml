@@ -67,6 +67,33 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - name: Crea el ZIP de Windows
+        run: |
+          python - <<'PY'
+          import zipfile
+
+          lanzador = (
+              "@echo off\r\n"
+              "title Steam Families\r\n"
+              '"%~dp0steam-families.exe" --datos "%~dp0datos"\r\n'
+              "if errorlevel 1 pause\r\n"
+          )
+          leeme = (
+              "Steam Families\r\n\r\n"
+              "1. Descomprime este ZIP en una carpeta.\r\n"
+              "2. Haz doble clic en iniciar.cmd.\r\n"
+              "3. Pega el token de Steam en la pagina que se abre.\r\n\r\n"
+              "Los datos se guardan en la carpeta datos.\r\n"
+          )
+          with zipfile.ZipFile("dist/steam-families.zip", "w", zipfile.ZIP_DEFLATED) as z:
+              z.write("dist/steam-families.exe", "steam-families.exe")
+              z.writestr("iniciar.cmd", lanzador)
+              z.writestr("LEEME.txt", leeme)
+              z.write("LICENSE", "LICENSE")
+              z.write("README.md", "README.md")
+          PY
+          unzip -l dist/steam-families.zip
+
       - name: Crea la release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

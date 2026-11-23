@@ -1,5 +1,13 @@
 # Cambios
 
+## 3.0.0 — 2026-11-23
+
+- Renovación guiada del token: se detecta la caducidad al arrancar y cada minuto, se explica el motivo y se enlaza la página oficial. El token caducado ya no se borra en silencio.
+- El panel también avisa cuando el token ha caducado o caduca pronto.
+- La suite deja de saltarse pruebas: 151 comunes, 58 de navegador y 4 de plataforma, cada una en su workflow.
+- Cobertura publicada como `htmlcov` y `coverage.xml`: 91 % de `steam_families.py`, 96 % de `empaquetar.py` y 96 % de `notas_release.py`.
+- La release incluye `steam-families.zip` para Windows sin Python.
+
 ## 2.10.0 — 2026-11-23
 
 - Operador `fecha:` con `>`, `<` y rangos `2026-01-01..2026-06-30` sobre la fecha de alta.

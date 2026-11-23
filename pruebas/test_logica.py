@@ -7,7 +7,6 @@ import csv
 import base64
 import io
 import json
-import os
 import pathlib
 import sys
 import tempfile
@@ -264,11 +263,6 @@ class PruebaCarpeta(unittest.TestCase):
             fichero.write_text("hola", encoding="utf-8")
             with self.assertRaises(SystemExit):
                 sfl.carpeta(str(fichero))
-
-    @unittest.skipUnless(os.name == "nt", "solo Windows")
-    def test_rechaza_comilla_colada(self):
-        with self.assertRaises(SystemExit):
-            sfl.carpeta('C:\\una\\ruta"')
 
 
 class PruebaEscrituraAtomica(unittest.TestCase):
@@ -754,47 +748,6 @@ class PruebaTokenGuardado(unittest.TestCase):
 
     def test_basura_se_trata_como_caducado(self):
         self.assertTrue(sfl.token_caducado("no.es.un.jwt"))
-
-    @unittest.skipUnless(os.name == "nt", "DPAPI solo existe en Windows")
-    def test_guardar_leer_y_olvidar(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            original = sfl.ruta_token
-            sfl.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
-            try:
-                tok = self.jwt(2000000000)
-                self.assertTrue(sfl.guardar_token(tok))
-                self.assertEqual(sfl.leer_token(), tok)
-                sfl.olvidar_token()
-                self.assertIsNone(sfl.leer_token())
-            finally:
-                sfl.ruta_token = original
-
-    @unittest.skipIf(os.name == "nt", "en Windows se usa DPAPI")
-    def test_guardar_en_linux(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            original = sfl.ruta_token
-            sfl.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
-            try:
-                tok = self.jwt(2000000000)
-                self.assertTrue(sfl.guardar_token(tok))
-                self.assertEqual(sfl.leer_token(), tok)
-                modo = pathlib.Path(tmp).joinpath("token.bin").stat().st_mode & 0o777
-                self.assertEqual(modo, 0o600)
-                sfl.olvidar_token()
-                self.assertIsNone(sfl.leer_token())
-            finally:
-                sfl.ruta_token = original
-
-    @unittest.skipUnless(os.name == "nt", "DPAPI solo existe en Windows")
-    def test_no_guarda_un_token_caducado(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            original = sfl.ruta_token
-            sfl.ruta_token = lambda: pathlib.Path(tmp) / "token.bin"
-            try:
-                sfl.guardar_token(self.jwt(1000000000))
-                self.assertIsNone(sfl.leer_token())
-            finally:
-                sfl.ruta_token = original
 
 
 class PruebaClaveGuardada(unittest.TestCase):

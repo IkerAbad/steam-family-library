@@ -1,6 +1,13 @@
 # Objetivos
 
-> Estado: los ocho primeros y las tandas segunda a novena están implementados.
+> Estado: los ocho primeros y las tandas segunda a décima están implementados.
+
+## Décima tanda (3.0.0)
+
+- Renovación guiada del token, con aviso en la interfaz local y en el panel.
+- Cero pruebas saltadas por defecto: suites separadas por plataforma y navegador.
+- Cobertura publicada y umbral del 90 %.
+- ZIP de Windows sin Python en la release.
 
 ## Novena tanda (2.10.0)
 

@@ -4,9 +4,10 @@ Se saltan si Playwright no está instalado:
 
     pip install playwright
     playwright install chromium
-    python -m unittest discover -s pruebas -p "test_interfaz.py" -v
+    python -m unittest discover -s pruebas_interfaz -p "test_interfaz.py" -v
 """
 
+import base64
 import csv
 import json
 import pathlib
@@ -964,6 +965,55 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertTrue(pagina.eval_on_selector(
             "#historialTabla tbody td:first-child",
             "td => td.scrollWidth <= td.clientWidth + 1"))
+
+    def test_renovacion_token_caducado(self):
+        carga = base64.urlsafe_b64encode(
+            json.dumps({"exp": 1000000000}).encode()).decode().rstrip("=")
+        sfl.guardar_token("x." + carga + ".y")
+        try:
+            pagina = self.pagina("/")
+            pagina.wait_for_selector("#avisoToken", state="visible")
+            self.assertTrue(pagina.is_visible("#avisoToken"))
+            aviso = pagina.inner_text("#avisoToken")
+            self.assertIn("caducado", aviso)
+            self.assertIn("Renovar token", aviso)
+            self.assertEqual(
+                pagina.get_attribute("#renovarToken", "href"),
+                "https://store.steampowered.com/pointssummary/ajaxgetasyncconfig")
+            self.assertIn("caducado", pagina.inner_text("#estado"))
+            self.assertEqual(pagina.evaluate("document.activeElement.id"), "token")
+        finally:
+            sfl.olvidar_token()
+
+    def test_panel_avisa_token_caducado(self):
+        carga = base64.urlsafe_b64encode(
+            json.dumps({"exp": 1000000000}).encode()).decode().rstrip("=")
+        sfl.guardar_token("x." + carga + ".y")
+        try:
+            pagina = self.pagina("/panel.html")
+            pagina.wait_for_selector("#tokenAviso", state="visible")
+            self.assertIn("caducado", pagina.inner_text("#tokenAviso"))
+            enlaces = pagina.eval_on_selector_all(
+                "#tokenAviso a", "as => as.map(a => a.getAttribute('href'))")
+            self.assertIn("/", enlaces)
+            self.assertIn(
+                "https://store.steampowered.com/pointssummary/ajaxgetasyncconfig",
+                enlaces)
+        finally:
+            sfl.olvidar_token()
+
+    def test_aviso_token_aparezca_sin_recargar(self):
+        pagina = self.pagina("/")
+        self.assertFalse(pagina.is_visible("#avisoToken"))
+        carga = base64.urlsafe_b64encode(
+            json.dumps({"exp": 1000000000}).encode()).decode().rstrip("=")
+        sfl.guardar_token("x." + carga + ".y")
+        try:
+            pagina.evaluate("vigilaToken()")
+            pagina.wait_for_selector("#avisoToken", state="visible")
+            self.assertIn("caducado", pagina.inner_text("#avisoToken"))
+        finally:
+            sfl.olvidar_token()
 
     def test_accesibilidad_basica(self):
         script = """() => {
