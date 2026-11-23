@@ -488,6 +488,22 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertEqual(filas.count(), 1)
         self.assertIn("Beta", pagina.inner_text("#cuerpo"))
 
+        pagina.fill("#q", "fecha:<" + mes(0))
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 2)
+        self.assertNotIn("Gamma", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "fecha:>" + mes(1))
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Gamma", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "fecha:" + mes(2) + ".." + mes(1))
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 2)
+        self.assertIn("Alfa", pagina.inner_text("#cuerpo"))
+        self.assertIn("Beta", pagina.inner_text("#cuerpo"))
+
         pagina.fill("#q", "origen:family estado:jugable")
         pagina.wait_for_timeout(250)
         self.assertEqual(filas.count(), 1)
@@ -507,6 +523,7 @@ class PruebaInterfaz(unittest.TestCase):
 
     def test_exportar_json(self):
         pagina = self.pagina("/panel.html")
+        pagina.click('[data-fav="20"]')
         pagina.fill("#q", "Beta")
         pagina.wait_for_timeout(250)
         with pagina.expect_download() as descarga:
@@ -519,6 +536,8 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertEqual(datos[0]["appid"], 20)
         self.assertTrue(datos[0]["playable"])
         self.assertEqual(datos[0]["playtime_minutes"], 120)
+        self.assertTrue(datos[0]["favorite"])
+        self.assertFalse(datos[0]["hidden"])
         self.assertEqual(datos[0]["store_url"],
                          "https://store.steampowered.com/app/20")
 
@@ -870,6 +889,81 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertTrue(pagina.is_visible("#saltar"))
         pagina.keyboard.press("Enter")
         self.assertEqual(pagina.evaluate("location.hash"), "#tablaJuegos")
+
+    def test_operadores_favorito_oculto(self):
+        pagina = self.pagina("/panel.html")
+        pagina.click('[data-fav="10"]')
+        pagina.click('[data-ocultar="20"]')
+        filas = pagina.locator("#cuerpo tr")
+        self.assertEqual(filas.count(), 2)
+
+        pagina.fill("#q", "oculto:si")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Beta", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "oculto:no")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 2)
+
+        pagina.fill("#q", "favorito:si")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Alfa", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "favorito:no")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Gamma", pagina.inner_text("#cuerpo"))
+
+    def test_historial_orden(self):
+        pagina = self.pagina("/panel.html")
+        pagina.click("#verHistorial")
+        filas = pagina.locator("#historialTabla tbody tr")
+        self.assertIn("Viejo", filas.first.inner_text())
+        self.assertEqual(
+            pagina.get_attribute(
+                '#historialTabla th[data-campo-historial="f"]', "aria-sort"),
+            "descending")
+
+        juego = pagina.locator('#historialTabla th[data-campo-historial="n"]')
+        juego.click()
+        self.assertEqual(juego.get_attribute("aria-sort"), "ascending")
+        self.assertIn("Paseo", filas.first.inner_text())
+
+        juego.click()
+        self.assertEqual(juego.get_attribute("aria-sort"), "descending")
+        self.assertIn("Viejo", filas.first.inner_text())
+
+    def test_historial_limpiar(self):
+        pagina = self.pagina("/panel.html")
+        pagina.click("#verHistorial")
+        pagina.fill("#hq", "Paseo")
+        pagina.select_option("#hecho", "nuevo")
+        pagina.fill("#hdesde", "2026-11-20")
+        pagina.click("#limpiarHistorial")
+        self.assertEqual(pagina.input_value("#hq"), "")
+        self.assertEqual(pagina.input_value("#hecho"), "todo")
+        self.assertEqual(pagina.input_value("#hdesde"), "")
+        self.assertEqual(pagina.locator("#historialTabla tbody tr").count(), 100)
+        pagina.reload()
+        self.assertEqual(pagina.input_value("#hq"), "")
+
+    def test_historial_movil(self):
+        contexto = self.navegador.new_context(
+            locale="es-ES", viewport={"width": 390, "height": 844})
+        self.addCleanup(contexto.close)
+        pagina = contexto.new_page()
+        pagina.goto(self.base + "/panel.html")
+        pagina.click("#verHistorial")
+        visibles = pagina.eval_on_selector_all(
+            "#historialTabla th", "ths => ths.filter(t => t.offsetParent !== null).length")
+        self.assertEqual(visibles, 3)
+        self.assertFalse(pagina.is_visible(
+            '#historialTabla th[data-campo-historial="q"]'))
+        self.assertTrue(pagina.eval_on_selector(
+            "#historialTabla tbody td:first-child",
+            "td => td.scrollWidth <= td.clientWidth + 1"))
 
     def test_accesibilidad_basica(self):
         script = """() => {

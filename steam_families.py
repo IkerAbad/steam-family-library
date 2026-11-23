@@ -39,7 +39,7 @@ from pathlib import Path
 API = "https://api.steampowered.com"
 COMUNIDAD = "https://steamcommunity.com"
 TIENDA = "https://store.steampowered.com"
-VERSION = "2.9.0"
+VERSION = "2.10.0"
 UA = f"steam-family-library/{VERSION}"
 EXCLUDE_REASONS = {
     0: "",
@@ -740,6 +740,11 @@ tr.oculto { opacity:.55; }
   body > table thead th:nth-child(7), body > table tbody td:nth-child(7) { display:none; }
   .nombre { gap:4px; }
   .marca { font-size:10px; padding:0 5px; }
+  #historialCaja th, #historialCaja td { font-size:11px; padding:4px 6px; }
+  #historialCaja th:nth-child(1) { width:36%; }
+  #historialCaja th:nth-child(2) { width:40%; }
+  #historialCaja th:nth-child(3) { width:24%; }
+  #historialCaja th:nth-child(4), #historialCaja td:nth-child(4) { display:none; }
 }
 html[data-tema="claro"] {
   --fondo:#f6f7f9; --panel:#ffffff; --borde:#d5dbe3; --texto:#1b2430; --suave:#5c6878;
@@ -883,6 +888,7 @@ html[data-tema="claro"] #version { color:#8b98a8; }
     </select>
     <input id="hdesde" type="date" data-ta="desde" aria-label="Desde">
     <input id="hhasta" type="date" data-ta="hasta" aria-label="Hasta">
+    <button type="button" id="limpiarHistorial" class="sec" data-t="limpiar">Limpiar filtros</button>
   </div>
   <div id="historialTabla"></div>
   <button type="button" id="exportarHistorial" class="sec" data-t="exportarHistorial" style="margin-top:10px">Exportar historial</button>
@@ -965,7 +971,7 @@ const TEXTOS = {
     imprimir: "Imprimir",
     ayuda: "Ayuda",
     ayudaBuscar: "Atajos: / enfoca el buscador, Escape lo limpia y ? abre o cierra esta ayuda.",
-    ayudaOperadores: "Operadores: horas:>10, horas:1-2, anio:2026, mes:2026-09, origen:family, estado:jugable, dueno:ana, appid:20, ultima:<30, ultima:>365, ultima:never, nota:si y nota:no.",
+    ayudaOperadores: "Operadores: horas:>10, horas:1-2, anio:2026, mes:2026-09, fecha:>2026-01-01, origen:family, estado:jugable, dueno:ana, appid:20, ultima:<30, ultima:>365, ultima:never, nota:si, nota:no, favorito:si y oculto:si.",
     verNuevos: "Ver solo novedades",
     preset: "Añadidos (90 días)",
     limpiar: "Limpiar filtros",
@@ -1098,7 +1104,7 @@ const TEXTOS = {
     imprimir: "Print",
     ayuda: "Help",
     ayudaBuscar: "Shortcuts: / focuses the search box, Escape clears it and ? opens or closes this help.",
-    ayudaOperadores: "Operators: horas:>10, horas:1-2, anio:2026, mes:2026-09, origen:family, estado:jugable, dueno:ana, appid:20, ultima:<30, ultima:>365, ultima:never, nota:si and nota:no.",
+    ayudaOperadores: "Operators: horas:>10, horas:1-2, anio:2026, mes:2026-09, fecha:>2026-01-01, origen:family, estado:jugable, dueno:ana, appid:20, ultima:<30, ultima:>365, ultima:never, nota:si, nota:no, favorito:si and oculto:si.",
     verNuevos: "Show only new",
     preset: "Added (90 days)",
     limpiar: "Clear filters",
@@ -1227,6 +1233,9 @@ function analizaConsulta(texto) {
   let ultima = null;
   let mes = null;
   let nota = null;
+  let fecha = null;
+  let favorito = null;
+  let oculto = null;
   (texto || "").split(/\s+/).forEach(t => {
     const h = /^horas:([<>])(\d+(?:[.,]\d+)?)$/i.exec(t);
     if (h) {
@@ -1281,9 +1290,26 @@ function analizaConsulta(texto) {
       nota = n[1].toLowerCase();
       return;
     }
+    const f = /^fecha:([<>])(\d{4}-\d{2}-\d{2})$/i.exec(t);
+    if (f) {
+      fecha = {signo: f[1], valor: f[2]};
+      return;
+    }
+    const fr = /^fecha:(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/i.exec(t);
+    if (fr) {
+      fecha = {min: fr[1], max: fr[2]};
+      return;
+    }
+    const fo = /^(favorito|oculto):(si|no)$/i.exec(t);
+    if (fo) {
+      if (fo[1].toLowerCase() === "favorito") favorito = fo[2].toLowerCase();
+      else oculto = fo[2].toLowerCase();
+      return;
+    }
     if (t) resto.push(t);
   });
-  return {texto: resto.join(" "), horas, anio, origen, estado, dueno, appid, ultima, mes, nota};
+  return {texto: resto.join(" "), horas, anio, origen, estado, dueno, appid,
+          ultima, mes, nota, fecha, favorito, oculto};
 }
 
 function preparaBusqueda() {
@@ -1363,6 +1389,7 @@ const CLAVE_HISTORIAL_FILTROS = "sf-historial-filtros";
 let ORDEN_CABECERA = null;
 let MIEMBROS_ACTUAL = [];
 let ORDEN_MIEMBROS = {campo: "j", dir: "desc"};
+let ORDEN_HISTORIAL = {campo: "f", dir: "desc"};
 
 function cargaLista(clave) {
   try {
@@ -1694,7 +1721,8 @@ function pinta() {
   const verOcultos = $("verOcultos").checked;
   const filtrando = !!palabras.length || !!consulta.horas || !!consulta.anio || !!consulta.origen ||
     !!consulta.estado || !!consulta.dueno || !!consulta.appid || !!consulta.ultima ||
-    !!consulta.mes || !!consulta.nota || origen !== "todo" || dueno !== "todo" || estado !== "todo" ||
+    !!consulta.mes || !!consulta.nota || !!consulta.fecha || !!consulta.favorito ||
+    !!consulta.oculto || origen !== "todo" || dueno !== "todo" || estado !== "todo" ||
     antiguedad !== "todo" || soloNuevos || soloFav || verOcultos || !!ORDEN_CABECERA;
   $("limpiar").hidden = !filtrando;
 
@@ -1720,6 +1748,20 @@ function pinta() {
     if (consulta.appid && d.a !== consulta.appid) return false;
     if (consulta.nota === "si" && !NOTAS[d.a]) return false;
     if (consulta.nota === "no" && NOTAS[d.a]) return false;
+    if (consulta.fecha) {
+      if (!d.q) return false;
+      if (consulta.fecha.min) {
+        if (d.q < consulta.fecha.min || d.q > consulta.fecha.max) return false;
+      } else {
+        const ok = consulta.fecha.signo === ">" ? d.q > consulta.fecha.valor
+          : d.q < consulta.fecha.valor;
+        if (!ok) return false;
+      }
+    }
+    if (consulta.favorito === "si" && !FAVORITOS.has(d.a)) return false;
+    if (consulta.favorito === "no" && FAVORITOS.has(d.a)) return false;
+    if (consulta.oculto === "si" && !OCULTOS.has(d.a)) return false;
+    if (consulta.oculto === "no" && OCULTOS.has(d.a)) return false;
     if (consulta.ultima) {
       if (consulta.ultima.modo === "never") {
         if (d.u) return false;
@@ -1746,7 +1788,7 @@ function pinta() {
     if (dueno !== "todo" && !(d.o || []).includes(dueno)) return false;
     if (soloNuevos && d.w !== "nuevo") return false;
     if (soloFav && !FAVORITOS.has(d.a)) return false;
-    if (!verOcultos && OCULTOS.has(d.a)) return false;
+    if (!verOcultos && !consulta.oculto && OCULTOS.has(d.a)) return false;
     if (corte && !(d.q && d.q >= corte)) return false;
     switch (estado) {
       case "jugable": if (!d.p) return false; break;
@@ -1943,7 +1985,7 @@ function pintaNombres() {
 function exportaHistorial() {
   const campos = ["fecha", "evento", "appid", "nombre", "quien", "propio"];
   const lineas = [campos.join(",")];
-  HISTORIAL_ACTUAL.slice().reverse().forEach(h => {
+  HISTORIAL_ACTUAL.forEach(h => {
     lineas.push([h.f, h.e, h.a || "", h.n, h.q || "", h.p ? "si" : "no"]
       .map(csvCampo).join(","));
   });
@@ -1960,7 +2002,7 @@ function exportaHistorial() {
 }
 
 function exportaHistorialJson() {
-  const datos = HISTORIAL_ACTUAL.slice().reverse().map(h => ({
+  const datos = HISTORIAL_ACTUAL.map(h => ({
     fecha: h.f,
     evento: h.e,
     appid: h.a ? Number(h.a) : null,
@@ -2135,6 +2177,8 @@ function exportaJson() {
     acquired: d.q || "",
     last_played: d.u || "",
     note: NOTAS[d.a] || "",
+    favorite: FAVORITOS.has(d.a),
+    hidden: OCULTOS.has(d.a),
     store_url: "https://store.steampowered.com/app/" + d.a
   }));
   const blob = new Blob([JSON.stringify(datos, null, 2)], {type: "application/json"});
@@ -2453,6 +2497,14 @@ function exportaMiembros() {
            "miembros-" + new Date().toISOString().slice(0, 10) + ".csv");
 }
 
+function tipoHistorial(h) {
+  return h.e === "nuevo" ? T("nuevo") : (h.e === "fuera" ? T("fuera") : T("otroDueno"));
+}
+
+function quienHistorial(h) {
+  return h.q || (h.p ? T("tu") : T("otroMiembro"));
+}
+
 function pintaHistorial() {
   const caja = $("historialCaja");
   if (caja.hidden) return;
@@ -2468,6 +2520,17 @@ function pintaHistorial() {
     if (hasta && dia > hasta) return false;
     return true;
   });
+  const campo = ORDEN_HISTORIAL.campo;
+  const signo = ORDEN_HISTORIAL.dir === "asc" ? 1 : -1;
+  lista.sort((a, b) => {
+    let x, y;
+    if (campo === "n") { x = a.n || ""; y = b.n || ""; }
+    else if (campo === "e") { x = tipoHistorial(a); y = tipoHistorial(b); }
+    else if (campo === "q") { x = quienHistorial(a); y = quienHistorial(b); }
+    else { x = a.f || ""; y = b.f || ""; }
+    const orden = compara(String(x), String(y)) * signo;
+    return orden || String(b.f || "").localeCompare(String(a.f || ""));
+  });
   HISTORIAL_ACTUAL = lista;
 
   const cuenta = document.createElement("p");
@@ -2479,15 +2542,42 @@ function pintaHistorial() {
   const tabla = document.createElement("table");
   const thead = document.createElement("thead");
   const fila = document.createElement("tr");
-  [T("fecha"), T("juego"), T("que"), T("quien")].forEach(texto => {
-    const th = document.createElement("th");
-    th.textContent = texto;
-    fila.appendChild(th);
-  });
+  [["f", T("fecha")], ["n", T("juego")], ["e", T("que")], ["q", T("quien")]]
+    .forEach(([clave, texto]) => {
+      const th = document.createElement("th");
+      th.textContent = texto;
+      th.dataset.campoHistorial = clave;
+      th.tabIndex = 0;
+      th.setAttribute("aria-sort", ORDEN_HISTORIAL.campo === clave
+        ? (ORDEN_HISTORIAL.dir === "asc" ? "ascending" : "descending") : "none");
+      if (ORDEN_HISTORIAL.campo === clave) {
+        const flecha = document.createElement("span");
+        flecha.className = "flecha";
+        flecha.textContent = ORDEN_HISTORIAL.dir === "asc" ? "▲" : "▼";
+        th.appendChild(flecha);
+      }
+      const alterna = () => {
+        if (ORDEN_HISTORIAL.campo === clave) {
+          ORDEN_HISTORIAL.dir = ORDEN_HISTORIAL.dir === "asc" ? "desc" : "asc";
+        } else {
+          ORDEN_HISTORIAL = {campo: clave, dir: clave === "f" ? "desc" : "asc"};
+        }
+        HISTORIAL_VISIBLE = 100;
+        pintaHistorial();
+      };
+      th.addEventListener("click", alterna);
+      th.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          alterna();
+        }
+      });
+      fila.appendChild(th);
+    });
   thead.appendChild(fila);
 
   const tbody = document.createElement("tbody");
-  lista.slice().reverse().slice(0, HISTORIAL_VISIBLE).forEach(h => {
+  lista.slice(0, HISTORIAL_VISIBLE).forEach(h => {
     const tr = document.createElement("tr");
     const f = document.createElement("td");
     f.className = "dim";
@@ -2496,10 +2586,10 @@ function pintaHistorial() {
     juego.textContent = h.n;
     const que = document.createElement("td");
     que.className = h.e === "nuevo" ? "si" : "no";
-    que.textContent = h.e === "nuevo" ? T("nuevo") : (h.e === "fuera" ? T("fuera") : T("otroDueno"));
+    que.textContent = tipoHistorial(h);
     const quien = document.createElement("td");
     quien.className = "quien";
-    quien.textContent = h.q || (h.p ? T("tu") : T("otroMiembro"));
+    quien.textContent = quienHistorial(h);
     tr.append(f, juego, que, quien);
     tbody.appendChild(tr);
   });
@@ -2685,6 +2775,15 @@ $("ficheroAjustes").addEventListener("change", async e => {
   guardaFiltrosHistorial();
   pintaHistorial();
 }));
+$("limpiarHistorial").addEventListener("click", () => {
+  $("hq").value = "";
+  $("hecho").value = "todo";
+  $("hdesde").value = "";
+  $("hhasta").value = "";
+  HISTORIAL_VISIBLE = 100;
+  try { localStorage.removeItem(CLAVE_HISTORIAL_FILTROS); } catch (e) {}
+  pintaHistorial();
+});
 async function hayPanelNuevo() {
   if (location.protocol !== "http:" && location.protocol !== "https:") return false;
   try {

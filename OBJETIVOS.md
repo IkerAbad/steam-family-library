@@ -1,6 +1,13 @@
 # Objetivos
 
-> Estado: los ocho primeros y las tandas segunda a octava están implementados.
+> Estado: los ocho primeros y las tandas segunda a novena están implementados.
+
+## Novena tanda (2.10.0)
+
+- Operadores `fecha:`, `favorito:` y `oculto:`.
+- Historial ordenable, con botón para limpiar sus filtros.
+- Historial adaptado a móvil.
+- Favorito y oculto en el JSON exportado.
 
 ## Octava tanda (2.9.0)
 

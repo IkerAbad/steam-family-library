@@ -1,5 +1,14 @@
 # Cambios
 
+## 2.10.0 — 2026-11-23
+
+- Operador `fecha:` con `>`, `<` y rangos `2026-01-01..2026-06-30` sobre la fecha de alta.
+- Operadores `favorito:si|no` y `oculto:si|no`; `oculto:si` enseña los ocultos aunque la casilla esté apagada.
+- Historial ordenable por fecha, juego, tipo o quién, con flecha y `aria-sort`.
+- Botón «Limpiar filtros» en el historial.
+- Historial adaptado a móvil: se oculta la columna de quién y la fecha no se solapa.
+- El JSON exportado incluye `favorite` y `hidden`.
+
 ## 2.9.0 — 2026-11-23
 
 - Buscador por palabras en cualquier orden: «ana beta» y «beta ana» encuentran lo mismo.
