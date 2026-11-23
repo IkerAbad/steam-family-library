@@ -1,6 +1,13 @@
 # Objetivos
 
-> Estado: los ocho primeros y las tandas segunda a sexta están implementados.
+> Estado: los ocho primeros y las tandas segunda a séptima están implementados.
+
+## Séptima tanda (2.8.0)
+
+- Alias locales de los miembros, aplicados en toda la interfaz.
+- Sección «Ya no están» con las bajas de la última actualización.
+- Vista móvil con columnas secundarias ocultas.
+- Rango `horas:1-2`, copiar nombres y horas propias en la cabecera.
 
 ## Sexta tanda (2.7.0)
 

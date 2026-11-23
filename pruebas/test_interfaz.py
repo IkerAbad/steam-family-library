@@ -229,6 +229,37 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertIn("3", total)
         self.assertIn("2", total)
         self.assertIn("3,0 h", total)
+        self.assertIn("2,0 h acumuladas en prestados", pagina.inner_text("#stats"))
+        self.assertIn("1,0 h tuyas", pagina.inner_text("#stats"))
+
+    def test_alias_miembros(self):
+        pagina = self.pagina("/panel.html")
+        hash_ana = sfl.etiqueta("222")
+        pagina.once("dialog", lambda dialogo: dialogo.accept("Mamá"))
+        pagina.click(f'[data-alias="{hash_ana}"]')
+
+        self.assertIn("Mamá", pagina.inner_text("#miembrosTabla"))
+        self.assertIn("Mamá", pagina.inner_text("#cuerpo tr[data-appid='20']"))
+        opciones = pagina.eval_on_selector(
+            "#duenoFiltro", "s => [...s.options].map(o => o.textContent).join('|')")
+        self.assertIn("Mamá", opciones)
+
+        pagina.fill("#q", "dueno:mama")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(pagina.locator("#cuerpo tr").count(), 2)
+        pagina.fill("#q", "")
+        pagina.wait_for_timeout(250)
+
+        with pagina.expect_download() as descarga:
+            pagina.click("#guardarAjustes")
+        datos = json.loads(pathlib.Path(descarga.value.path()).read_text(encoding="utf-8"))
+        self.assertEqual(datos["alias"][hash_ana], "Mamá")
+
+        pagina.reload()
+        self.assertIn("Mamá", pagina.inner_text("#miembrosTabla"))
+        pagina.once("dialog", lambda dialogo: dialogo.accept(""))
+        pagina.click(f'[data-alias="{hash_ana}"]')
+        self.assertIn("Ana", pagina.inner_text("#miembrosTabla"))
 
     def test_favoritos_y_ocultos(self):
         pagina = self.pagina("/panel.html")
@@ -438,6 +469,18 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertEqual(filas.count(), 1)
         self.assertIn("Beta", pagina.inner_text("#cuerpo"))
 
+        pagina.fill("#q", "horas:1-2")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 2)
+        self.assertIn("Alfa", pagina.inner_text("#cuerpo"))
+        self.assertIn("Beta", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "horas:0-1")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 2)
+        self.assertIn("Gamma", pagina.inner_text("#cuerpo"))
+        self.assertNotIn("Beta", pagina.inner_text("#cuerpo"))
+
     def test_exportar_json(self):
         pagina = self.pagina("/panel.html")
         pagina.fill("#q", "Beta")
@@ -516,7 +559,10 @@ class PruebaInterfaz(unittest.TestCase):
                 (d / nombre).write_bytes((self.datos / nombre).read_bytes())
             (d / "novedades.json").write_text(json.dumps({
                 "fecha": "2026-11-21T10:00:00+00:00",
-                "eventos": [{"appid": "20", "evento": "nuevo"}]}), encoding="utf-8")
+                "eventos": [
+                    {"appid": "20", "evento": "nuevo", "nombre": "Beta"},
+                    {"appid": "99", "evento": "fuera", "nombre": "Viejo", "quien": "Ana"},
+                ]}), encoding="utf-8")
             sfl.generar_panel(d)
             contexto = self.navegador.new_context(locale="es-ES")
             self.addCleanup(contexto.close)
@@ -524,6 +570,11 @@ class PruebaInterfaz(unittest.TestCase):
             pagina.goto((d / "panel.html").as_uri())
             self.assertTrue(pagina.title().startswith("(1) "))
             self.assertIn("Biblioteca familiar", pagina.title())
+            self.assertTrue(pagina.is_visible("#fueraCaja"))
+            self.assertIn("Viejo", pagina.inner_text("#fueraLista"))
+            self.assertIn("Ana", pagina.inner_text("#fueraLista"))
+            self.assertIn("1 juegos nuevos", pagina.inner_text("#avisoTexto"))
+            self.assertIn("que ya no están", pagina.inner_text("#avisoTexto"))
 
     def test_titulo_cambia_de_idioma(self):
         pagina = self.pagina("/panel.html")
@@ -716,6 +767,31 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertTrue(pagina.evaluate("document.getElementById('ayuda').open"))
         pagina.keyboard.press("Shift+Slash")
         self.assertFalse(pagina.evaluate("document.getElementById('ayuda').open"))
+
+    def test_copiar_nombres(self):
+        pagina = self.pagina("/panel.html")
+        pagina.context.grant_permissions(["clipboard-read", "clipboard-write"])
+        pagina.fill("#q", "Beta")
+        pagina.wait_for_timeout(250)
+        pagina.click("#copiarNombres")
+        for _ in range(60):
+            if pagina.inner_text("#copiarNombres") == "Copiado":
+                break
+            pagina.wait_for_timeout(50)
+        self.assertEqual(pagina.evaluate("navigator.clipboard.readText()"), "Beta")
+
+    def test_vista_movil(self):
+        contexto = self.navegador.new_context(
+            locale="es-ES", viewport={"width": 390, "height": 844})
+        self.addCleanup(contexto.close)
+        pagina = contexto.new_page()
+        pagina.goto(self.base + "/panel.html")
+        self.assertTrue(pagina.is_visible('th[data-campo="n"]'))
+        self.assertFalse(pagina.is_visible('th[data-campo="s"]'))
+        self.assertFalse(pagina.is_visible('th[data-campo="u"]'))
+        self.assertFalse(pagina.is_visible('th[data-campo="q"]'))
+        self.assertTrue(pagina.is_visible('th[data-campo="m"]'))
+        self.assertEqual(pagina.locator("#cuerpo tr").count(), 3)
 
     def test_accesibilidad_basica(self):
         script = """() => {

@@ -39,7 +39,7 @@ from pathlib import Path
 API = "https://api.steampowered.com"
 COMUNIDAD = "https://steamcommunity.com"
 TIENDA = "https://store.steampowered.com"
-VERSION = "2.7.0"
+VERSION = "2.8.0"
 UA = f"steam-family-library/{VERSION}"
 EXCLUDE_REASONS = {
     0: "",
@@ -627,12 +627,12 @@ thead th { position:sticky; top:0; background:var(--panel); text-align:left; pad
 thead th[data-campo]:hover { color:var(--texto); }
 thead th:focus { outline:1px solid var(--acento); outline-offset:-1px; }
 .flecha { color:var(--acento); margin-left:5px; font-size:10px; }
-thead th:nth-child(2) { width:150px; }
-thead th:nth-child(3) { width:100px; }
-thead th:nth-child(4) { width:180px; }
-thead th:nth-child(5) { width:100px; }
-thead th:nth-child(6) { width:120px; }
-thead th:nth-child(7) { width:100px; }
+body > table thead th:nth-child(2) { width:150px; }
+body > table thead th:nth-child(3) { width:100px; }
+body > table thead th:nth-child(4) { width:180px; }
+body > table thead th:nth-child(5) { width:100px; }
+body > table thead th:nth-child(6) { width:120px; }
+body > table thead th:nth-child(7) { width:100px; }
 thead th.der { text-align:right; }
 tbody td { padding:8px 12px; border-bottom:1px solid #1e242c; vertical-align:middle; }
 body.compacto tbody td { padding:3px 10px; font-size:12px; }
@@ -672,6 +672,10 @@ tr.oculto { opacity:.55; }
 #historialCaja { padding:16px 24px 30px; border-top:1px solid var(--borde); }
 #miembrosCaja { padding:16px 24px 0; border-top:1px solid var(--borde); }
 #mesesCaja { padding:16px 24px 0; border-top:1px solid var(--borde); }
+#fueraCaja { padding:16px 24px 0; border-top:1px solid var(--borde); }
+#fueraCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
+#fueraLista ul { margin:0; padding-left:18px; color:var(--suave); font-size:13px; }
+#fueraLista li { margin:4px 0; }
 #mesesCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
 .meses { display:flex; gap:6px; align-items:flex-end; height:120px; }
 .mes { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:4px; height:100%; cursor:pointer; }
@@ -683,6 +687,13 @@ tr.oculto { opacity:.55; }
 .mes:hover .barra { opacity:1; }
 #miembrosCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
 #miembrosCaja table, #topCaja table { min-width:0; }
+#miembrosCaja th:nth-child(1) { width:45%; }
+#miembrosCaja th:nth-child(2) { width:18%; }
+#miembrosCaja th:nth-child(3) { width:18%; }
+#miembrosCaja th:nth-child(4) { width:19%; }
+#topCaja th:nth-child(1) { width:60%; }
+#topCaja th:nth-child(2) { width:20%; }
+#topCaja th:nth-child(3) { width:20%; }
 #miembrosCaja th, #miembrosCaja td, #topCaja th, #topCaja td { font-size:12px; padding:6px 8px; }
 #topCaja { padding:16px 24px 0; border-top:1px solid var(--borde); margin-top:16px; }
 #topCaja h2 { font-size:15px; margin:0 0 10px; font-weight:600; }
@@ -702,7 +713,7 @@ tr.oculto { opacity:.55; }
 #ayuda p { margin:8px 0; }
 @media print {
   .controles, #ajustes, #stats, #aviso, #mesesCaja, #miembrosCaja, #topCaja,
-  #historialCaja, #elegido, #version, #ayuda, #tema, [data-idioma], .icono,
+  #historialCaja, #fueraCaja, #elegido, #version, #ayuda, #tema, [data-idioma], .icono,
   thead th .flecha { display:none !important; }
   body { background:#fff; color:#000; }
   #resumen { color:#000; }
@@ -710,6 +721,23 @@ tr.oculto { opacity:.55; }
   thead th { position:static; background:#fff; color:#000; border-bottom:1px solid #000; }
   tbody td { border-bottom:1px solid #ddd; }
   a { color:#000; text-decoration:none; }
+}
+@media (max-width: 760px) {
+  #stats, #aviso, #resumen, #elegido { padding-left:12px; padding-right:12px; }
+  .controles { padding-left:12px; padding-right:12px; }
+  #mesesCaja, #miembrosCaja, #topCaja, #historialCaja, #fueraCaja { padding-left:12px; padding-right:12px; }
+  #ajustes, #ayuda, #version { padding-left:12px; padding-right:12px; }
+  input[type=search] { flex:1 1 100%; min-width:0; }
+  table { min-width:0; }
+  body > table thead th, body > table tbody td { padding:6px 6px; font-size:11px; }
+  body > table thead th:nth-child(2) { width:70px; }
+  body > table thead th:nth-child(4) { width:90px; }
+  body > table thead th:nth-child(5) { width:60px; }
+  body > table thead th:nth-child(3), body > table tbody td:nth-child(3),
+  body > table thead th:nth-child(6), body > table tbody td:nth-child(6),
+  body > table thead th:nth-child(7), body > table tbody td:nth-child(7) { display:none; }
+  .nombre { gap:4px; }
+  .marca { font-size:10px; padding:0 5px; }
 }
 html[data-tema="claro"] {
   --fondo:#f6f7f9; --panel:#ffffff; --borde:#d5dbe3; --texto:#1b2430; --suave:#5c6878;
@@ -802,6 +830,7 @@ html[data-tema="claro"] #version { color:#8b98a8; }
   <button type="button" id="exportarJson" class="sec" data-t="exportarJson">Exportar JSON</button>
   <button type="button" id="copiarResumen" class="sec" data-t="copiarResumen">Copiar resumen</button>
   <button type="button" id="copiarEnlace" class="sec" data-t="copiarEnlace">Copiar enlace</button>
+  <button type="button" id="copiarNombres" class="sec" data-t="copiarNombres">Copiar nombres</button>
   <button type="button" id="imprimir" class="sec" data-t="imprimir">Imprimir</button>
 </div>
 <div id="elegido" role="status" aria-live="polite"></div>
@@ -821,6 +850,10 @@ html[data-tema="claro"] #version { color:#8b98a8; }
   <tbody id="cuerpo"></tbody>
 </table>
 <div id="vacio" hidden data-t="vacio">Ningún juego cumple esos filtros.</div>
+<section id="fueraCaja" hidden>
+  <h2 data-t="fueraTitulo">Ya no están</h2>
+  <div id="fueraLista"></div>
+</section>
 <section id="mesesCaja">
   <h2 data-t="mesesTitulo">Altas por mes</h2>
   <div id="mesesTabla"></div>
@@ -886,6 +919,7 @@ const HAY_NOV = __HAY_NOV__;
 const ACTUALIZADO = __ACTUALIZADO__;
 const SIN_NOMBRE = __SIN_NOMBRE__;
 const HISTORIAL = __HISTORIAL__;
+const NOVEDADES = __NOVEDADES__;
 const NOMBRES = __NOMBRES__;
 
 const TEXTOS = {
@@ -926,7 +960,7 @@ const TEXTOS = {
     imprimir: "Imprimir",
     ayuda: "Ayuda",
     ayudaBuscar: "Atajos: / enfoca el buscador, Escape lo limpia y ? abre o cierra esta ayuda.",
-    ayudaOperadores: "Operadores: horas:>10, anio:2026, mes:2026-09, origen:family, estado:jugable, dueno:ana, appid:20, ultima:<30, ultima:>365, ultima:never, nota:si y nota:no.",
+    ayudaOperadores: "Operadores: horas:>10, horas:1-2, anio:2026, mes:2026-09, origen:family, estado:jugable, dueno:ana, appid:20, ultima:<30, ultima:>365, ultima:never, nota:si y nota:no.",
     verNuevos: "Ver solo novedades",
     preset: "Añadidos (90 días)",
     limpiar: "Limpiar filtros",
@@ -940,6 +974,7 @@ const TEXTOS = {
     sorprende: "Sorpréndeme",
     teToca: "Te toca",
     copiarEnlace: "Copiar enlace",
+    copiarNombres: "Copiar nombres",
     exportarHistorial: "Exportar historial",
     exportarMiembros: "Exportar CSV",
     guardarAjustes: "Guardar ajustes",
@@ -955,6 +990,11 @@ const TEXTOS = {
     historialCuenta: "%n% de %m% novedades",
     mostrarMas: "Mostrar más",
     miembrosTitulo: "Por miembro",
+    aliasEditar: "Editar nombre",
+    aliasPrompt: "Nombre para",
+    aliasAyuda: "vacío para volver al de Steam",
+    fueraTitulo: "Ya no están",
+    horasPropias: "h tuyas",
     topTitulo: "Más jugados",
     filtrarPor: "Filtrar por",
     pulsaFiltrar: "pulsa para filtrar",
@@ -1044,7 +1084,7 @@ const TEXTOS = {
     imprimir: "Print",
     ayuda: "Help",
     ayudaBuscar: "Shortcuts: / focuses the search box, Escape clears it and ? opens or closes this help.",
-    ayudaOperadores: "Operators: horas:>10, anio:2026, mes:2026-09, origen:family, estado:jugable, dueno:ana, appid:20, ultima:<30, ultima:>365, ultima:never, nota:si and nota:no.",
+    ayudaOperadores: "Operators: horas:>10, horas:1-2, anio:2026, mes:2026-09, origen:family, estado:jugable, dueno:ana, appid:20, ultima:<30, ultima:>365, ultima:never, nota:si and nota:no.",
     verNuevos: "Show only new",
     preset: "Added (90 days)",
     limpiar: "Clear filters",
@@ -1058,6 +1098,7 @@ const TEXTOS = {
     sorprende: "Surprise me",
     teToca: "You play",
     copiarEnlace: "Copy link",
+    copiarNombres: "Copy names",
     exportarHistorial: "Export history",
     exportarMiembros: "Export CSV",
     guardarAjustes: "Save settings",
@@ -1073,6 +1114,11 @@ const TEXTOS = {
     historialCuenta: "%n% of %m% changes",
     mostrarMas: "Show more",
     miembrosTitulo: "By member",
+    aliasEditar: "Edit name",
+    aliasPrompt: "Name for",
+    aliasAyuda: "empty to use the Steam name",
+    fueraTitulo: "No longer there",
+    horasPropias: "h yours",
     topTitulo: "Most played",
     filtrarPor: "Filter by",
     pulsaFiltrar: "click to filter",
@@ -1165,6 +1211,12 @@ function analizaConsulta(texto) {
       horas = {signo: h[1], valor: parseFloat(h[2].replace(",", "."))};
       return;
     }
+    const rango = /^horas:(\d+(?:[.,]\d+)?)-(\d+(?:[.,]\d+)?)$/i.exec(t);
+    if (rango) {
+      horas = {min: parseFloat(rango[1].replace(",", ".")),
+               max: parseFloat(rango[2].replace(",", "."))};
+      return;
+    }
     const a = /^anio:(\d{4})$/i.exec(t);
     if (a) {
       anio = a[1];
@@ -1214,10 +1266,12 @@ function analizaConsulta(texto) {
 
 function preparaBusqueda() {
   DATOS.forEach(d => {
-    const miembro = /^Miembro (\d+)$/.exec(d.d || "");
-    const alterno = miembro && IDIOMA === "en" ? "Member " + miembro[1] : "";
+    const dueno = duenoDe(d);
+    const enIngles = dueno.replace(/Miembro (\d+)/g, "Member $1");
+    const enEspanol = dueno.replace(/Member (\d+)/g, "Miembro $1");
     const propio = d.d === "tú" ? T("tu") : "";
-    d.b = plano([d.n, d.d || "", alterno, propio, NOTAS[d.a] || ""].join(" "));
+    d.b = plano([d.n, d.d || "", dueno, enIngles, enEspanol, propio,
+                 NOTAS[d.a] || ""].join(" "));
   });
 }
 
@@ -1227,10 +1281,7 @@ function pintaDuenos() {
   const hashes = new Set();
   DATOS.forEach(d => (d.o || []).forEach(h => hashes.add(h)));
   const opciones = [...hashes].map(h => {
-    let nombre = NOMBRES[h] || h;
-    nombre = nombre === "tú" ? T("tu")
-      : nombre.replace(/^Miembro (\d+)$/, (todo, n) => IDIOMA === "en" ? "Member " + n : todo);
-    return {h, nombre};
+    return {h, nombre: nombreMiembro(h)};
   }).sort((a, b) => compara(a.nombre, b.nombre));
   sel.replaceChildren();
   const todo = document.createElement("option");
@@ -1285,6 +1336,7 @@ const CLAVE_FILTROS = "sf-filtros";
 const CLAVE_FAV = "sf-favoritos";
 const CLAVE_OCULTOS = "sf-ocultos";
 const CLAVE_NOTAS = "sf-notas";
+const CLAVE_ALIAS = "sf-alias";
 let ORDEN_CABECERA = null;
 let MIEMBROS_ACTUAL = [];
 
@@ -1325,9 +1377,49 @@ function guardaNotas() {
   } catch (e) {}
 }
 
+function cargaAlias() {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLAVE_ALIAS) || "{}");
+    if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+    const salida = {};
+    Object.entries(v).forEach(([h, nombre]) => {
+      if (typeof nombre === "string" && nombre.trim()) {
+        salida[String(h)] = nombre.trim().slice(0, 40);
+      }
+    });
+    return salida;
+  } catch (e) {
+    return {};
+  }
+}
+
+function guardaAlias() {
+  try {
+    localStorage.setItem(CLAVE_ALIAS, JSON.stringify(ALIAS));
+  } catch (e) {}
+}
+
 let FAVORITOS = new Set(cargaLista(CLAVE_FAV));
 let OCULTOS = new Set(cargaLista(CLAVE_OCULTOS));
 let NOTAS = cargaNotas();
+let ALIAS = cargaAlias();
+const YO = Object.keys(NOMBRES).find(h => NOMBRES[h] === "tú") || "";
+
+function nombreMiembro(h) {
+  let nombre = ALIAS[h] || NOMBRES[h] || h;
+  if (nombre === "tú" || nombre === "tu") return T("tu");
+  const miembro = /^Miembro (\d+)$/.exec(nombre);
+  if (miembro && IDIOMA === "en") return "Member " + miembro[1];
+  return nombre;
+}
+
+function duenoDe(d) {
+  const hashes = d.o || [];
+  if (!hashes.length) return d.d || "";
+  const otros = hashes.filter(h => h !== YO).map(nombreMiembro).filter(Boolean).sort(compara);
+  if (otros.length) return otros.join(", ");
+  return hashes.includes(YO) ? T("tu") : (d.d || "");
+}
 let LISTA_ACTUAL = [];
 let HISTORIAL_ACTUAL = [];
 let HISTORIAL_VISIBLE = 100;
@@ -1467,6 +1559,7 @@ const totales = {
   prestados: DATOS.filter(d => d.s === "family").length,
   jugables: DATOS.filter(d => d.s === "family" && d.p).length,
   horas: DATOS.filter(d => d.s === "family").reduce((a, d) => a + d.m, 0),
+  horasPropias: DATOS.filter(d => d.s === "own").reduce((a, d) => a + d.m, 0),
   jugados: DATOS.filter(d => d.s === "family" && d.m > 0).length
 };
 const hoyISO = new Date().toISOString().slice(0, 10);
@@ -1482,20 +1575,49 @@ function pintaStats() {
     "<b>" + numero(totales.jugados) + "</b> " + T("yaJugados"),
     "<b>" + horas(totales.horas) + "</b> " + T("horasPrestados"),
     "<b>" + numero(recientesAnio) + "</b> " + T("anadidosAnio")
-  ].concat(conNota ? ["<b>" + numero(conNota) + "</b> " + T("conNota")] : []).join(" &middot; ");
+  ].concat(totales.horasPropias > 0
+    ? ["<b>" + horas(totales.horasPropias) + "</b> " + T("horasPropias")]
+    : []).concat(conNota ? ["<b>" + numero(conNota) + "</b> " + T("conNota")] : [])
+   .join(" &middot; ");
 }
 
 function pintaAviso() {
   if (!HAY_NOV) { $("aviso").hidden = true; return; }
-  const nuevos = DATOS.filter(d => d.w === "nuevo").length;
-  const fuera = DATOS.filter(d => d.w === "fuera").length;
+  const eventos = NOVEDADES || [];
+  const nuevos = eventos.length
+    ? eventos.filter(e => e.evento === "nuevo").length
+    : DATOS.filter(d => d.w === "nuevo").length;
+  const fuera = eventos.length
+    ? eventos.filter(e => e.evento === "fuera").length
+    : DATOS.filter(d => d.w === "fuera").length;
   $("aviso").hidden = false;
   $("avisoTexto").textContent = T("resumenNovedades") + " (" + fechaHora(FECHA_NOV) + "): " +
     nuevos + " " + T("juegosNuevos") + ", " + fuera + " " + T("yaNoEstan") + ".";
 }
 
+function pintaFuera() {
+  const fuera = (NOVEDADES || []).filter(e => e.evento === "fuera");
+  $("fueraCaja").hidden = fuera.length === 0;
+  if (!fuera.length) {
+    $("fueraLista").replaceChildren();
+    return;
+  }
+  const ul = document.createElement("ul");
+  fuera.forEach(e => {
+    const li = document.createElement("li");
+    const quien = e.quien ? " (" + e.quien + ")" : "";
+    li.textContent = (e.nombre || "") + quien;
+    ul.appendChild(li);
+  });
+  $("fueraLista").replaceChildren(ul);
+}
+
 function pintaTitulo() {
-  const nuevos = HAY_NOV ? DATOS.filter(d => d.w === "nuevo").length : 0;
+  const lista = NOVEDADES || [];
+  const nuevos = HAY_NOV
+    ? (lista.length ? lista.filter(e => e.evento === "nuevo").length
+                    : DATOS.filter(d => d.w === "nuevo").length)
+    : 0;
   document.title = (nuevos ? "(" + nuevos + ") " : "") + T("titulo");
 }
 
@@ -1508,7 +1630,8 @@ function sorprende() {
     fila.classList.add("elegido");
     fila.scrollIntoView({block: "center", behavior: "smooth"});
   }
-  const dueno = d.d ? " (" + (d.d === "tú" ? T("tu") : d.d) + ")" : "";
+  const quien = duenoDe(d);
+  const dueno = quien ? " (" + quien + ")" : "";
   $("elegido").textContent = T("teToca") + " " + d.n + dueno;
 }
 
@@ -1539,9 +1662,13 @@ function pinta() {
     if (q && !d.b.includes(q)) return false;
     if (consulta.horas) {
       const jugadas = d.m / 60;
-      const signo = consulta.horas.signo === ">" ? jugadas > consulta.horas.valor
-        : jugadas < consulta.horas.valor;
-      if (!signo) return false;
+      if ("min" in consulta.horas) {
+        if (jugadas < consulta.horas.min || jugadas > consulta.horas.max) return false;
+      } else {
+        const signo = consulta.horas.signo === ">" ? jugadas > consulta.horas.valor
+          : jugadas < consulta.horas.valor;
+        if (!signo) return false;
+      }
     }
     if (consulta.anio && (!d.q || d.q.slice(0, 4) !== consulta.anio)) return false;
     if (consulta.mes && (!d.q || d.q.slice(0, 7) !== consulta.mes)) return false;
@@ -1567,7 +1694,7 @@ function pinta() {
       if (consulta.estado === "sinestrenar" && d.m > 0) return false;
     }
     if (consulta.dueno) {
-      const nombres = [d.d || "", d.d === "tú" ? T("tu") : ""].map(plano);
+      const nombres = [duenoDe(d), d.d || ""].map(plano);
       if (!nombres.some(n => n.includes(consulta.dueno))) return false;
     }
     if (origen !== "todo" && d.s !== origen) return false;
@@ -1692,11 +1819,9 @@ function pinta() {
 
     const td2 = document.createElement("td");
     td2.className = "dim";
-    const miembro = /^Miembro (\d+)$/.exec(d.d || "");
-    const quien = (d.d === "tú" || d.d === "tu") ? T("tu")
-      : (miembro && IDIOMA === "en") ? "Member " + miembro[1] : d.d;
-    td2.textContent = quien || "";
-    td2.title = quien || "";
+    const quien = duenoDe(d);
+    td2.textContent = quien;
+    td2.title = quien;
 
     const td3 = document.createElement("td");
     const m3 = document.createElement("span");
@@ -1796,6 +1921,7 @@ function guardaAjustesFichero() {
     favoritos: [...FAVORITOS],
     ocultos: [...OCULTOS],
     notas: NOTAS,
+    alias: ALIAS,
     filtros: JSON.parse(localStorage.getItem(CLAVE_FILTROS) || "{}"),
     compacto: COMPACTO
   };
@@ -1858,9 +1984,19 @@ async function cargaAjustesFichero(fichero) {
       });
       NOTAS = limpias;
     }
+    if (d.alias && typeof d.alias === "object" && !Array.isArray(d.alias)) {
+      const limpios = {};
+      Object.entries(d.alias).forEach(([h, nombre]) => {
+        if (typeof nombre === "string" && nombre.trim()) {
+          limpios[String(h)] = nombre.trim().slice(0, 40);
+        }
+      });
+      ALIAS = limpios;
+    }
     guardaLista(CLAVE_FAV, FAVORITOS);
     guardaLista(CLAVE_OCULTOS, OCULTOS);
     guardaNotas();
+    guardaAlias();
     if (d.tema === "claro" || d.tema === "oscuro") {
       TEMA = d.tema;
       try { localStorage.setItem(CLAVE_TEMA, TEMA); } catch (e) {}
@@ -1932,7 +2068,7 @@ function exportaJson() {
   const datos = LISTA_ACTUAL.map(d => ({
     appid: Number(d.a),
     name: d.n,
-    owner: d.d || "",
+    owner: duenoDe(d),
     source: d.s,
     playable: !!d.p,
     exclude_reason: d.e || "",
@@ -2017,10 +2153,7 @@ function pintaMiembros() {
     acumulado.set(h, m);
   }));
   const filas = [...acumulado.entries()].map(([h, m]) => {
-    let nombre = NOMBRES[h] || h;
-    nombre = nombre === "tú" ? T("tu")
-      : nombre.replace(/^Miembro (\d+)$/, (todo, n) => IDIOMA === "en" ? "Member " + n : todo);
-    return {h, nombre, j: m.j, p: m.p, m: m.m};
+    return {h, nombre: nombreMiembro(h), j: m.j, p: m.p, m: m.m};
   });
   filas.sort((a, b) => b.j - a.j || compara(a.nombre, b.nombre));
   MIEMBROS_ACTUAL = filas;
@@ -2047,6 +2180,15 @@ function pintaMiembros() {
     boton.title = T("filtrarPor") + " " + f.nombre;
     boton.addEventListener("click", () => filtraPorDueno(f.h));
     nombre.appendChild(boton);
+    const editar = document.createElement("button");
+    editar.type = "button";
+    editar.className = "icono";
+    editar.dataset.alias = f.h;
+    editar.textContent = "✎";
+    editar.title = T("aliasEditar");
+    editar.setAttribute("aria-label", T("aliasEditar") + " " + f.nombre);
+    editar.addEventListener("click", () => editaAlias(f.h, f.nombre));
+    nombre.appendChild(editar);
     const juegos = document.createElement("td");
     juegos.className = "der";
     juegos.textContent = numero(f.j);
@@ -2113,6 +2255,21 @@ function editaNota(appid, nombre) {
   pinta();
 }
 
+function editaAlias(h, nombreActual) {
+  const texto = window.prompt(
+    T("aliasPrompt") + " " + nombreActual + " (" + T("aliasAyuda") + ")",
+    ALIAS[h] || "");
+  if (texto === null) return;
+  const limpio = texto.trim().slice(0, 40);
+  if (limpio) ALIAS[h] = limpio; else delete ALIAS[h];
+  guardaAlias();
+  preparaBusqueda();
+  pintaDuenos();
+  pintaMiembros();
+  pintaTop();
+  pinta();
+}
+
 function pintaTop() {
   const filas = DATOS.filter(d => d.m > 0)
     .sort((a, b) => b.m - a.m || compara(a.n, b.n))
@@ -2144,8 +2301,7 @@ function pintaTop() {
     a.title = d.n;
     nombre.appendChild(a);
     const dueno = document.createElement("td");
-    dueno.textContent = d.d || "";
-    if (d.d === "tú") dueno.textContent = T("tu");
+    dueno.textContent = duenoDe(d);
     const tiempo = document.createElement("td");
     tiempo.className = "der";
     tiempo.textContent = horas(d.m) + " h";
@@ -2188,6 +2344,11 @@ async function copiaResumen() {
 async function copiaEnlace() {
   guardaHash();
   await copiaTexto(location.href, $("copiarEnlace"), "copiarEnlace");
+}
+
+async function copiaNombres() {
+  await copiaTexto(LISTA_ACTUAL.map(d => d.n).join("\n"),
+                   $("copiarNombres"), "copiarNombres");
 }
 
 function exportaMiembros() {
@@ -2289,6 +2450,7 @@ function aplicaIdioma() {
   pintaStats();
   pintaAviso();
   pintaTitulo();
+  pintaFuera();
   pintaActualizado();
   pintaNombres();
   pintaMeses();
@@ -2406,6 +2568,7 @@ $("exportar").addEventListener("click", exportaCsv);
 $("exportarJson").addEventListener("click", exportaJson);
 $("sorprende").addEventListener("click", sorprende);
 $("copiarEnlace").addEventListener("click", copiaEnlace);
+$("copiarNombres").addEventListener("click", copiaNombres);
 $("imprimir").addEventListener("click", () => window.print());
 $("exportarMiembros").addEventListener("click", exportaMiembros);
 $("copiarResumen").addEventListener("click", copiaResumen);
@@ -2644,6 +2807,9 @@ def generar_panel(datos):
     historial = json.dumps(leer_historial(datos), ensure_ascii=False,
                            separators=(",", ":")).replace("</", "<\\/")
     html = html.replace("__HISTORIAL__", historial)
+    novedades = json.dumps(nov.get("eventos", []), ensure_ascii=False,
+                           separators=(",", ":")).replace("</", "<\\/")
+    html = html.replace("__NOVEDADES__", novedades)
     # Los datos van al final: si un nombre de juego coincide con un marcador, no se toca.
     html = html.replace("__DATOS__", blob)
 

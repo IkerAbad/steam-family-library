@@ -1,5 +1,14 @@
 # Cambios
 
+## 2.8.0 — 2026-11-23
+
+- Nombres locales para los miembros: se editan desde «Por miembro» y valen en la tabla, los filtros y las estadísticas.
+- Sección «Ya no están» con los juegos que salieron en la última actualización.
+- Vista móvil: columnas secundarias ocultas y controles apilados en pantallas estrechas.
+- Rango de horas en el buscador: `horas:1-2`.
+- Botón «Copiar nombres» con la lista de la vista filtrada.
+- Las horas de tus propios juegos aparecen en la cabecera cuando hay alguna.
+
 ## 2.7.0 — 2026-11-23
 
 - Notas por juego: se crean, se editan, se borran, se buscan y se filtran con `nota:si` y `nota:no`.
