@@ -1,5 +1,14 @@
 # Cambios
 
+## 2.9.0 — 2026-11-23
+
+- Buscador por palabras en cualquier orden: «ana beta» y «beta ana» encuentran lo mismo.
+- El historial recuerda sus filtros entre visitas.
+- Las estadísticas por miembro se ordenan pulsando sus cabeceras.
+- «Actualizado» muestra el tiempo relativo («hace 2 h»).
+- Enlace «Saltar a la tabla» para navegar con teclado.
+- «Detener la app» desde el panel cuando se sirve desde la propia app.
+
 ## 2.8.0 — 2026-11-23
 
 - Nombres locales para los miembros: se editan desde «Por miembro» y valen en la tabla, los filtros y las estadísticas.

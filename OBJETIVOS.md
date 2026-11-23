@@ -1,6 +1,13 @@
 # Objetivos
 
-> Estado: los ocho primeros y las tandas segunda a séptima están implementados.
+> Estado: los ocho primeros y las tandas segunda a octava están implementados.
+
+## Octava tanda (2.9.0)
+
+- Buscador por palabras en cualquier orden.
+- Filtros del historial recordados.
+- Cabeceras ordenables en las estadísticas por miembro.
+- Fecha relativa, enlace de salto y botón para detener la app.
 
 ## Séptima tanda (2.8.0)
 

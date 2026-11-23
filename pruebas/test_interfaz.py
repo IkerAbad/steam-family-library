@@ -209,6 +209,20 @@ class PruebaInterfaz(unittest.TestCase):
         pagina.click("#historialMas")
         self.assertEqual(filas.count(), 122)
 
+    def test_miembros_orden(self):
+        pagina = self.pagina("/panel.html")
+        horas = pagina.locator('#miembrosTabla th[data-campo-miembro="m"]')
+        horas.click()
+        self.assertEqual(horas.get_attribute("aria-sort"), "descending")
+        filas = pagina.locator("#miembrosTabla tbody tr").all_inner_texts()
+        self.assertIn("Ana", filas[0])
+
+        horas.click()
+        self.assertEqual(horas.get_attribute("aria-sort"), "ascending")
+        filas = pagina.locator("#miembrosTabla tbody tr").all_inner_texts()
+        self.assertIn("Ana", filas[-1])
+        self.assertIn("tú", filas[-2])
+
     def test_miembros(self):
         pagina = self.pagina("/panel.html")
         filas = pagina.locator("#miembrosTabla tbody tr").all_inner_texts()
@@ -464,6 +478,16 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertEqual(filas.count(), 2)
         self.assertNotIn("Alfa", pagina.inner_text("#cuerpo"))
 
+        pagina.fill("#q", "ana beta")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Beta", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "beta ana")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Beta", pagina.inner_text("#cuerpo"))
+
         pagina.fill("#q", "origen:family estado:jugable")
         pagina.wait_for_timeout(250)
         self.assertEqual(filas.count(), 1)
@@ -571,6 +595,7 @@ class PruebaInterfaz(unittest.TestCase):
             self.assertTrue(pagina.title().startswith("(1) "))
             self.assertIn("Biblioteca familiar", pagina.title())
             self.assertTrue(pagina.is_visible("#fueraCaja"))
+            self.assertFalse(pagina.is_visible("#detenerPanel"))
             self.assertIn("Viejo", pagina.inner_text("#fueraLista"))
             self.assertIn("Ana", pagina.inner_text("#fueraLista"))
             self.assertIn("1 juegos nuevos", pagina.inner_text("#avisoTexto"))
@@ -585,8 +610,15 @@ class PruebaInterfaz(unittest.TestCase):
     def test_historial_se_recuerda(self):
         pagina = self.pagina("/panel.html")
         pagina.click("#verHistorial")
+        pagina.fill("#hq", "Paseo")
+        pagina.select_option("#hecho", "nuevo")
+        pagina.fill("#hdesde", "2026-11-20")
         pagina.reload()
         self.assertTrue(pagina.is_visible("#historialCaja"))
+        self.assertEqual(pagina.input_value("#hq"), "Paseo")
+        self.assertEqual(pagina.input_value("#hecho"), "nuevo")
+        self.assertEqual(pagina.input_value("#hdesde"), "2026-11-20")
+        self.assertEqual(pagina.locator("#historialTabla tbody tr").count(), 1)
         pagina.click("#verHistorial")
         pagina.reload()
         self.assertFalse(pagina.is_visible("#historialCaja"))
@@ -748,6 +780,38 @@ class PruebaInterfaz(unittest.TestCase):
                 sfl.Handler.datos = original
                 sfl.Handler.servidor = original_servidor
 
+    def test_detener_desde_el_panel(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            for nombre in ("library.csv", "snapshot.json"):
+                (d / nombre).write_bytes((self.datos / nombre).read_bytes())
+            sfl.generar_panel(d)
+            original = sfl.Handler.datos
+            original_servidor = sfl.Handler.servidor
+            sfl.Handler.datos = d
+            servidor = sfl.Servidor(("127.0.0.1", 0), sfl.Handler)
+            sfl.Handler.servidor = servidor
+            hilo = threading.Thread(target=servidor.serve_forever, daemon=True)
+            hilo.start()
+            try:
+                contexto = self.navegador.new_context(locale="es-ES")
+                self.addCleanup(contexto.close)
+                pagina = contexto.new_page()
+                pagina.goto(f"http://127.0.0.1:{servidor.server_address[1]}/panel.html")
+                self.assertTrue(pagina.is_visible("#detenerPanel"))
+                pagina.click("#detenerPanel")
+                for _ in range(40):
+                    if "detenida" in pagina.inner_text("h1").lower():
+                        break
+                    pagina.wait_for_timeout(50)
+                self.assertIn("detenida", pagina.inner_text("h1").lower())
+            finally:
+                servidor.shutdown()
+                servidor.server_close()
+                hilo.join(timeout=5)
+                sfl.Handler.datos = original
+                sfl.Handler.servidor = original_servidor
+
     def test_imprimir(self):
         pagina = self.pagina("/panel.html")
         pagina.evaluate("window.print = () => { window.__impreso = true; }")
@@ -792,6 +856,20 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertFalse(pagina.is_visible('th[data-campo="q"]'))
         self.assertTrue(pagina.is_visible('th[data-campo="m"]'))
         self.assertEqual(pagina.locator("#cuerpo tr").count(), 3)
+
+    def test_actualizado_relativo(self):
+        pagina = self.pagina("/panel.html")
+        texto = pagina.inner_text("#actualizado")
+        self.assertIn("Actualizado el", texto)
+        self.assertIn("hace", texto)
+
+    def test_saltar_a_la_tabla(self):
+        pagina = self.pagina("/panel.html")
+        pagina.keyboard.press("Tab")
+        self.assertEqual(pagina.evaluate("document.activeElement.id"), "saltar")
+        self.assertTrue(pagina.is_visible("#saltar"))
+        pagina.keyboard.press("Enter")
+        self.assertEqual(pagina.evaluate("location.hash"), "#tablaJuegos")
 
     def test_accesibilidad_basica(self):
         script = """() => {

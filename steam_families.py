@@ -39,7 +39,7 @@ from pathlib import Path
 API = "https://api.steampowered.com"
 COMUNIDAD = "https://steamcommunity.com"
 TIENDA = "https://store.steampowered.com"
-VERSION = "2.8.0"
+VERSION = "2.9.0"
 UA = f"steam-family-library/{VERSION}"
 EXCLUDE_REASONS = {
     0: "",
@@ -611,6 +611,8 @@ h1 { font-size:20px; margin:0 0 6px; font-weight:600; }
 .idiomas button:hover { color:var(--texto); }
 .idiomas button[aria-pressed="true"] { background:#22303c; color:var(--acento); }
 .aviso { margin:10px 24px 0; padding:9px 12px; border-radius:8px; background:#16241a; border:1px solid #2f5c3b; color:var(--verde); font-size:13px; }
+.saltar { position:absolute; left:-9999px; top:0; }
+.saltar:focus { left:12px; top:10px; z-index:10; background:var(--panel); color:var(--texto); border:1px solid var(--acento); border-radius:6px; padding:8px 12px; }
 .aviso button { float:right; background:none; border:none; color:var(--verde); cursor:pointer; font:inherit; text-decoration:underline; }
 .controles { display:flex; flex-wrap:wrap; gap:8px; padding:14px 24px 8px; align-items:center; }
 input[type=search], select { background:var(--panel); color:var(--texto); border:1px solid var(--borde); border-radius:6px; padding:7px 10px; font:inherit; }
@@ -714,7 +716,7 @@ tr.oculto { opacity:.55; }
 @media print {
   .controles, #ajustes, #stats, #aviso, #mesesCaja, #miembrosCaja, #topCaja,
   #historialCaja, #fueraCaja, #elegido, #version, #ayuda, #tema, [data-idioma], .icono,
-  thead th .flecha { display:none !important; }
+  .saltar, thead th .flecha { display:none !important; }
   body { background:#fff; color:#000; }
   #resumen { color:#000; }
   table { min-width:0; }
@@ -767,6 +769,7 @@ html[data-tema="claro"] #version { color:#8b98a8; }
 </style>
 </head>
 <body>
+<a href="#tablaJuegos" id="saltar" class="saltar" data-t="saltar">Saltar a la tabla</a>
 <header>
   <div class="titulo">
     <h1 data-t="titulo">Biblioteca familiar de Steam</h1>
@@ -789,6 +792,7 @@ html[data-tema="claro"] #version { color:#8b98a8; }
   <span id="avisoNombresTexto"></span>
   <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener" data-t="pedirClave">consíguela aquí</a>
 </div>
+<div id="viejo" hidden></div>
 <div class="controles">
   <input id="q" type="search" data-tp="buscar" data-ta="buscarEtiqueta" placeholder="Buscar por nombre… (los acentos dan igual)" autocomplete="off">
   <select id="origen" aria-label="Origen" data-ta="origen">
@@ -835,7 +839,7 @@ html[data-tema="claro"] #version { color:#8b98a8; }
 </div>
 <div id="elegido" role="status" aria-live="polite"></div>
 <div id="resumen" aria-live="polite"></div>
-<table>
+<table id="tablaJuegos" tabindex="-1">
   <thead>
     <tr>
       <th scope="col" data-t="juego" data-campo="n" tabindex="0">Juego</th>
@@ -910,7 +914,7 @@ html[data-tema="claro"] #version { color:#8b98a8; }
   <p data-t="ayudaBuscar">Atajos: / enfoca el buscador, Escape lo limpia y ? abre o cierra esta ayuda.</p>
   <p data-t="ayudaOperadores">Operadores: horas:>10, anio:2026, mes:2026-09, origen:family, estado:jugable, dueno:ana, appid:20, ultima:<30, ultima:>365, ultima:never, nota:si y nota:no.</p>
 </details>
-<div id="version">Steam Families v__VERSION__</div>
+<div id="version">Steam Families v__VERSION__ · <a href="#" id="detenerPanel" hidden data-t="detener">Detener la app</a></div>
 
 <script>
 const DATOS = __DATOS__;
@@ -925,6 +929,7 @@ const NOMBRES = __NOMBRES__;
 const TEXTOS = {
   es: {
     titulo: "Biblioteca familiar de Steam",
+    saltar: "Saltar a la tabla",
     buscar: "Buscar por nombre o dueño… (horas:>10, anio:2026, ultima:<30)",
     buscarEtiqueta: "Buscar",
     todo: "Todo",
@@ -1026,7 +1031,15 @@ const TEXTOS = {
     juegosNuevos: "juegos nuevos",
     yaNoEstan: "que ya no están",
     actualizado: "Actualizado el",
+    haceAhora: "hace un momento",
+    haceMin: "hace %n% min",
+    haceHoras: "hace %n% h",
+    haceUnDia: "hace un día",
+    haceDias: "hace %n% días",
     viejo: "datos de hace más de un día: abre la app y actualiza con un token nuevo",
+    detener: "Detener la app",
+    detenida: "Aplicación detenida",
+    detenidaTexto: "Ya puedes cerrar esta pestaña.",
     sinNombre: "Hay %n% miembros sin nombre.",
     sinNombreUno: "Hay 1 miembro sin nombre.",
     pedirClave: "consíguela aquí",
@@ -1049,6 +1062,7 @@ const TEXTOS = {
   },
   en: {
     titulo: "Steam family library",
+    saltar: "Skip to the table",
     buscar: "Search by name or owner… (horas:>10, anio:2026, ultima:<30)",
     buscarEtiqueta: "Search",
     todo: "All",
@@ -1150,7 +1164,15 @@ const TEXTOS = {
     juegosNuevos: "new games",
     yaNoEstan: "gone",
     actualizado: "Updated",
+    haceAhora: "just now",
+    haceMin: "%n% min ago",
+    haceHoras: "%n% h ago",
+    haceUnDia: "1 day ago",
+    haceDias: "%n% days ago",
     viejo: "data is over a day old: open the app and update with a new token",
+    detener: "Stop the app",
+    detenida: "Application stopped",
+    detenidaTexto: "You can close this tab now.",
     sinNombre: "%n% members have no name yet.",
     sinNombreUno: "1 member has no name yet.",
     pedirClave: "get one here",
@@ -1337,8 +1359,10 @@ const CLAVE_FAV = "sf-favoritos";
 const CLAVE_OCULTOS = "sf-ocultos";
 const CLAVE_NOTAS = "sf-notas";
 const CLAVE_ALIAS = "sf-alias";
+const CLAVE_HISTORIAL_FILTROS = "sf-historial-filtros";
 let ORDEN_CABECERA = null;
 let MIEMBROS_ACTUAL = [];
+let ORDEN_MIEMBROS = {campo: "j", dir: "desc"};
 
 function cargaLista(clave) {
   try {
@@ -1462,6 +1486,27 @@ function guardaFiltros() {
       dueno: $("duenoFiltro").value,
       q: $("q").value,
       cabecera: ORDEN_CABECERA
+    }));
+  } catch (e) {}
+}
+
+function cargaFiltrosHistorial() {
+  try {
+    const g = JSON.parse(localStorage.getItem(CLAVE_HISTORIAL_FILTROS) || "{}");
+    if (typeof g.q === "string") $("hq").value = g.q.slice(0, 200);
+    if (["todo", "nuevo", "fuera", "nuevo_dueno"].includes(g.tipo)) $("hecho").value = g.tipo;
+    if (typeof g.desde === "string") $("hdesde").value = g.desde;
+    if (typeof g.hasta === "string") $("hhasta").value = g.hasta;
+  } catch (e) {}
+}
+
+function guardaFiltrosHistorial() {
+  try {
+    localStorage.setItem(CLAVE_HISTORIAL_FILTROS, JSON.stringify({
+      q: $("hq").value,
+      tipo: $("hecho").value,
+      desde: $("hdesde").value,
+      hasta: $("hhasta").value
     }));
   } catch (e) {}
 }
@@ -1638,7 +1683,7 @@ function sorprende() {
 function pinta() {
   $("elegido").textContent = "";
   const consulta = analizaConsulta($("q").value.trim());
-  const q = plano(consulta.texto);
+  const palabras = plano(consulta.texto).split(/\s+/).filter(Boolean);
   const origen = $("origen").value;
   const dueno = $("duenoFiltro").value;
   const estado = $("estado").value;
@@ -1647,7 +1692,7 @@ function pinta() {
   const soloNuevos = $("soloNuevos").checked;
   const soloFav = $("soloFav").checked;
   const verOcultos = $("verOcultos").checked;
-  const filtrando = !!q || !!consulta.horas || !!consulta.anio || !!consulta.origen ||
+  const filtrando = !!palabras.length || !!consulta.horas || !!consulta.anio || !!consulta.origen ||
     !!consulta.estado || !!consulta.dueno || !!consulta.appid || !!consulta.ultima ||
     !!consulta.mes || !!consulta.nota || origen !== "todo" || dueno !== "todo" || estado !== "todo" ||
     antiguedad !== "todo" || soloNuevos || soloFav || verOcultos || !!ORDEN_CABECERA;
@@ -1659,7 +1704,7 @@ function pinta() {
   else if (antiguedad === "anio") corte = hoyISO.slice(0, 4) + "-01-01";
 
   let lista = DATOS.filter(d => {
-    if (q && !d.b.includes(q)) return false;
+    if (palabras.length && !palabras.every(p => d.b.includes(p))) return false;
     if (consulta.horas) {
       const jugadas = d.m / 60;
       if ("min" in consulta.horas) {
@@ -1862,6 +1907,18 @@ function pinta() {
   cuerpo.replaceChildren(frag);
 }
 
+function relativo(iso) {
+  const t = Date.parse(iso);
+  if (!isFinite(t)) return "";
+  const minutos = Math.max(0, Math.floor((Date.now() - t) / 60000));
+  if (minutos < 1) return T("haceAhora");
+  if (minutos < 60) return T("haceMin").replace("%n%", numero(minutos));
+  const horas = Math.floor(minutos / 60);
+  if (horas < 24) return T("haceHoras").replace("%n%", numero(horas));
+  const dias = Math.floor(horas / 24);
+  return dias === 1 ? T("haceUnDia") : T("haceDias").replace("%n%", numero(dias));
+}
+
 function pintaActualizado() {
   const el = $("actualizado");
   if (!ACTUALIZADO) { el.textContent = ""; el.className = ""; return; }
@@ -1869,6 +1926,8 @@ function pintaActualizado() {
   if (isNaN(f)) { el.textContent = ""; el.className = ""; return; }
   const horas = (Date.now() - f.getTime()) / 3600000;
   el.textContent = T("actualizado") + " " + f.toLocaleString(LOCALE(), {year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"});
+  const rel = relativo(ACTUALIZADO);
+  if (rel) el.textContent += " (" + rel + ")";
   el.className = horas > 24 ? "viejo" : "";
   if (horas > 24) el.textContent += " — " + T("viejo");
 }
@@ -2155,16 +2214,49 @@ function pintaMiembros() {
   const filas = [...acumulado.entries()].map(([h, m]) => {
     return {h, nombre: nombreMiembro(h), j: m.j, p: m.p, m: m.m};
   });
-  filas.sort((a, b) => b.j - a.j || compara(a.nombre, b.nombre));
+  const campo = ORDEN_MIEMBROS.campo;
+  const signo = ORDEN_MIEMBROS.dir === "asc" ? 1 : -1;
+  filas.sort((a, b) => {
+    if (campo === "nombre") {
+      return compara(a.nombre, b.nombre) * signo || b.j - a.j;
+    }
+    return (a[campo] - b[campo]) * signo || compara(a.nombre, b.nombre);
+  });
   MIEMBROS_ACTUAL = filas;
   const maxHoras = Math.max(1, ...filas.map(f => f.m));
 
   const tabla = document.createElement("table");
   const thead = document.createElement("thead");
   const fila = document.createElement("tr");
-  [T("miembro"), T("juegos"), T("jugablesHeader"), T("horasHeader")].forEach(texto => {
+  [["nombre", T("miembro")], ["j", T("juegos")], ["p", T("jugablesHeader")],
+   ["m", T("horasHeader")]].forEach(([clave, texto]) => {
     const th = document.createElement("th");
     th.textContent = texto;
+    th.dataset.campoMiembro = clave;
+    th.tabIndex = 0;
+    th.setAttribute("aria-sort", ORDEN_MIEMBROS.campo === clave
+      ? (ORDEN_MIEMBROS.dir === "asc" ? "ascending" : "descending") : "none");
+    if (ORDEN_MIEMBROS.campo === clave) {
+      const flecha = document.createElement("span");
+      flecha.className = "flecha";
+      flecha.textContent = ORDEN_MIEMBROS.dir === "asc" ? "▲" : "▼";
+      th.appendChild(flecha);
+    }
+    const alterna = () => {
+      if (ORDEN_MIEMBROS.campo === clave) {
+        ORDEN_MIEMBROS.dir = ORDEN_MIEMBROS.dir === "asc" ? "desc" : "asc";
+      } else {
+        ORDEN_MIEMBROS = {campo: clave, dir: clave === "nombre" ? "asc" : "desc"};
+      }
+      pintaMiembros();
+    };
+    th.addEventListener("click", alterna);
+    th.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        alterna();
+      }
+    });
     fila.appendChild(th);
   });
   thead.appendChild(fila);
@@ -2570,6 +2662,7 @@ $("sorprende").addEventListener("click", sorprende);
 $("copiarEnlace").addEventListener("click", copiaEnlace);
 $("copiarNombres").addEventListener("click", copiaNombres);
 $("imprimir").addEventListener("click", () => window.print());
+$("detenerPanel").addEventListener("click", detenerPanel);
 $("exportarMiembros").addEventListener("click", exportaMiembros);
 $("copiarResumen").addEventListener("click", copiaResumen);
 $("compacto").addEventListener("change", () => {
@@ -2589,6 +2682,7 @@ $("ficheroAjustes").addEventListener("change", async e => {
 });
 ["hq", "hecho", "hdesde", "hhasta"].forEach(id => $(id).addEventListener("input", () => {
   HISTORIAL_VISIBLE = 100;
+  guardaFiltrosHistorial();
   pintaHistorial();
 }));
 async function hayPanelNuevo() {
@@ -2608,8 +2702,26 @@ async function compruebaPanel() {
 }
 setInterval(compruebaPanel, 120000);
 
+async function detenerPanel(e) {
+  e.preventDefault();
+  try {
+    await fetch("/api/detener", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: "{}"
+    });
+  } catch (x) {}
+  document.body.innerHTML = '<div style="padding:40px"><h1>' + T("detenida") +
+    '</h1><p class="sub">' + T("detenidaTexto") + '</p></div>';
+}
+
+if (location.protocol === "http:" || location.protocol === "https:") {
+  $("detenerPanel").hidden = false;
+}
+
 pintaDuenos();
 cargaFiltros();
+cargaFiltrosHistorial();
 aplicaHash();
 try {
   if (localStorage.getItem(CLAVE_HISTORIAL) === "1") $("historialCaja").hidden = false;
