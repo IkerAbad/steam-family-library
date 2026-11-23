@@ -1,5 +1,14 @@
 # Cambios
 
+## 3.1.0 — 2026-11-23
+
+- El proyecto incluye `pyproject.toml`: se puede instalar con `pip install .` y
+  ejecutar con el comando `steam-families`, con las mismas opciones que el
+  script.
+- La distribución se llamará `steam-families-library`. La primera subida a PyPI
+  queda pendiente del límite de proyectos nuevos de la cuenta.
+- Sin cambios de comportamiento.
+
 ## 3.0.1 — 2026-11-23
 
 - Pruebas de los endpoints HTTP y de los caminos de error de la app.

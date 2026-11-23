@@ -25,3 +25,5 @@ historial.corrupto.csv
 ajustes.json
 .lock
 *.lock
+
+*.egg-info/

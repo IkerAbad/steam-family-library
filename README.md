@@ -16,6 +16,8 @@ Steam fusiona todas las bibliotecas del grupo y no tiene ningún filtro para sep
 
 Sin Python: descarga la [última release](https://github.com/IkerAbad/steam-family-library/releases/latest), descomprime el ZIP y haz doble clic en `iniciar.cmd`.
 
+Si prefieres instalarlo como paquete de Python: `pip install .` desde esta carpeta y después `steam-families`, con las mismas opciones que `iniciar.cmd`.
+
 1. Instala [Python 3.8 o superior](https://www.python.org/downloads/). En Windows, marca «Add python.exe to PATH».
 2. Windows: doble clic en `iniciar.cmd`. Linux o macOS: `./iniciar.sh`. Los datos se guardan en la subcarpeta `datos/`.
 3. Se abre una página en `127.0.0.1`. Pega el token la primera vez; a partir de ahí se guarda cifrado y la app se actualiza sola hasta que caduque. Con la ventana abierta repite cada 6 horas (`--cada`).
@@ -138,6 +140,8 @@ Steam merges all the libraries of the group and has no filter to tell them apart
 ## Getting started
 
 Without Python: download the [latest release](https://github.com/IkerAbad/steam-family-library/releases/latest), unzip it and double-click `iniciar.cmd`.
+
+If you prefer to install it as a Python package: `pip install .` from this folder, then run `steam-families` with the same options as `iniciar.cmd`.
 
 1. Install [Python 3.8 or higher](https://www.python.org/downloads/). On Windows, tick "Add python.exe to PATH".
 2. Windows: double-click `iniciar.cmd`. Linux or macOS: `./iniciar.sh`. Data is stored in the `datos/` subfolder.
