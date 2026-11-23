@@ -526,6 +526,100 @@ class PruebaInterfaz(unittest.TestCase):
         pagina.click('[data-idioma="en"]')
         self.assertEqual(pagina.title(), "Steam family library")
 
+    def test_historial_se_recuerda(self):
+        pagina = self.pagina("/panel.html")
+        pagina.click("#verHistorial")
+        pagina.reload()
+        self.assertTrue(pagina.is_visible("#historialCaja"))
+        pagina.click("#verHistorial")
+        pagina.reload()
+        self.assertFalse(pagina.is_visible("#historialCaja"))
+
+    def test_exportar_historial_json(self):
+        pagina = self.pagina("/panel.html")
+        pagina.click("#verHistorial")
+        pagina.fill("#hq", "Paseo")
+        with pagina.expect_download() as descarga:
+            pagina.click("#exportarHistorialJson")
+        self.assertTrue(descarga.value.suggested_filename.endswith(".json"))
+        datos = json.loads(pathlib.Path(descarga.value.path()).read_text(encoding="utf-8"))
+        self.assertEqual(len(datos), 1)
+        self.assertEqual(datos[0]["nombre"], "Paseo")
+        self.assertEqual(datos[0]["evento"], "nuevo")
+        self.assertEqual(datos[0]["appid"], 20)
+        self.assertFalse(datos[0]["propio"])
+
+    def test_exportar_miembros(self):
+        pagina = self.pagina("/panel.html")
+        with pagina.expect_download() as descarga:
+            pagina.click("#exportarMiembros")
+        self.assertTrue(descarga.value.suggested_filename.startswith("miembros-"))
+        lineas = pathlib.Path(descarga.value.path()).read_text(
+            encoding="utf-8-sig").splitlines()
+        self.assertEqual(lineas[0], "miembro,juegos,jugables,horas")
+        self.assertTrue(any(l.startswith("Ana,2,1,2.0") for l in lineas))
+        self.assertTrue(any(l.startswith("tú,1,1,1.0") for l in lineas))
+
+    def test_operadores_appid_mes_ultima(self):
+        pagina = self.pagina("/panel.html")
+        filas = pagina.locator("#cuerpo tr")
+
+        pagina.fill("#q", "appid:20")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Beta", pagina.inner_text("#cuerpo"))
+
+        clave = date.today().strftime("%Y-%m")
+        pagina.fill("#q", "mes:" + clave)
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Gamma", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "ultima:never")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 1)
+        self.assertIn("Gamma", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "ultima:>30")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(filas.count(), 2)
+        self.assertNotIn("Gamma", pagina.inner_text("#cuerpo"))
+
+    def test_enlace_comparte_filtros(self):
+        pagina = self.pagina("/panel.html#q=Beta")
+        self.assertEqual(pagina.input_value("#q"), "Beta")
+        self.assertEqual(pagina.locator("#cuerpo tr").count(), 1)
+        self.assertIn("q=Beta", pagina.evaluate("location.hash"))
+
+        pagina.context.grant_permissions(["clipboard-read", "clipboard-write"])
+        pagina.click("#copiarEnlace")
+        for _ in range(60):
+            if pagina.inner_text("#copiarEnlace") == "Copiado":
+                break
+            pagina.wait_for_timeout(50)
+        enlace = pagina.evaluate("navigator.clipboard.readText()")
+        self.assertIn("#q=Beta", enlace)
+
+    def test_mes_filtra(self):
+        pagina = self.pagina("/panel.html")
+        clave = date.today().strftime("%Y-%m")
+        pagina.click('.mes[data-clave="%s"]' % clave)
+        self.assertEqual(pagina.input_value("#q"), "mes:" + clave)
+        self.assertEqual(pagina.locator("#cuerpo tr").count(), 1)
+        self.assertIn("Gamma", pagina.inner_text("#cuerpo"))
+
+    def test_hash_tambien_en_panel_suelto(self):
+        contexto = self.navegador.new_context(locale="es-ES")
+        self.addCleanup(contexto.close)
+        pagina = contexto.new_page()
+        pagina.goto((self.datos / "panel.html").as_uri())
+        pagina.fill("#q", "Beta")
+        pagina.wait_for_timeout(250)
+        self.assertIn("q=Beta", pagina.evaluate("location.hash"))
+        pagina.goto((self.datos / "panel.html").as_uri() + "#q=Beta")
+        self.assertEqual(pagina.input_value("#q"), "Beta")
+        self.assertEqual(pagina.locator("#cuerpo tr").count(), 1)
+
     def test_accesibilidad_basica(self):
         script = """() => {
           const fallos = [];

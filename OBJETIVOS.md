@@ -1,6 +1,13 @@
 # Objetivos
 
-> Estado: los ocho primeros y las tandas segunda, tercera y cuarta están implementados.
+> Estado: los ocho primeros y las tandas segunda a quinta están implementados.
+
+## Quinta tanda (2.6.0)
+
+- Historial recordado entre visitas.
+- Exportar historial en JSON y miembros en CSV.
+- Operadores `appid:`, `mes:` y `ultima:`.
+- Meses clicables y enlace de la vista con los filtros.
 
 ## Cuarta tanda (2.5.0)
 

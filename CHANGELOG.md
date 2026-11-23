@@ -1,5 +1,14 @@
 # Cambios
 
+## 2.6.0 — 2026-11-23
+
+- El historial recuerda si lo dejaste abierto.
+- Exportar el historial en JSON, con los filtros aplicados.
+- Exportar la tabla por miembro en CSV.
+- Operadores `appid:`, `mes:` y `ultima:` (`<30`, `>365`, `never`).
+- Las barras de altas por mes filtran ese mes al pulsarlas.
+- Los filtros se guardan en la dirección y «Copiar enlace» comparte la vista exacta.
+
 ## 2.5.0 — 2026-11-22
 
 - Intervalo de actualización automática configurable desde el panel, guardado en `ajustes.json`.

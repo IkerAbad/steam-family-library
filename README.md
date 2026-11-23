@@ -45,9 +45,9 @@ Todos se escriben en la subcarpeta `datos/`, que el lanzador pasa con `--datos`.
 
 El panel trae buscador sin acentos, filtros por origen, estado y antigüedad, columna **Añadido** con la fecha de adquisición, marca **nuevo**, marca **gratis** y el atajo **Añadidos (90 días)**. La interfaz y el panel están en español y en inglés: el botón **ES / EN** de la esquina cambia el idioma y la elección se recuerda. `novedades.txt` se escribe en el idioma de la interfaz; `historial.csv` mantiene las columnas en español.
 
-El panel añade vista compacta, exportación de la vista filtrada en CSV o JSON, copia del resumen al portapapeles, un botón **Sorpréndeme** que elige un juego al azar de lo que estás viendo, un top de los más jugados y el intervalo de actualización automática configurable desde la propia página. Pulsar un miembro en las estadísticas filtra la tabla por él.
+El panel añade vista compacta, exportación de la vista filtrada en CSV o JSON, copia del resumen al portapapeles, un botón **Sorpréndeme** que elige un juego al azar de lo que estás viendo, un top de los más jugados y el intervalo de actualización automática configurable desde la propia página. Pulsar un miembro en las estadísticas filtra la tabla por él. El historial se queda abierto si lo dejas, se exporta en CSV o JSON y las barras de altas por mes filtran ese mes al pulsarlas. Los filtros se reflejan en la dirección y **Copiar enlace** guarda la vista exacta.
 
-El buscador admite operadores: `horas:>10`, `anio:2026`, `origen:family`, `estado:jugable` y `dueno:ana`, combinables con el texto normal.
+El buscador admite operadores: `horas:>10`, `anio:2026`, `mes:2026-09`, `origen:family`, `estado:jugable`, `dueno:ana`, `appid:20` y `ultima:<30` / `ultima:>365` / `ultima:never`, combinables con el texto normal.
 
 Debajo del título, el panel muestra la fecha de la última actualización y la pone en ámbar si tiene más de un día. También avisa si algún miembro sigue como «Miembro N», con enlace a la API key. Recuerda los filtros y el orden, y ordena al pulsar una cabecera.
 
@@ -112,7 +112,7 @@ Los tres endpoints de familia están sin documentar: funcionan hoy y pueden camb
 python -m unittest discover -s pruebas -v
 ```
 
-117 pruebas sin red, más 33 de interfaz con Playwright (se saltan si no está instalado; hacen falta `pip install -r requirements-dev.txt` y `playwright install chromium`). Tres de las unitarias son solo de Windows y se saltan en otros sistemas. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`, y las pruebas de navegador en Chromium. La cobertura de `steam_families.py` se mide en el CI con un mínimo del 85 %.
+117 pruebas sin red, más 40 de interfaz con Playwright (se saltan si no está instalado; hacen falta `pip install -r requirements-dev.txt` y `playwright install chromium`). Tres de las unitarias son solo de Windows y se saltan en otros sistemas. GitHub Actions ejecuta además la interfaz completa en Ubuntu 22.04 con Python 3.8, Ubuntu latest con 3.12 y Windows con 3.9 y 3.12, incluido el lanzador `.cmd`, y las pruebas de navegador en Chromium. La cobertura de `steam_families.py` se mide en el CI con un mínimo del 85 %.
 
 ## Créditos
 
@@ -161,9 +161,9 @@ All of them go into the `datos/` subfolder, which the launcher passes with `--da
 
 The dashboard has accent-insensitive search, filters by origin, status and age, an **Añadido** (added) column with the acquisition date, a **nuevo** (new) tag, a **gratis** (free) tag and the **Añadidos (90 días)** shortcut (added in the last 90 days). The interface and the dashboard come in Spanish and English: the **ES / EN** button in the corner switches the language and the choice is remembered. `novedades.txt` is written in the interface language; `historial.csv` keeps Spanish column names.
 
-The dashboard adds a compact view, export of the filtered view as CSV or JSON, copying the summary to the clipboard, a **Surprise me** button that picks a random game from what you are seeing, a most-played top and the auto-update interval configurable from the page itself. Clicking a member in the stats filters the table by them.
+The dashboard adds a compact view, export of the filtered view as CSV or JSON, copying the summary to the clipboard, a **Surprise me** button that picks a random game from what you are seeing, a most-played top and the auto-update interval configurable from the page itself. Clicking a member in the stats filters the table by them. The history stays open if you leave it open, exports as CSV or JSON and the monthly bars filter that month when clicked. Filters are reflected in the address and **Copy link** saves the exact view.
 
-The search box accepts operators: `horas:>10`, `anio:2026`, `origen:family`, `estado:jugable` and `dueno:ana`, combined with normal text.
+The search box accepts operators: `horas:>10`, `anio:2026`, `mes:2026-09`, `origen:family`, `estado:jugable`, `dueno:ana`, `appid:20` and `ultima:<30` / `ultima:>365` / `ultima:never`, combined with normal text.
 
 Under the title, the dashboard shows the last update time and turns it amber when the data is over a day old. It also warns when a member is still "Miembro N", with a link to the API key. It remembers your filters and sort order, and sorts when you click a column header.
 
@@ -228,7 +228,7 @@ The three family endpoints are undocumented: they work today and may change tomo
 python -m unittest discover -s pruebas -v
 ```
 
-117 tests with no network, plus 33 browser tests with Playwright (skipped if it is not installed; they need `pip install -r requirements-dev.txt` and `playwright install chromium`). Three of the unit tests are Windows-only and are skipped elsewhere. GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher, and the browser tests on Chromium. Coverage of `steam_families.py` is measured in CI with an 85 % floor.
+117 tests with no network, plus 40 browser tests with Playwright (skipped if it is not installed; they need `pip install -r requirements-dev.txt` and `playwright install chromium`). Three of the unit tests are Windows-only and are skipped elsewhere. GitHub Actions also runs the full interface on Ubuntu 22.04 with Python 3.8, Ubuntu latest with 3.12, and Windows with 3.9 and 3.12, including the `.cmd` launcher, and the browser tests on Chromium. Coverage of `steam_families.py` is measured in CI with an 85 % floor.
 
 ## Credits
 
