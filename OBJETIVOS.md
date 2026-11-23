@@ -9,6 +9,10 @@
 - Cobertura publicada y umbral del 90 %.
 - ZIP de Windows sin Python en la release.
 
+### Parche 3.0.1
+
+- Pruebas de endpoints y errores; cobertura al 93 % en `steam_families.py`.
+
 ## Novena tanda (2.10.0)
 
 - Operadores `fecha:`, `favorito:` y `oculto:`.

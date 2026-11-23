@@ -119,7 +119,7 @@ python -m unittest discover -s pruebas_plataforma -p "test_windows.py" -v  # Win
 python -m unittest discover -s pruebas_plataforma -p "test_posix.py" -v    # Linux y macOS
 ```
 
-152 pruebas comunes, 58 de navegador y 4 de plataforma (3 de Windows y 1 de POSIX). Ninguna se salta: la suite común no lleva pruebas de plataforma ni de navegador; la de interfaz se ejecuta en el workflow **Interfaz** con Chromium instalado, y cada workflow de sistema ejecuta su módulo de plataforma. Son las 173 pruebas que ya había, sin borrar ninguna, más las nuevas de errores, empaquetado y renovación del token. Ninguna prueba toca la red real: `pruebas/falso.py` imita la API de Steam y la interfaz levanta un servidor local. La cobertura se publica como `htmlcov` y `coverage.xml`: 91 % de `steam_families.py`, 96 % de `empaquetar.py` y 96 % de `notas_release.py`; el CI falla por debajo del 90 %.
+162 pruebas comunes, 58 de navegador y 4 de plataforma (3 de Windows y 1 de POSIX). Ninguna se salta: la suite común no lleva pruebas de plataforma ni de navegador; la de interfaz se ejecuta en el workflow **Interfaz** con Chromium instalado, y cada workflow de sistema ejecuta su módulo de plataforma. Son las 173 pruebas que ya había, sin borrar ninguna, más las nuevas de errores, empaquetado y renovación del token. Ninguna prueba toca la red real: `pruebas/falso.py` imita la API de Steam y la interfaz levanta un servidor local. La cobertura se publica como `htmlcov` y `coverage.xml`: 93 % de `steam_families.py`, 96 % de `empaquetar.py` y 96 % de `notas_release.py`; el CI falla por debajo del 90 %.
 
 ## Créditos
 
@@ -242,7 +242,7 @@ python -m unittest discover -s pruebas_plataforma -p "test_windows.py" -v  # Win
 python -m unittest discover -s pruebas_plataforma -p "test_posix.py" -v    # Linux and macOS
 ```
 
-152 common tests, 58 browser tests and 4 platform tests (3 Windows and 1 POSIX). None is skipped: the common suite has no platform or browser tests, the interface suite runs in the **Interfaz** workflow with Chromium installed, and each OS workflow runs its platform module. These are the 173 tests that already existed, with none removed, plus the new error, packaging and token-renewal tests. No test touches the real network: `pruebas/falso.py` imitates the Steam API and the interface starts a local server. Coverage is published as `htmlcov` and `coverage.xml`: 91 % for `steam_families.py`, 96 % for `empaquetar.py` and 96 % for `notas_release.py`; CI fails below 90 %.
+162 common tests, 58 browser tests and 4 platform tests (3 Windows and 1 POSIX). None is skipped: the common suite has no platform or browser tests, the interface suite runs in the **Interfaz** workflow with Chromium installed, and each OS workflow runs its platform module. These are the 173 tests that already existed, with none removed, plus the new error, packaging and token-renewal tests. No test touches the real network: `pruebas/falso.py` imitates the Steam API and the interface starts a local server. Coverage is published as `htmlcov` and `coverage.xml`: 93 % for `steam_families.py`, 96 % for `empaquetar.py` and 96 % for `notas_release.py`; CI fails below 90 %.
 
 ## Credits
 

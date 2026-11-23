@@ -1,5 +1,11 @@
 # Cambios
 
+## 3.0.1 — 2026-11-23
+
+- Pruebas de los endpoints HTTP y de los caminos de error de la app.
+- Cobertura al 93 % en `steam_families.py` (96 % en `empaquetar.py` y `notas_release.py`).
+- Sin cambios visibles: la renovación guiada sigue igual que en 3.0.0.
+
 ## 3.0.0 — 2026-11-23
 
 - Renovación guiada del token: se detecta la caducidad al arrancar y cada minuto, se explica el motivo y se enlaza la página oficial. El token caducado ya no se borra en silencio.

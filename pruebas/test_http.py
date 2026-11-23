@@ -14,6 +14,7 @@ import unittest
 import urllib.error
 import urllib.request
 import zipfile
+from unittest import mock
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
@@ -255,6 +256,89 @@ class PruebaHttp(unittest.TestCase):
             self.assertEqual(respuesta.status, 403)
         finally:
             conexion.close()
+
+    def test_post_host_ajeno(self):
+        puerto = self.servidor.server_address[1]
+        conexion = http.client.HTTPConnection("127.0.0.1", puerto, timeout=5)
+        try:
+            conexion.putrequest("POST", "/api/actualizar", skip_host=True)
+            conexion.putheader("Host", "malo.example")
+            conexion.putheader("Content-Type", "application/json")
+            conexion.putheader("Content-Length", "2")
+            conexion.endheaders()
+            conexion.send(b"{}")
+            respuesta = conexion.getresponse()
+            respuesta.read()
+            self.assertEqual(respuesta.status, 403)
+        finally:
+            conexion.close()
+
+    def test_content_length_invalido(self):
+        puerto = self.servidor.server_address[1]
+        conexion = http.client.HTTPConnection("127.0.0.1", puerto, timeout=5)
+        try:
+            conexion.putrequest("POST", "/api/actualizar")
+            conexion.putheader("Content-Type", "application/json")
+            conexion.putheader("Content-Length", "abc")
+            conexion.endheaders()
+            respuesta = conexion.getresponse()
+            respuesta.read()
+            self.assertEqual(respuesta.status, 400)
+        finally:
+            conexion.close()
+
+    def test_json_lista(self):
+        self.assertEqual(self.post("/api/actualizar", [1, 2])[0], 400)
+
+    def test_fichero_directorio(self):
+        ruta = self.datos / "prestados.csv"
+        ruta.mkdir()
+        try:
+            self.assertEqual(self.get("/prestados.csv")[0], 500)
+        finally:
+            ruta.rmdir()
+
+    def test_zip_con_error(self):
+        with mock.patch("zipfile.ZipFile.write", side_effect=OSError("boom")):
+            self.assertEqual(self.get("/datos.zip")[0], 200)
+
+    def test_post_desconocido(self):
+        self.assertEqual(self.post("/nada", {})[0], 404)
+
+    def test_fallo_interno_get(self):
+        with mock.patch.object(sfl.Handler, "_get", side_effect=RuntimeError("boom")):
+            self.assertEqual(self.get("/")[0], 500)
+
+    def test_fallo_interno_post(self):
+        with mock.patch.object(sfl.Handler, "_post", side_effect=RuntimeError("boom")):
+            self.assertEqual(self.post("/api/actualizar", {})[0], 500)
+
+    def test_actualizar_fallo(self):
+        original = sfl.ejecutar
+        sfl.ejecutar = lambda *a, **k: (False, "fallo de prueba")
+        try:
+            codigo, cuerpo = self.post("/api/actualizar", {"token": token_falso(),
+                                                          "guardar": False})
+        finally:
+            sfl.ejecutar = original
+        self.assertEqual(codigo, 500)
+        self.assertIn("fallo de prueba", json.loads(cuerpo)["error"])
+
+    def test_actualizar_guarda_token_y_clave(self):
+        original = sfl.ejecutar
+        sfl.ejecutar = lambda *a, **k: (True, "ok")
+        tok = token_falso()
+        clave = "0123456789abcdef0123456789abcdef"
+        try:
+            codigo, _ = self.post("/api/actualizar", {
+                "token": tok, "api_key": clave, "guardar": True})
+            self.assertEqual(codigo, 200)
+            self.assertEqual(sfl.leer_token(), tok)
+            self.assertEqual(sfl.leer_clave(), clave)
+        finally:
+            sfl.ejecutar = original
+            sfl.olvidar_token()
+            sfl.olvidar_clave()
 
     def test_json_roto(self):
         req = urllib.request.Request(
