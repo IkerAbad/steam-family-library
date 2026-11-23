@@ -18,6 +18,7 @@ import base64
 import csv
 import ctypes
 import hashlib
+import io
 import json
 import os
 import sys
@@ -27,6 +28,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
+import zipfile
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -37,7 +39,7 @@ from pathlib import Path
 API = "https://api.steampowered.com"
 COMUNIDAD = "https://steamcommunity.com"
 TIENDA = "https://store.steampowered.com"
-VERSION = "2.6.0"
+VERSION = "2.7.0"
 UA = f"steam-family-library/{VERSION}"
 EXCLUDE_REASONS = {
     0: "",
@@ -655,6 +657,7 @@ td.der { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap
 .icono { background:none; border:0; color:var(--suave); cursor:pointer; font:inherit; font-size:13px; line-height:1; padding:0 2px; }
 .icono:hover { color:var(--acento); }
 .icono[aria-pressed="true"] { color:var(--ambar); }
+.icono.notaBoton.conNota { color:var(--ambar); }
 tr.oculto { opacity:.55; }
 .atajo { background:#22303c; color:var(--acento); border:1px solid #2b5878; border-radius:6px; padding:7px 12px; font:inherit; cursor:pointer; }
 .atajo:hover { background:#2a3d4d; }
@@ -693,6 +696,21 @@ tr.oculto { opacity:.55; }
 #historialCaja table { min-width:0; }
 #historialCaja th, #historialCaja td { font-size:12px; padding:6px 8px; }
 .acciones { display:flex; gap:8px; align-items:center; }
+.marca.nota { color:#c9a227; border-color:#5a4a22; background:#241f11; }
+#ayuda { padding:0 24px 20px; color:var(--suave); font-size:13px; }
+#ayuda summary { cursor:pointer; color:var(--texto); }
+#ayuda p { margin:8px 0; }
+@media print {
+  .controles, #ajustes, #stats, #aviso, #mesesCaja, #miembrosCaja, #topCaja,
+  #historialCaja, #elegido, #version, #ayuda, #tema, [data-idioma], .icono,
+  thead th .flecha { display:none !important; }
+  body { background:#fff; color:#000; }
+  #resumen { color:#000; }
+  table { min-width:0; }
+  thead th { position:static; background:#fff; color:#000; border-bottom:1px solid #000; }
+  tbody td { border-bottom:1px solid #ddd; }
+  a { color:#000; text-decoration:none; }
+}
 html[data-tema="claro"] {
   --fondo:#f6f7f9; --panel:#ffffff; --borde:#d5dbe3; --texto:#1b2430; --suave:#5c6878;
   --acento:#1a6fa8; --verde:#1d7a3e; --ambar:#8a5a00; --rojo:#b03030;
@@ -704,6 +722,7 @@ html[data-tema="claro"] .prestado { color:#1d7a3e; border-color:#9fd3b0; backgro
 html[data-tema="claro"] .propio { color:#5c6878; border-color:#d5dbe3; background:#f1f3f6; }
 html[data-tema="claro"] .bloqueado { color:#8a5a00; border-color:#e5c98a; background:#fdf6e3; }
 html[data-tema="claro"] .nuevo { color:#1a6fa8; border-color:#a9cfe8; background:#eaf4fb; }
+html[data-tema="claro"] .marca.nota { color:#8a5a00; border-color:#e2c98a; background:#fdf6e3; }
 html[data-tema="claro"] .fuera { color:#b03030; border-color:#e5a9a9; background:#fdecec; }
 html[data-tema="claro"] .aviso { background:#eaf7ee; border-color:#9fd3b0; color:#1d7a3e; }
 html[data-tema="claro"] .aviso.ambar { background:#fdf6e3; border-color:#e5c98a; color:#8a5a00; }
@@ -783,6 +802,7 @@ html[data-tema="claro"] #version { color:#8b98a8; }
   <button type="button" id="exportarJson" class="sec" data-t="exportarJson">Exportar JSON</button>
   <button type="button" id="copiarResumen" class="sec" data-t="copiarResumen">Copiar resumen</button>
   <button type="button" id="copiarEnlace" class="sec" data-t="copiarEnlace">Copiar enlace</button>
+  <button type="button" id="imprimir" class="sec" data-t="imprimir">Imprimir</button>
 </div>
 <div id="elegido" role="status" aria-live="polite"></div>
 <div id="resumen" aria-live="polite"></div>
@@ -852,6 +872,11 @@ html[data-tema="claro"] #version { color:#8b98a8; }
   <button type="button" id="cargarAjustes" class="sec" data-t="cargarAjustes">Cargar ajustes</button>
   <input id="ficheroAjustes" type="file" accept="application/json,.json" hidden>
 </div>
+<details id="ayuda">
+  <summary data-t="ayuda">Ayuda</summary>
+  <p data-t="ayudaBuscar">Atajos: / enfoca el buscador, Escape lo limpia y ? abre o cierra esta ayuda.</p>
+  <p data-t="ayudaOperadores">Operadores: horas:>10, anio:2026, mes:2026-09, origen:family, estado:jugable, dueno:ana, appid:20, ultima:<30, ultima:>365, ultima:never, nota:si y nota:no.</p>
+</details>
 <div id="version">Steam Families v__VERSION__</div>
 
 <script>
@@ -892,6 +917,16 @@ const TEXTOS = {
     quitarFavorito: "Quitar de favoritos",
     ocultar: "Ocultar",
     mostrar: "Mostrar",
+    nota: "nota",
+    notaAnadir: "Añadir nota",
+    notaEditar: "Editar nota",
+    notaPrompt: "Nota para",
+    notaAyuda: "vacío para borrar",
+    conNota: "con nota",
+    imprimir: "Imprimir",
+    ayuda: "Ayuda",
+    ayudaBuscar: "Atajos: / enfoca el buscador, Escape lo limpia y ? abre o cierra esta ayuda.",
+    ayudaOperadores: "Operadores: horas:>10, anio:2026, mes:2026-09, origen:family, estado:jugable, dueno:ana, appid:20, ultima:<30, ultima:>365, ultima:never, nota:si y nota:no.",
     verNuevos: "Ver solo novedades",
     preset: "Añadidos (90 días)",
     limpiar: "Limpiar filtros",
@@ -1000,6 +1035,16 @@ const TEXTOS = {
     quitarFavorito: "Remove from favourites",
     ocultar: "Hide",
     mostrar: "Show",
+    nota: "note",
+    notaAnadir: "Add note",
+    notaEditar: "Edit note",
+    notaPrompt: "Note for",
+    notaAyuda: "empty to delete",
+    conNota: "with a note",
+    imprimir: "Print",
+    ayuda: "Help",
+    ayudaBuscar: "Shortcuts: / focuses the search box, Escape clears it and ? opens or closes this help.",
+    ayudaOperadores: "Operators: horas:>10, anio:2026, mes:2026-09, origen:family, estado:jugable, dueno:ana, appid:20, ultima:<30, ultima:>365, ultima:never, nota:si and nota:no.",
     verNuevos: "Show only new",
     preset: "Added (90 days)",
     limpiar: "Clear filters",
@@ -1113,6 +1158,7 @@ function analizaConsulta(texto) {
   let appid = null;
   let ultima = null;
   let mes = null;
+  let nota = null;
   (texto || "").split(/\s+/).forEach(t => {
     const h = /^horas:([<>])(\d+(?:[.,]\d+)?)$/i.exec(t);
     if (h) {
@@ -1156,9 +1202,14 @@ function analizaConsulta(texto) {
       mes = m[1];
       return;
     }
+    const n = /^nota:(si|no)$/i.exec(t);
+    if (n) {
+      nota = n[1].toLowerCase();
+      return;
+    }
     if (t) resto.push(t);
   });
-  return {texto: resto.join(" "), horas, anio, origen, estado, dueno, appid, ultima, mes};
+  return {texto: resto.join(" "), horas, anio, origen, estado, dueno, appid, ultima, mes, nota};
 }
 
 function preparaBusqueda() {
@@ -1166,7 +1217,7 @@ function preparaBusqueda() {
     const miembro = /^Miembro (\d+)$/.exec(d.d || "");
     const alterno = miembro && IDIOMA === "en" ? "Member " + miembro[1] : "";
     const propio = d.d === "tú" ? T("tu") : "";
-    d.b = plano([d.n, d.d || "", alterno, propio].join(" "));
+    d.b = plano([d.n, d.d || "", alterno, propio, NOTAS[d.a] || ""].join(" "));
   });
 }
 
@@ -1233,6 +1284,7 @@ function aplicaCompacto() {
 const CLAVE_FILTROS = "sf-filtros";
 const CLAVE_FAV = "sf-favoritos";
 const CLAVE_OCULTOS = "sf-ocultos";
+const CLAVE_NOTAS = "sf-notas";
 let ORDEN_CABECERA = null;
 let MIEMBROS_ACTUAL = [];
 
@@ -1251,8 +1303,31 @@ function guardaLista(clave, conjunto) {
   } catch (e) {}
 }
 
+function cargaNotas() {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLAVE_NOTAS) || "{}");
+    if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+    const salida = {};
+    Object.entries(v).forEach(([clave, texto]) => {
+      if (typeof texto === "string" && texto.trim()) {
+        salida[String(clave)] = texto.trim().slice(0, 500);
+      }
+    });
+    return salida;
+  } catch (e) {
+    return {};
+  }
+}
+
+function guardaNotas() {
+  try {
+    localStorage.setItem(CLAVE_NOTAS, JSON.stringify(NOTAS));
+  } catch (e) {}
+}
+
 let FAVORITOS = new Set(cargaLista(CLAVE_FAV));
 let OCULTOS = new Set(cargaLista(CLAVE_OCULTOS));
+let NOTAS = cargaNotas();
 let LISTA_ACTUAL = [];
 let HISTORIAL_ACTUAL = [];
 let HISTORIAL_VISIBLE = 100;
@@ -1399,6 +1474,7 @@ const isoDias = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 
 const recientesAnio = DATOS.filter(d => d.q && d.q >= hoyISO.slice(0, 4) + "-01-01").length;
 
 function pintaStats() {
+  const conNota = DATOS.filter(d => NOTAS[d.a]).length;
   $("stats").innerHTML = [
     "<b>" + numero(totales.juegos) + "</b> " + T("juegos"),
     "<b>" + numero(totales.prestados) + "</b> " + T("prestados"),
@@ -1406,7 +1482,7 @@ function pintaStats() {
     "<b>" + numero(totales.jugados) + "</b> " + T("yaJugados"),
     "<b>" + horas(totales.horas) + "</b> " + T("horasPrestados"),
     "<b>" + numero(recientesAnio) + "</b> " + T("anadidosAnio")
-  ].join(" &middot; ");
+  ].concat(conNota ? ["<b>" + numero(conNota) + "</b> " + T("conNota")] : []).join(" &middot; ");
 }
 
 function pintaAviso() {
@@ -1450,7 +1526,7 @@ function pinta() {
   const verOcultos = $("verOcultos").checked;
   const filtrando = !!q || !!consulta.horas || !!consulta.anio || !!consulta.origen ||
     !!consulta.estado || !!consulta.dueno || !!consulta.appid || !!consulta.ultima ||
-    !!consulta.mes || origen !== "todo" || dueno !== "todo" || estado !== "todo" ||
+    !!consulta.mes || !!consulta.nota || origen !== "todo" || dueno !== "todo" || estado !== "todo" ||
     antiguedad !== "todo" || soloNuevos || soloFav || verOcultos || !!ORDEN_CABECERA;
   $("limpiar").hidden = !filtrando;
 
@@ -1470,6 +1546,8 @@ function pinta() {
     if (consulta.anio && (!d.q || d.q.slice(0, 4) !== consulta.anio)) return false;
     if (consulta.mes && (!d.q || d.q.slice(0, 7) !== consulta.mes)) return false;
     if (consulta.appid && d.a !== consulta.appid) return false;
+    if (consulta.nota === "si" && !NOTAS[d.a]) return false;
+    if (consulta.nota === "no" && NOTAS[d.a]) return false;
     if (consulta.ultima) {
       if (consulta.ultima.modo === "never") {
         if (d.u) return false;
@@ -1561,6 +1639,13 @@ function pinta() {
       b.textContent = T("masDueno");
       cont.appendChild(b);
     }
+    if (NOTAS[d.a]) {
+      const b = document.createElement("span");
+      b.className = "marca nota";
+      b.textContent = T("nota");
+      b.title = NOTAS[d.a];
+      cont.appendChild(b);
+    }
 
     const fav = document.createElement("button");
     fav.type = "button";
@@ -1590,6 +1675,17 @@ function pinta() {
       pinta();
     });
     cont.appendChild(ocultar);
+
+    const botonNota = document.createElement("button");
+    botonNota.type = "button";
+    botonNota.className = "icono notaBoton" + (NOTAS[d.a] ? " conNota" : "");
+    botonNota.dataset.nota = d.a;
+    botonNota.textContent = "✎";
+    botonNota.title = NOTAS[d.a] ? T("notaEditar") : T("notaAnadir");
+    botonNota.setAttribute("aria-label", botonNota.title +
+      (NOTAS[d.a] ? ": " + NOTAS[d.a].slice(0, 100) : ""));
+    botonNota.addEventListener("click", () => editaNota(d.a, d.n));
+    cont.appendChild(botonNota);
     if (OCULTOS.has(d.a)) tr.classList.add("oculto");
 
     td1.appendChild(cont);
@@ -1699,6 +1795,7 @@ function guardaAjustesFichero() {
     idioma: IDIOMA,
     favoritos: [...FAVORITOS],
     ocultos: [...OCULTOS],
+    notas: NOTAS,
     filtros: JSON.parse(localStorage.getItem(CLAVE_FILTROS) || "{}"),
     compacto: COMPACTO
   };
@@ -1752,8 +1849,18 @@ async function cargaAjustesFichero(fichero) {
     if (!d || typeof d !== "object") throw new Error("no es un objeto");
     if (Array.isArray(d.favoritos)) FAVORITOS = new Set(d.favoritos.map(String));
     if (Array.isArray(d.ocultos)) OCULTOS = new Set(d.ocultos.map(String));
+    if (d.notas && typeof d.notas === "object" && !Array.isArray(d.notas)) {
+      const limpias = {};
+      Object.entries(d.notas).forEach(([clave, texto]) => {
+        if (typeof texto === "string" && texto.trim()) {
+          limpias[String(clave)] = texto.trim().slice(0, 500);
+        }
+      });
+      NOTAS = limpias;
+    }
     guardaLista(CLAVE_FAV, FAVORITOS);
     guardaLista(CLAVE_OCULTOS, OCULTOS);
+    guardaNotas();
     if (d.tema === "claro" || d.tema === "oscuro") {
       TEMA = d.tema;
       try { localStorage.setItem(CLAVE_TEMA, TEMA); } catch (e) {}
@@ -1832,6 +1939,7 @@ function exportaJson() {
     playtime_minutes: d.m,
     acquired: d.q || "",
     last_played: d.u || "",
+    note: NOTAS[d.a] || "",
     store_url: "https://store.steampowered.com/app/" + d.a
   }));
   const blob = new Blob([JSON.stringify(datos, null, 2)], {type: "application/json"});
@@ -1990,6 +2098,19 @@ function filtraPorMes(clave) {
   pinta();
   const tabla = document.querySelector("table");
   if (tabla) tabla.scrollIntoView({block: "start", behavior: "smooth"});
+}
+
+function editaNota(appid, nombre) {
+  const actual = NOTAS[appid] || "";
+  const texto = window.prompt(
+    T("notaPrompt") + " " + nombre + " (" + T("notaAyuda") + ")", actual);
+  if (texto === null) return;
+  const limpio = texto.trim().slice(0, 500);
+  if (limpio) NOTAS[appid] = limpio; else delete NOTAS[appid];
+  guardaNotas();
+  preparaBusqueda();
+  pintaStats();
+  pinta();
 }
 
 function pintaTop() {
@@ -2240,6 +2361,11 @@ document.addEventListener("keydown", e => {
     $("q").value = "";
     clearTimeout(esperaPinta);
     pinta();
+  } else if (e.key === "?" && !["input", "select", "textarea"].includes(etiqueta)) {
+    e.preventDefault();
+    const ayuda = $("ayuda");
+    ayuda.open = !ayuda.open;
+    if (ayuda.open) ayuda.scrollIntoView({block: "nearest", behavior: "smooth"});
   }
 });
 $("verNuevos").addEventListener("click", () => {
@@ -2280,6 +2406,7 @@ $("exportar").addEventListener("click", exportaCsv);
 $("exportarJson").addEventListener("click", exportaJson);
 $("sorprende").addEventListener("click", sorprende);
 $("copiarEnlace").addEventListener("click", copiaEnlace);
+$("imprimir").addEventListener("click", () => window.print());
 $("exportarMiembros").addEventListener("click", exportaMiembros);
 $("copiarResumen").addEventListener("click", copiaResumen);
 $("compacto").addEventListener("change", () => {
@@ -2301,6 +2428,23 @@ $("ficheroAjustes").addEventListener("change", async e => {
   HISTORIAL_VISIBLE = 100;
   pintaHistorial();
 }));
+async function hayPanelNuevo() {
+  if (location.protocol !== "http:" && location.protocol !== "https:") return false;
+  try {
+    const r = await fetch("/api/estado", {cache: "no-store"});
+    if (!r.ok) return false;
+    const d = await r.json();
+    return !!(d.actualizado && ACTUALIZADO && d.actualizado !== ACTUALIZADO);
+  } catch (e) {
+    return false;
+  }
+}
+
+async function compruebaPanel() {
+  if (await hayPanelNuevo()) location.reload();
+}
+setInterval(compruebaPanel, 120000);
+
 pintaDuenos();
 cargaFiltros();
 aplicaHash();
@@ -2954,6 +3098,10 @@ class Handler(BaseHTTPRequestHandler):
         if pedida == "/api/ajustes":
             self._enviar(200, {"ok": True, "cada": self.cada})
             return
+        if pedida == "/datos.zip":
+            self._enviar(200, self._zip_datos(), "application/zip",
+                         {"Content-Disposition": 'attachment; filename="steam-families-datos.zip"'})
+            return
         if pedida in FICHEROS:
             nombre, tipo = FICHEROS[pedida]
             ruta = self.datos / nombre
@@ -2971,6 +3119,21 @@ class Handler(BaseHTTPRequestHandler):
                          {"Content-Disposition": f'inline; filename="{nombre}"'})
             return
         self._enviar(404, {"ok": False, "error": tr("no existe", "not found")})
+
+    def _zip_datos(self):
+        """Los ficheros generados, en un ZIP para llevárselos o hacer copia."""
+        memoria = io.BytesIO()
+        with zipfile.ZipFile(memoria, "w", zipfile.ZIP_DEFLATED) as z:
+            for nombre in ("library.csv", "snapshot.json", "prestados.csv",
+                           "prestados.txt", "novedades.txt", "novedades.json",
+                           "historial.csv", "panel.html"):
+                ruta = self.datos / nombre
+                try:
+                    if ruta.is_file():
+                        z.write(ruta, arcname=nombre)
+                except OSError:
+                    continue
+        return memoria.getvalue()
 
     def _post(self):
         if not self._host_ok():
@@ -3242,6 +3405,7 @@ html[data-tema="claro"] .nota { background:#fdf6e3; border-color:#e5c98a; color:
       <button class="sec" onclick="window.open('/prestados.csv','_blank')" data-t="abrirCsv">Abrir CSV de prestados</button>
       <button class="sec" onclick="window.open('/novedades.txt','_blank')" data-t="abrirNovedades">Abrir novedades</button>
       <button class="sec" onclick="window.open('/historial.csv','_blank')" data-t="historial">Historial</button>
+      <button class="sec" onclick="window.open('/datos.zip','_blank')" data-t="descargarZip">Descargar todo (ZIP)</button>
     </div>
   </section>
 
@@ -3294,6 +3458,7 @@ const TEXTOS = {
     abrirPanel: "Abrir panel",
     abrirCsv: "Abrir CSV de prestados",
     abrirNovedades: "Abrir novedades",
+    descargarZip: "Descargar todo (ZIP)",
     historial: "Historial",
     pie: 'Todo se ejecuta en tu ordenador y no se guarda ninguna cookie de Steam. Si marcas «recordar», el token queda guardado solo para tu usuario: cifrado con DPAPI en Windows, permisos 600 en Linux y macOS.',
     detener: "Detener la interfaz",
@@ -3376,6 +3541,7 @@ const TEXTOS = {
     abrirPanel: "Open panel",
     abrirCsv: "Open shared CSV",
     abrirNovedades: "Open changes",
+    descargarZip: "Download everything (ZIP)",
     historial: "History",
     pie: 'Everything runs on your computer and no Steam cookie is stored. If you tick “remember”, the token is stored for your user only: encrypted with DPAPI on Windows, 600 permissions on Linux and macOS.',
     detener: "Stop the interface",

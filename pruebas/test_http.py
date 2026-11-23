@@ -3,6 +3,7 @@
 import base64
 import csv
 import http.client
+import io
 import json
 import pathlib
 import sys
@@ -12,6 +13,7 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+import zipfile
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
@@ -116,6 +118,7 @@ class PruebaHttp(unittest.TestCase):
             datos = json.loads(self.get("/api/token")[1])
             self.assertTrue(datos["guardado"])
             self.assertNotIn("token", datos)
+            self.assertIn("/", datos["caduca"])
         finally:
             sfl.olvidar_token()
 
@@ -137,6 +140,26 @@ class PruebaHttp(unittest.TestCase):
         codigo, cuerpo = self.get("/library.csv")
         self.assertEqual(codigo, 200)
         self.assertIn("appid", cuerpo)
+
+    def test_zip_de_datos(self):
+        (self.datos / "prestados.csv").write_text("appid,name\n1,Uno\n", encoding="utf-8")
+        (self.datos / "historial.csv").write_text("fecha,evento\n", encoding="utf-8")
+        try:
+            with urllib.request.urlopen(self.base + "/datos.zip", timeout=5) as r:
+                self.assertEqual(r.status, 200)
+                self.assertEqual(r.headers.get_content_type(), "application/zip")
+                self.assertIn("attachment", r.headers.get("Content-Disposition", ""))
+                contenido = r.read()
+        finally:
+            (self.datos / "prestados.csv").unlink(missing_ok=True)
+            (self.datos / "historial.csv").unlink(missing_ok=True)
+        with zipfile.ZipFile(io.BytesIO(contenido)) as z:
+            nombres = set(z.namelist())
+        self.assertIn("library.csv", nombres)
+        self.assertIn("snapshot.json", nombres)
+        self.assertIn("prestados.csv", nombres)
+        self.assertIn("historial.csv", nombres)
+        self.assertNotIn("../steam_families.py", nombres)
 
     def test_usa_el_token_guardado_si_no_se_pega(self):
         carga = base64.urlsafe_b64encode(

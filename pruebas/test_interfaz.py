@@ -362,6 +362,7 @@ class PruebaInterfaz(unittest.TestCase):
         fichero.write_text(json.dumps({
             "version": 1, "tema": "oscuro", "idioma": "en",
             "favoritos": ["20"], "ocultos": ["10"], "filtros": {},
+            "notas": {"20": "desde la copia"},
         }), encoding="utf-8")
         pagina.set_input_files("#ficheroAjustes", str(fichero))
         pagina.wait_for_timeout(300)
@@ -370,6 +371,10 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertIn("Steam family library", pagina.inner_text("h1"))
         self.assertEqual(pagina.get_attribute('[data-fav="20"]', "aria-pressed"), "true")
         self.assertEqual(pagina.locator("#cuerpo tr").count(), 2)
+        self.assertEqual(pagina.get_attribute('[data-nota="20"]', "title"), "Edit note")
+        self.assertEqual(
+            pagina.get_attribute("#cuerpo tr[data-appid='20'] .marca.nota", "title"),
+            "desde la copia")
 
     def test_cada_desde_el_panel(self):
         pagina = self.pagina("/panel.html")
@@ -619,6 +624,98 @@ class PruebaInterfaz(unittest.TestCase):
         pagina.goto((self.datos / "panel.html").as_uri() + "#q=Beta")
         self.assertEqual(pagina.input_value("#q"), "Beta")
         self.assertEqual(pagina.locator("#cuerpo tr").count(), 1)
+
+    def test_notas(self):
+        pagina = self.pagina("/panel.html")
+        pagina.once("dialog", lambda dialogo: dialogo.accept("para el finde"))
+        pagina.click('[data-nota="20"]')
+
+        fila = pagina.locator("#cuerpo tr[data-appid='20']")
+        self.assertEqual(fila.locator(".marca.nota").count(), 1)
+        self.assertEqual(pagina.get_attribute('[data-nota="20"]', "title"), "Editar nota")
+        self.assertIn("con nota", pagina.inner_text("#stats"))
+
+        pagina.reload()
+        self.assertEqual(
+            pagina.locator("#cuerpo tr[data-appid='20'] .marca.nota").count(), 1)
+        self.assertEqual(pagina.get_attribute('[data-nota="20"]', "title"), "Editar nota")
+
+        pagina.fill("#q", "finde")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(pagina.locator("#cuerpo tr").count(), 1)
+        self.assertIn("Beta", pagina.inner_text("#cuerpo"))
+
+        pagina.fill("#q", "nota:si")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(pagina.locator("#cuerpo tr").count(), 1)
+
+        pagina.fill("#q", "nota:no")
+        pagina.wait_for_timeout(250)
+        self.assertEqual(pagina.locator("#cuerpo tr").count(), 2)
+
+        pagina.fill("#q", "")
+        pagina.wait_for_timeout(250)
+        with pagina.expect_download() as descarga:
+            pagina.click("#guardarAjustes")
+        datos = json.loads(pathlib.Path(descarga.value.path()).read_text(encoding="utf-8"))
+        self.assertEqual(datos["notas"]["20"], "para el finde")
+
+        pagina.once("dialog", lambda dialogo: dialogo.accept(""))
+        pagina.click('[data-nota="20"]')
+        self.assertEqual(
+            pagina.locator("#cuerpo tr[data-appid='20'] .marca.nota").count(), 0)
+        self.assertNotIn("con nota", pagina.inner_text("#stats"))
+
+    def test_panel_detecta_actualizacion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            for nombre in ("library.csv", "snapshot.json"):
+                (d / nombre).write_bytes((self.datos / nombre).read_bytes())
+            sfl.generar_panel(d)
+            original = sfl.Handler.datos
+            original_servidor = sfl.Handler.servidor
+            sfl.Handler.datos = d
+            servidor = sfl.Servidor(("127.0.0.1", 0), sfl.Handler)
+            sfl.Handler.servidor = servidor
+            hilo = threading.Thread(target=servidor.serve_forever, daemon=True)
+            hilo.start()
+            try:
+                contexto = self.navegador.new_context(locale="es-ES")
+                self.addCleanup(contexto.close)
+                pagina = contexto.new_page()
+                pagina.goto(f"http://127.0.0.1:{servidor.server_address[1]}/panel.html")
+                self.assertFalse(pagina.evaluate("hayPanelNuevo()"))
+                snap = json.loads((d / "snapshot.json").read_text(encoding="utf-8"))
+                snap["fecha"] = "2027-01-01T00:00:00+00:00"
+                (d / "snapshot.json").write_text(json.dumps(snap), encoding="utf-8")
+                sfl.generar_panel(d)
+                self.assertTrue(pagina.evaluate("hayPanelNuevo()"))
+            finally:
+                servidor.shutdown()
+                servidor.server_close()
+                hilo.join(timeout=5)
+                sfl.Handler.datos = original
+                sfl.Handler.servidor = original_servidor
+
+    def test_imprimir(self):
+        pagina = self.pagina("/panel.html")
+        pagina.evaluate("window.print = () => { window.__impreso = true; }")
+        pagina.click("#imprimir")
+        self.assertTrue(pagina.evaluate("window.__impreso"))
+        pagina.emulate_media(media="print")
+        self.assertFalse(pagina.is_visible("#ajustes"))
+        self.assertFalse(pagina.is_visible(".controles"))
+        self.assertEqual(pagina.locator("#cuerpo tr").count(), 3)
+        pagina.emulate_media(media="screen")
+        self.assertTrue(pagina.is_visible("#ajustes"))
+
+    def test_ayuda(self):
+        pagina = self.pagina("/panel.html")
+        self.assertFalse(pagina.evaluate("document.getElementById('ayuda').open"))
+        pagina.keyboard.press("Shift+Slash")
+        self.assertTrue(pagina.evaluate("document.getElementById('ayuda').open"))
+        pagina.keyboard.press("Shift+Slash")
+        self.assertFalse(pagina.evaluate("document.getElementById('ayuda').open"))
 
     def test_accesibilidad_basica(self):
         script = """() => {

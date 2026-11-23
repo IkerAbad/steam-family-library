@@ -1,6 +1,14 @@
 # Objetivos
 
-> Estado: los ocho primeros y las tandas segunda a quinta están implementados.
+> Estado: los ocho primeros y las tandas segunda a sexta están implementados.
+
+## Sexta tanda (2.7.0)
+
+- Notas por juego, con búsqueda y filtros `nota:si` y `nota:no`.
+- Notas en la copia de ajustes y en el JSON exportado.
+- Descargar todo en ZIP desde la interfaz.
+- Recarga automática del panel tras una actualización.
+- Impresión limpia y ayuda de atajos con `?`.
 
 ## Quinta tanda (2.6.0)
 

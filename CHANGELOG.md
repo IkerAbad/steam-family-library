@@ -1,5 +1,14 @@
 # Cambios
 
+## 2.7.0 — 2026-11-23
+
+- Notas por juego: se crean, se editan, se borran, se buscan y se filtran con `nota:si` y `nota:no`.
+- Las notas van en la copia de ajustes y en el JSON exportado.
+- Descargar todo en un ZIP desde la interfaz local.
+- El panel se recarga solo cuando la app termina una actualización.
+- Botón e hoja de estilo para imprimir o guardar en PDF.
+- Ayuda de atajos y operadores con `?`.
+
 ## 2.6.0 — 2026-11-23
 
 - El historial recuerda si lo dejaste abierto.
