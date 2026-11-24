@@ -27,3 +27,9 @@ ajustes.json
 *.lock
 
 *.egg-info/
+
+# Local notes, never published
+AGENTS.md
+CLAUDE.md
+.opencode/
+.claude/
