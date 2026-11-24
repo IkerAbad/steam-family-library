@@ -5,8 +5,7 @@
 - El proyecto incluye `pyproject.toml`: se puede instalar con `pip install .` y
   ejecutar con el comando `steam-families`, con las mismas opciones que el
   script.
-- La distribución se llamará `steam-families-library`. La primera subida a PyPI
-  queda pendiente del límite de proyectos nuevos de la cuenta.
+- La distribución se llama `steam-families-library` y está publicada en PyPI.
 - Sin cambios de comportamiento.
 
 ## 3.0.1 — 2026-11-23
