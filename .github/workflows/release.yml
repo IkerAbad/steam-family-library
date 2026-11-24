@@ -1,12 +1,33 @@
-name: release
+name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
+  binarios:
+    name: Binario (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            nombre: steam-families
+            binario: dist/steam-families.exe
+          - os: ubuntu-latest
+            nombre: steam-families-linux
+            binario: dist/steam-families-linux
+          - os: macos-latest
+            nombre: steam-families-macos
+            binario: dist/steam-families-macos
+          - os: macos-15-intel
+            nombre: steam-families-macos-intel
+            binario: dist/steam-families-macos-intel
 
     steps:
       - uses: actions/checkout@v4
@@ -14,13 +35,71 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
 
-      - name: Build
+      - name: Instala dependencias
         run: |
-          python -m pip install --upgrade build
-          python -m build
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Empaqueta
+        run: python empaquetar.py --nombre ${{ matrix.nombre }}
+
+      - name: Comprueba el ejecutable
+        run: ${{ matrix.binario }} --version
+
+      - uses: actions/upload-artifact@v4
         with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
+          name: ${{ matrix.nombre }}
+          path: ${{ matrix.binario }}
+
+  publicar:
+    name: Publica la release
+    needs: binarios
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Crea el ZIP de Windows
+        run: |
+          python - <<'PY'
+          import zipfile
+
+          lanzador = (
+              "@echo off\r\n"
+              "title Steam Families\r\n"
+              '"%~dp0steam-families.exe" --datos "%~dp0datos"\r\n'
+              "if errorlevel 1 pause\r\n"
+          )
+          leeme = (
+              "Steam Families\r\n\r\n"
+              "1. Descomprime este ZIP en una carpeta.\r\n"
+              "2. Haz doble clic en iniciar.cmd.\r\n"
+              "3. Pega el token de Steam en la pagina que se abre.\r\n\r\n"
+              "Los datos se guardan en la carpeta datos.\r\n"
+          )
+          with zipfile.ZipFile("dist/steam-families.zip", "w", zipfile.ZIP_DEFLATED) as z:
+              z.write("dist/steam-families.exe", "steam-families.exe")
+              z.writestr("iniciar.cmd", lanzador)
+              z.writestr("LEEME.txt", leeme)
+              z.write("LICENSE", "LICENSE")
+              z.write("README.md", "README.md")
+          PY
+          unzip -l dist/steam-families.zip
+
+      - name: Crea la release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python notas_release.py "$GITHUB_REF_NAME" > notas.md
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Steam Families $GITHUB_REF_NAME" \
+            --notes-file notas.md \
+            dist/*
