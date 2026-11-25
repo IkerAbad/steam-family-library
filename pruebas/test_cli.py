@@ -76,7 +76,7 @@ class PruebaCli(unittest.TestCase):
             finally:
                 sfl.liberar_datos(candado)
             self.assertEqual(codigo, 1)
-            self.assertIn("otra ventana", texto)
+            self.assertTrue("otra ventana" in texto or "another Steam Families window" in texto)
             codigo, _ = self.ejecuta(["--panel", "--datos", str(d)])
             self.assertEqual(codigo, 0)
 
@@ -109,7 +109,7 @@ class PruebaCli(unittest.TestCase):
             codigo, texto = self.ejecuta(["--exportar", "--token", token_falso(),
                                           "--datos", tmp, "--sin-precios"])
             self.assertEqual(codigo, 1)
-            self.assertIn("rechazado", texto)
+            self.assertTrue("rechazado" in texto or "rejected" in texto)
 
     def test_interfaz_arranca_y_se_para(self):
         with tempfile.TemporaryDirectory() as tmp:

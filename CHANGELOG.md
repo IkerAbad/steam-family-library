@@ -1,5 +1,12 @@
 # Cambios
 
+## 3.1.2 — 2026-11-25
+
+- La interfaz y los mensajes salen en inglés por defecto. El español sigue
+  disponible desde el selector de idioma.
+- El atributo `lang` del documento y el título de la página siguen al idioma
+  elegido.
+
 ## 3.1.1 — 2026-11-25
 
 - Corregido un fallo que rompía la actualización automática al arrancar: el

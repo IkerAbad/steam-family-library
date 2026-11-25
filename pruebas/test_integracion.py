@@ -139,7 +139,7 @@ class PruebaIntegracion(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(SystemExit) as error:
                 sfl.exportar(pathlib.Path(tmp), self.token(), con_precios=False)
-            self.assertIn("grupo familiar", str(error.exception))
+            self.assertTrue("grupo familiar" in str(error.exception) or "family group" in str(error.exception))
 
     def test_sin_apps(self):
         SteamFalso.sin_apps = True

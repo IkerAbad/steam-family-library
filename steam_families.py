@@ -39,7 +39,7 @@ from pathlib import Path
 API = "https://api.steampowered.com"
 COMUNIDAD = "https://steamcommunity.com"
 TIENDA = "https://store.steampowered.com"
-VERSION = "3.1.1"
+VERSION = "3.1.2"
 UA = f"steam-family-library/{VERSION}"
 EXCLUDE_REASONS = {
     0: "",
@@ -58,10 +58,10 @@ _IDIOMA = threading.local()
 
 
 def idioma(valor=None):
-    """Idioma de la petición en curso: «es» por defecto, «en» si la interfaz está en inglés."""
+    """Idioma de la petición en curso: «en» por defecto, «es» si la interfaz está en español."""
     if valor is not None:
         _IDIOMA.valor = "en" if str(valor).lower().startswith("en") else "es"
-    return getattr(_IDIOMA, "valor", "es")
+    return getattr(_IDIOMA, "valor", "en")
 
 
 def tr(es, en):
@@ -590,12 +590,12 @@ def leer_json(ruta, defecto=None):
 
 
 PLANTILLA = r"""<!doctype html>
-<html lang="es">
+<html lang="__LANG__">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%2366c0f4'/><text x='8' y='12' font-size='10' font-family='sans-serif' text-anchor='middle' fill='%2312151a'>S</text></svg>">
-<title>Biblioteca familiar de Steam</title>
+<title>__TITULO__</title>
 <script>try{const t=localStorage.getItem("sf-tema");document.documentElement.dataset.tema=(t==="claro"||t==="oscuro")?t:(matchMedia("(prefers-color-scheme: light)").matches?"claro":"oscuro");}catch(e){}</script>
 <style>
 :root { --fondo:#12151a; --panel:#1a1f26; --borde:#2a313b; --texto:#dfe6ee; --suave:#8b98a8; --acento:#66c0f4; --verde:#7bd88f; --ambar:#e0b341; --rojo:#e06c6c; }
@@ -3039,6 +3039,8 @@ def generar_panel(datos):
 
     blob = json.dumps(juegos, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     html = PLANTILLA.replace("__FECHA_NOV__", json.dumps(nov.get("fecha", ""), ensure_ascii=False))
+    html = html.replace("__LANG__", idioma())
+    html = html.replace("__TITULO__", tr("Biblioteca familiar de Steam", "Steam family library"))
     html = html.replace("__HAY_NOV__", "true" if marca else "false")
     html = html.replace("__ACTUALIZADO__", json.dumps(snap.get("fecha", ""), ensure_ascii=False))
     sin_nombre = sum(1 for v in alias.values() if str(v).startswith("Miembro "))
@@ -3509,7 +3511,7 @@ class Handler(BaseHTTPRequestHandler):
         idioma((consulta.get("lang") or [""])[0])
         pedida = urllib.parse.urlparse(self.path).path
         if pedida in ("/", "/index.html"):
-            self._enviar(200, PAGINA.replace("__VERSION__", VERSION), "text/html; charset=utf-8")
+            self._enviar(200, PAGINA.replace("__VERSION__", VERSION).replace("__LANG__", idioma()), "text/html; charset=utf-8")
             return
         if pedida == "/api/estado":
             self._enviar(200, estado(self.datos))
@@ -3698,7 +3700,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 PAGINA = r"""<!doctype html>
-<html lang="es">
+<html lang="__LANG__">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
