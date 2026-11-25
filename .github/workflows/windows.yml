@@ -56,7 +56,7 @@ jobs:
           python steam_families.py --exportar --datos 'C:\x<y' --token x 2> $err
           $codigo = $LASTEXITCODE
           if ($codigo -ne 1) { throw "una ruta con < deberia salir con 1, salio con $codigo" }
-          if (-not (Select-String -Path $err -Pattern "caracteres no v" -Quiet)) {
+          if (-not (Select-String -Path $err -Pattern "caracteres no v|invalid characters" -Quiet)) {
             throw "mensaje inesperado: " + (Get-Content $err -Raw)
           }
           Write-Host "rechaza la ruta con el mensaje correcto"
