@@ -102,4 +102,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "Steam Families $GITHUB_REF_NAME" \
             --notes-file notas.md \
-            dist/*
+            dist/* || gh release upload "$GITHUB_REF_NAME" dist/* --clobber
