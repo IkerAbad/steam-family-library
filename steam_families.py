@@ -39,7 +39,7 @@ from pathlib import Path
 API = "https://api.steampowered.com"
 COMUNIDAD = "https://steamcommunity.com"
 TIENDA = "https://store.steampowered.com"
-VERSION = "3.1.0"
+VERSION = "3.1.1"
 UA = f"steam-family-library/{VERSION}"
 EXCLUDE_REASONS = {
     0: "",
@@ -4583,7 +4583,7 @@ def interfaz(args):
         cada = 6.0 if guardado is None else guardado
     Handler.cada = cada
     threading.Thread(target=actualizacion_periodica,
-                     args=(datos, lambda: type(Handler).cada * 3600),
+                     args=(datos, lambda: Handler.cada * 3600),
                      daemon=True).start()
     url = f"http://127.0.0.1:{servidor.server_address[1]}/"
     print(f"Datos: {datos}")

@@ -1,5 +1,12 @@
 # Cambios
 
+## 3.1.1 — 2026-11-25
+
+- Corregido un fallo que rompía la actualización automática al arrancar: el
+  intervalo se leía de `type(Handler).cada` en lugar de `Handler.cada`, así que
+  el hilo periódico lanzaba `AttributeError` y se cerraba.
+- Sin cambios de comportamiento en el resto.
+
 ## 3.1.0 — 2026-11-23
 
 - El proyecto incluye `pyproject.toml`: se puede instalar con `pip install .` y
